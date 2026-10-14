@@ -54,6 +54,11 @@ const api: VisApi = {
   clearInbox: () => ipcRenderer.invoke('inbox:clear'),
   showInbox: () => ipcRenderer.invoke('inbox:show'),
   onNavigate: (cb) => on('ui:navigate', cb),
+  getUpdates: () => ipcRenderer.invoke('updates:state'),
+  checkForUpdates: () => ipcRenderer.invoke('updates:check'),
+  downloadUpdate: () => ipcRenderer.invoke('updates:download'),
+  installUpdate: () => ipcRenderer.invoke('updates:install'),
+  onUpdates: (cb) => on('updates', cb),
 };
 
 contextBridge.exposeInMainWorld('api', api);

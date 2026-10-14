@@ -12,6 +12,7 @@ export interface AppConfig {
   closeToTray: boolean;
   miniAlwaysOnTop: boolean;
   launchAtLogin: boolean;
+  autoDownloadUpdates: boolean;
   miniHotkey: string;
   onboardingDone?: boolean;
   onboardingVersion?: number;
@@ -26,6 +27,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   closeToTray: true,
   miniAlwaysOnTop: true,
   launchAtLogin: false,
+  autoDownloadUpdates: true,
   miniHotkey: DEFAULT_MINI_HOTKEY,
   localModels: DEFAULT_LOCAL_CONFIG,
 };

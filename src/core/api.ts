@@ -4,6 +4,7 @@ import type { HookInstallState, StatusLineState } from './hooksConfig';
 import type { UsageView } from './usage';
 import type { SessionSummary, SessionView } from './state';
 import type { InboxSnapshot } from './inbox';
+import type { UpdateView } from './updates';
 import type { LocalModelsConfig, LocalModelsView } from './localModels';
 
 export interface AppConfigView {
@@ -14,6 +15,7 @@ export interface AppConfigView {
   closeToTray: boolean;
   miniAlwaysOnTop: boolean;
   launchAtLogin: boolean;
+  autoDownloadUpdates: boolean;
   miniHotkey: string;
   onboardingDone?: boolean;
   onboardingVersion?: number;
@@ -118,4 +120,12 @@ export interface VisApi {
   showInbox(): Promise<void>;
   /** the main process asks the window to show a page (tray menu, notification) */
   onNavigate(cb: (page: string) => void): () => void;
+  /** auto-update state (see core/updates.ts) */
+  getUpdates(): Promise<UpdateView>;
+  checkForUpdates(): Promise<UpdateView>;
+  /** start the download when "Automatically download updates" is off */
+  downloadUpdate(): Promise<UpdateView>;
+  /** quit and install the downloaded update */
+  installUpdate(): Promise<boolean>;
+  onUpdates(cb: (u: UpdateView) => void): () => void;
 }

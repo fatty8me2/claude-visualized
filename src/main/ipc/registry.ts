@@ -4,12 +4,14 @@ import type { InboxService } from '../inbox';
 import type { LocalMonitor } from '../localMonitor';
 import type { SessionManager } from '../manager';
 import type { SystemInfoView } from '@core/api';
+import type { Updater } from '../updater';
 import type { UsageView } from '@core/usage';
 import { registerConfigIpc } from './config';
 import { registerInboxIpc } from './inbox';
 import { registerLocalIpc } from './local';
 import { registerSessionsIpc } from './sessions';
 import { registerSystemIpc } from './system';
+import { registerUpdatesIpc } from './updates';
 import { registerUsageIpc } from './usage';
 
 /**
@@ -33,6 +35,7 @@ export interface IpcContext {
   showInbox: () => void;
   /** true once if the tray asked for the settings dialog while the window was still loading */
   takePendingOpenSettings: () => boolean;
+  updater: Updater;
 }
 
 /** One module per area, each exporting a function that registers that area's `ipcMain.handle` channels. */
@@ -50,6 +53,7 @@ export const IPC_AREAS: readonly IpcRegistrar[] = [
   registerSystemIpc,
   registerLocalIpc,
   registerInboxIpc,
+  registerUpdatesIpc,
 ];
 
 export function registerAllIpc(ctx: IpcContext): void {
