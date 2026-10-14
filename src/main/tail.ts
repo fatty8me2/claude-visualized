@@ -1,5 +1,12 @@
 import fs from 'node:fs/promises';
 
+/** structured-clone friendly read position, so a worker can hand a file over to the main thread */
+export interface TailSnapshot {
+  offset: number;
+  mtimeMs: number;
+  partial: Uint8Array;
+}
+
 /**
  * Incremental line reader for an append-only file. Polling + byte offsets is more reliable
  * on Windows than fs.watch. A file that shrinks is reported as truncated so callers can rebuild.
@@ -42,6 +49,16 @@ export class FileTail {
     }
     this.partial = Buffer.from(data.subarray(nl + 1));
     return data.subarray(0, nl).toString('utf8').split('\n');
+  }
+
+  snapshot(): TailSnapshot {
+    return { offset: this.offset, mtimeMs: this.mtimeMs, partial: new Uint8Array(this.partial) };
+  }
+
+  restore(s: TailSnapshot) {
+    this.offset = s.offset;
+    this.mtimeMs = s.mtimeMs;
+    this.partial = Buffer.from(s.partial);
   }
 
   reset() {
