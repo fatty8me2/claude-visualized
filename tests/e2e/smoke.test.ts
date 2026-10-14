@@ -74,7 +74,10 @@ describe('app smoke (fixture data)', () => {
     expect(timeline).toContain('npm test');
     expect(await drawer.getByTestId('commands').innerText()).toContain('npm test');
     await page.screenshot({ path: path.join(ART, 'agent-drawer.png') });
+    // the open drawer can cover other cards when the plan rail narrows the graph
+    await drawer.getByRole('button', { name: '×' }).click();
     await page.locator('[data-agent="a1"]').click();
+    await drawer.waitFor();
     expect(await drawer.getByTestId('task').innerText()).toBe('find it');
     expect(await drawer.getByTestId('files').count()).toBe(0);
     await drawer.getByRole('button', { name: '×' }).click();
