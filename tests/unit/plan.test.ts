@@ -24,9 +24,10 @@ describe('parsePlan', () => {
 - npm test passes
 `);
     expect(p.title).toBe('Ship retries');
-    expect(p.sections.map((s) => s.title)).toEqual(['Implementation', 'Verification']);
-    expect(p.steps.map((s) => s.title)).toEqual(['Add retry to the api client', 'Update the docs', 'Run the test suite', 'npm test passes']);
-    expect(p.steps.map((s) => s.section)).toEqual([0, 0, 0, 1]);
+    // Implementation names the work, so Verification is reference material
+    expect(p.sections.map((s) => s.title)).toEqual(['Implementation']);
+    expect(p.steps.map((s) => s.title)).toEqual(['Add retry to the api client', 'Update the docs', 'Run the test suite']);
+    expect(p.steps.map((s) => s.section)).toEqual([0, 0, 0]);
   });
 
   it('reads checkboxes with their state and nesting', () => {
@@ -287,5 +288,36 @@ describe('plan events', () => {
       ...normalizeLine(line({ type: 'user', timestamp: '2026-10-01T10:00:05Z', toolUseResult: { isAsync: true, status: 'async_launched', agentId: 'a2', description: 'run tests' }, message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_A' }] } }), ctx),
     ];
     expect(foldEvents('s1', evs).agents.a2.prompt).toBe('please run the unit tests');
+  });
+});
+
+describe('plan sections that hold the work', () => {
+  it('uses only Milestones/Steps sections when the plan has them, and skips file-path items', async () => {
+    const { parsePlan } = await import('@core/plan');
+    const md = [
+      '# Agent Visualizer plan',
+      '## Architecture',
+      '- **Live session:** transcript modified recently',
+      '- **Which source wins:** hooks for timing',
+      '## Key files',
+      '- `src/shared/events.ts`: unified event union',
+      '- `src/main/{indexer,tailer}.ts`',
+      '## Milestones',
+      '**M0 – Scaffold:** electron-vite app.',
+      '- **M0 – Scaffold:** electron-vite React-TS app',
+      '- **M1 – MVP:** live view',
+      '  - Session picker.',
+      '- **M2 – Hooks:** hook server',
+      '## Risks',
+      '- Unstable transcript format',
+    ].join('\n');
+    const p = parsePlan(md);
+    expect(p.steps.map((s) => s.title)).toEqual(['M0 – Scaffold', 'M1 – MVP', 'M2 – Hooks']);
+  });
+
+  it('without work sections, file-path bullets still are not steps', async () => {
+    const { parsePlan } = await import('@core/plan');
+    const p = parsePlan(['# P', '## Changes', '- `src/a/b.ts`', '- Add retry to the api client', '- src/x/{y,z}.tsx'].join('\n'));
+    expect(p.steps.map((s) => s.title)).toEqual(['Add retry to the api client']);
   });
 });

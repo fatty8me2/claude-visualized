@@ -40,6 +40,19 @@ const DETAIL_CAP = 400;
 const INFO_RE =
   /^(?:(?:part|section|phase|step)\s+\w+\s*[:.\-–—]\s*)?(context|background|overview|goals?|non-?goals?|summary|findings?|stack|data sources?|(?:user |key )?decisions?(?: \(.*\))?|notes?|risks?|assumptions?|open (?:questions?|problems?)|current state|measured|constraints?|out of scope|references?|motivation|problem|what (?:already )?exists|what the .* does|the experience|critical files|why|execution model|how (?:it|this) works)\b/i;
 
+/** sections that hold the actual work, when a plan has them the other sections are reference material */
+const WORK_RE = /^(?:\d+[.)]?\s*)?(?:the\s+)?(milestones?|steps?|phases?|tasks?|implementation(?:\s+(?:plan|steps|order))?|work\s*plan|roadmap|to-?dos?|order of work|execution plan|build order)\b/i;
+
+export function isWorkHeading(title: string): boolean {
+  return WORK_RE.test(title.trim().replace(/^[§#]\s*\d*\s*/, ''));
+}
+
+/** a list item that is just a file path or path list ("src/main/{a,b}.ts"), not a piece of work */
+function isPathItem(raw: string): boolean {
+  const t = stripMd(raw).replace(/[:,;]\s*$/, '');
+  return !/\s/.test(t) && /[\/]|\.[a-z]{1,5}$/i.test(t);
+}
+
 export function isInfoHeading(title: string): boolean {
   return INFO_RE.test(title.trim().replace(/^\d+[.)]?\s*/, '').replace(/^[§#]\s*\d*\s*/, ''));
 }
@@ -168,12 +181,24 @@ export function parsePlan(md: string): ParsedPlan {
     steps.push({ id: `s${steps.length + 1}`, text: cap(stripMd(text), TEXT_CAP), title: makeTitle(text), detail: cap(stripMd(detail), DETAIL_CAP), section: si, depth, checked });
   };
 
+  // when the plan names its work sections (Milestones, Steps, Phases…), only those hold steps;
+  // subsections nested under them count too
+  const workSecs = new Set<RawSection>();
+  let workLevel = 0;
+  for (const sec of secs) {
+    if (sec.level && workLevel && sec.level <= workLevel) workLevel = 0;
+    if (sec.level && isWorkHeading(sec.title)) workLevel = sec.level;
+    if (workLevel && !sec.info) workSecs.add(sec);
+  }
+  const workOnly = [...workSecs].some((x) => x.items.length > 0);
+
   for (const sec of secs) {
     // items before the first heading are preamble, not steps
     if (sec.info || !sec.items.length || (!sec.title && !sec.level)) continue;
+    if (workOnly && !workSecs.has(sec)) continue;
     const strong = sec.items.some((i) => i.depth === 0 && (i.numbered || i.checked !== null));
     // attach non-step items to their nearest step ancestor as detail
-    const isStep = (i: RawItem) => (strong ? i.numbered || i.checked !== null : i.depth === 0) && (i.depth === 0 || i.numbered || i.checked !== null);
+    const isStep = (i: RawItem) => (strong ? i.numbered || i.checked !== null : i.depth === 0) && (i.depth === 0 || i.numbered || i.checked !== null) && !isPathItem(i.raw);
     for (const it of sec.items) {
       if (isStep(it)) continue;
       let p = it.parent;
