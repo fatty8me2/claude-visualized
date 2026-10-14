@@ -3,6 +3,7 @@ import type { AgentEvent } from './events';
 import type { HookInstallState, StatusLineState } from './hooksConfig';
 import type { UsageView } from './usage';
 import type { SessionSummary, SessionView } from './state';
+import type { HistoryStatus, HistorySummary, SearchArgs, SearchResult, SummaryArgs } from './history';
 import type { LocalModelsConfig, LocalModelsView } from './localModels';
 
 export interface AppConfigView {
@@ -87,6 +88,12 @@ export interface VisApi {
   getUsage(): Promise<UsageView>;
   refreshUsage(): Promise<void>;
   onUsage(cb: (u: UsageView) => void): () => void;
+  /** history index (local SQLite built from the transcripts) */
+  historyStatus(): Promise<HistoryStatus>;
+  historySummary(args: SummaryArgs): Promise<HistorySummary>;
+  historySearch(args: SearchArgs): Promise<SearchResult>;
+  historyRebuild(): Promise<void>;
+  onHistory(cb: (s: HistoryStatus) => void): () => void;
   /** open the session in the Claude desktop app (claude:// deep link) */
   openInClaude(id: string): Promise<{ ok: boolean; url?: string; error?: string }>;
   getSystemInfo(): Promise<SystemInfoView>;

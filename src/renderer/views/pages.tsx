@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { HistoryPage } from '../components/HistoryPage';
 import { LocalModelsPage } from '../components/LocalModelsPage';
 import { Overview } from '../components/Overview';
 import { SessionView, type SessionViewProps } from './SessionView';
@@ -93,6 +94,16 @@ export const PAGES: readonly PageDef[] = [
     group: 'nav',
     testId: 'nav-local',
     render: (ctx) => <LocalModelsPage onOpenSession={ctx.openSession} onSettings={ctx.openSettings} />,
+  },
+  {
+    id: 'history',
+    icon: '▤',
+    label: 'history',
+    title: 'Usage, cost and search across every past session',
+    collapsedTitle: 'History and search',
+    group: 'nav',
+    testId: 'nav-history',
+    render: (ctx) => <HistoryPage onOpenSession={ctx.openSession} />,
   },
 ];
 

@@ -5,6 +5,7 @@ import type { SessionManager } from '../manager';
 import type { SystemInfoView } from '@core/api';
 import type { UsageView } from '@core/usage';
 import { registerConfigIpc } from './config';
+import { registerHistoryIpc } from './history';
 import { registerLocalIpc } from './local';
 import { registerSessionsIpc } from './sessions';
 import { registerSystemIpc } from './system';
@@ -38,7 +39,7 @@ export type IpcRegistrar = (ctx: IpcContext) => void;
  * (`export const registerInboxIpc: IpcRegistrar = (ctx) => { ipcMain.handle('inbox:get', ...) }`), then add ONE line to this array.
  * Channel names are `<area>:<verb>`; the renderer-facing method goes in src/core/api.ts (VisApi) and src/preload/index.ts.
  */
-export const IPC_AREAS: readonly IpcRegistrar[] = [registerSessionsIpc, registerUsageIpc, registerConfigIpc, registerSystemIpc, registerLocalIpc];
+export const IPC_AREAS: readonly IpcRegistrar[] = [registerSessionsIpc, registerUsageIpc, registerConfigIpc, registerSystemIpc, registerLocalIpc, registerHistoryIpc];
 
 export function registerAllIpc(ctx: IpcContext): void {
   for (const register of IPC_AREAS) register(ctx);
