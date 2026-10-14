@@ -233,6 +233,17 @@ const overviewWatchers = new Set<number>();
 
 function registerIpc() {
   ipcMain.handle('usage:get', () => usage);
+  ipcMain.handle('session:openInClaude', async (_e, id: string) => {
+    const url = manager.deepLink(id);
+    // tests must not launch the real Claude app
+    if (process.env.CLAUDE_VIS_NO_EXTERNAL) return { ok: true, url };
+    try {
+      await shell.openExternal(url);
+      return { ok: true, url };
+    } catch (err) {
+      return { ok: false, url, error: (err as Error).message };
+    }
+  });
   ipcMain.handle('overview:get', () => manager.overview());
   ipcMain.handle('overview:watch', (e, on: boolean) => {
     const id = e.sender.id;
@@ -297,7 +308,7 @@ if (!app.requestSingleInstanceLock()) {
     manager.on('overview', (v) => broadcast('overview', v));
     manager.on('selected', (id) => broadcast('selected', id));
     manager.on('notify', notify);
-    manager.on('quota', (q) => setUsage(applyQuota(usage, q)));
+    manager.on('quota', (q) => setUsage(applyQuota(usage, q, Date.now())));
     loadUsage();
     // windows that reset while the app was closed, and countdowns crossing a reset
     setInterval(() => setUsage(usage), 30_000);

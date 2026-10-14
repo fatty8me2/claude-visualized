@@ -58,8 +58,9 @@ export function applyStatusline(u: UsageView, payload: Json, now: number): Usage
 }
 
 /** A transcript record of a limit being hit pins that window at 100% until it resets. */
-export function applyQuota(u: UsageView, q: { limitType: string; status: string; resetsAt: number | null; ts: number }): UsageView {
-  if (q.status !== 'rejected') return u;
+export function applyQuota(u: UsageView, q: { limitType: string; status: string; resetsAt: number | null; ts: number }, now: number): UsageView {
+  // a limit that has since reset says nothing about now
+  if (q.status !== 'rejected' || !q.resetsAt || q.resetsAt <= now) return u;
   const key = q.limitType === 'five_hour' ? 'fiveHour' : q.limitType === 'seven_day' ? 'sevenDay' : null;
   if (!key) return u;
   const cur = u[key];
@@ -67,8 +68,15 @@ export function applyQuota(u: UsageView, q: { limitType: string; status: string;
   return { ...u, [key]: { pct: 100, resetsAt: q.resetsAt, at: q.ts, source: 'transcript' } };
 }
 
-/** Windows whose reset time has passed restart at 0% (until the next reading). */
+/**
+ * After a window's reset time: a status-line window restarts at 0% until the next reading; a
+ * transcript-only reading (limit hit) is dropped, since nothing is known about the new window.
+ */
 export function settleUsage(u: UsageView, now: number): UsageView {
-  const fix = <T extends UsageWindow>(w: T | null): T | null => (w && w.resetsAt && w.resetsAt <= now ? { ...w, pct: 0, resetsAt: null, at: now } : w);
+  const fix = <T extends UsageWindow>(w: T | null): T | null => {
+    if (!w) return w;
+    if (w.source === 'transcript' && (!w.resetsAt || w.resetsAt <= now)) return null;
+    return w.resetsAt && w.resetsAt <= now ? { ...w, pct: 0, resetsAt: null, at: now } : w;
+  };
   return { ...u, fiveHour: fix(u.fiveHour), sevenDay: fix(u.sevenDay), spend: fix(u.spend) };
 }

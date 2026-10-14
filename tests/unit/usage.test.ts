@@ -23,16 +23,20 @@ describe('usage limits', () => {
   });
 
   it('pins a window at 100% when a transcript records the limit being hit, unless a newer reading exists', () => {
-    const hit = applyQuota(emptyUsage(), { limitType: 'five_hour', status: 'rejected', resetsAt: NOW + 7200_000, ts: NOW });
+    const hit = applyQuota(emptyUsage(), { limitType: 'five_hour', status: 'rejected', resetsAt: NOW + 7200_000, ts: NOW }, NOW);
     expect(hit.fiveHour).toMatchObject({ pct: 100, source: 'transcript' });
     const newer = applyStatusline(emptyUsage(), { rate_limits: { five_hour: { used_percentage: 3, resets_at: sec(NOW + 9e6) } } }, NOW + 10);
-    expect(applyQuota(newer, { limitType: 'five_hour', status: 'rejected', resetsAt: NOW, ts: NOW })).toBe(newer);
-    expect(applyQuota(emptyUsage(), { limitType: 'five_hour', status: 'allowed', resetsAt: null, ts: NOW }).fiveHour).toBeNull();
+    expect(applyQuota(newer, { limitType: 'five_hour', status: 'rejected', resetsAt: NOW + 9e6, ts: NOW }, NOW)).toBe(newer);
+    expect(applyQuota(emptyUsage(), { limitType: 'five_hour', status: 'allowed', resetsAt: null, ts: NOW }, NOW).fiveHour).toBeNull();
+    // a limit hit in September that has long reset is ignored (it showed up as a bogus 0%)
+    expect(applyQuota(emptyUsage(), { limitType: 'five_hour', status: 'rejected', resetsAt: NOW - 86400_000, ts: NOW - 90000_000 }, NOW).fiveHour).toBeNull();
   });
 
   it('resets windows whose reset time has passed', () => {
-    const u = applyQuota(emptyUsage(), { limitType: 'seven_day', status: 'rejected', resetsAt: NOW - 1, ts: NOW - 100 });
-    expect(settleUsage(u, NOW).sevenDay).toMatchObject({ pct: 0, resetsAt: null });
+    const sl = applyStatusline(emptyUsage(), { rate_limits: { seven_day: { used_percentage: 70, resets_at: sec(NOW - 1000) } } }, NOW - 5000);
+    expect(settleUsage(sl, NOW).sevenDay).toMatchObject({ pct: 0, resetsAt: null });
+    const tr = applyQuota(emptyUsage(), { limitType: 'seven_day', status: 'rejected', resetsAt: NOW + 10, ts: NOW - 100 }, NOW);
+    expect(settleUsage(tr, NOW + 20).sevenDay).toBeNull();
   });
 
   it('parses quotaLimits from transcript lines', () => {

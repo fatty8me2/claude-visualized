@@ -43,7 +43,16 @@ function Panel({ v, index, now, onOpen }: { v: SessionView; index: number; now: 
             agents {running}/{subs.length} · {formatTokens(tokens)} tok{v.costUSD != null ? ` · $${v.costUSD.toFixed(2)}` : ''}
           </span>
         </div>
-        <span className="ov-open">open ›</span>
+        <button
+          className="ov-claude"
+          title="Open in the Claude desktop app"
+          onClick={(e) => {
+            e.stopPropagation();
+            void window.api.openInClaude(v.id);
+          }}
+        >
+          ↗ Claude
+        </button>
       </header>
       {main?.currentTool && (
         <div className={`ov-tool ${famClass(main.model)}`}>

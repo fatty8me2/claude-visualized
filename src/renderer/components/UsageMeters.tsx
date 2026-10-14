@@ -29,7 +29,7 @@ function Meter({ label, w, span, now, compact }: { label: string; w: UsageWindow
         <span className="m-bar">
           <i style={{ width: 0 }} />
         </span>
-        <span className="m-pct">—</span>
+        <span className="m-pct">no data</span>
       </div>
     );
   }

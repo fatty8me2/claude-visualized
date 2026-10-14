@@ -5,6 +5,7 @@ import { normalizeHook } from '@core/normalize';
 import { MAIN, toView, type AgentStatus, type SessionSummary, type SessionView } from '@core/state';
 import { SessionIndexer, LIVE_MS } from './indexer';
 import { SessionWatcher } from './watcher';
+import { claudeDeepLink } from './desktopSessions';
 
 const POLL_MS = 600;
 const SCAN_MS = 2500;
@@ -91,6 +92,11 @@ export class SessionManager extends EventEmitter {
     return this.selectedId;
   }
 
+  /** claude:// link that opens this session in the desktop app */
+  deepLink(id: string): string {
+    return claudeDeepLink(id, this.indexer.desktop.byCliId.get(id));
+  }
+
   getSummaries(): SessionSummary[] {
     return this.summaries;
   }
@@ -162,9 +168,13 @@ export class SessionManager extends EventEmitter {
         s.mode = w.state.mode;
         s.waiting = w.state.agents[MAIN]?.status === 'waiting';
         if (w.state.title && w.state.titleKind !== 'prompt') s.title = w.state.title;
-        const act = Math.max(w.state.lastActivity ?? 0, w.mtimeMs);
+        // transcript timestamps only: file mtimes move when the desktop app rewrites old transcripts
+        const act = w.state.lastActivity ?? 0;
         if (act > s.mtime) s.mtime = act;
-        s.live = Date.now() - s.mtime < LIVE_MS && !w.state.ended;
+        const main = w.state.agents[MAIN];
+        // a long tool call writes nothing until it returns, but the session is still working
+        const busy = !!main?.currentTool || main?.status === 'waiting' || agents.some((a) => a.status === 'running' && a.currentTool && Date.now() - a.lastActivity < 30 * 60_000);
+        s.live = !w.state.ended && (Date.now() - s.mtime < LIVE_MS || (busy && Date.now() - s.mtime < 60 * 60_000));
       }
     }
     this.emit('sessions', this.summaries);

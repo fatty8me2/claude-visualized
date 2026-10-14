@@ -11,6 +11,7 @@ export interface AppConfigView {
   notifyAgentDone: boolean;
   closeToTray: boolean;
   miniAlwaysOnTop: boolean;
+  openInClaudeOnClick: boolean;
 }
 
 export interface HookServerStatusView {
@@ -62,6 +63,8 @@ export interface VisApi {
   hookApply(action: 'install' | 'uninstall'): Promise<{ ok: boolean; backup?: string | null; error?: string }>;
   getUsage(): Promise<UsageView>;
   onUsage(cb: (u: UsageView) => void): () => void;
+  /** open the session in the Claude desktop app (claude:// deep link) */
+  openInClaude(id: string): Promise<{ ok: boolean; url?: string; error?: string }>;
   toggleMini(): Promise<void>;
   showMain(): Promise<void>;
   openPath(p: string): Promise<void>;

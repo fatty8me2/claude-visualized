@@ -190,6 +190,7 @@ export interface SessionSummary {
   project: string;
   cwd: string | null;
   title: string | null;
+  /** last real activity (transcript timestamps, desktop lastActivityAt, subagent writes) */
   mtime: number;
   size: number;
   live: boolean;
@@ -197,4 +198,8 @@ export interface SessionSummary {
   running?: number;
   mode?: string;
   waiting?: boolean;
+  /** the Claude desktop app's own id (local_…) when it knows this session */
+  desktopId?: string | null;
+  /** hidden in the desktop app's sidebar */
+  archived?: boolean;
 }

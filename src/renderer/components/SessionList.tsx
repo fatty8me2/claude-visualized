@@ -10,9 +10,20 @@ function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: 
       <span className={`dot ${dot}`} />
       <span className="t">{s.title ?? '(untitled)'}</span>
       <span style={{ display: 'flex', gap: 4 }}>
+        {s.archived && <span className="badge" title="Archived in the Claude desktop app (hidden from its sidebar)">archived</span>}
         {s.mode === 'plan' && s.live && <span className="badge plan">plan</span>}
         {!!s.running && <span className="badge run">{s.running}▸</span>}
       </span>
+      <button
+        className="row-claude"
+        title="Open in the Claude desktop app"
+        onClick={(e) => {
+          e.stopPropagation();
+          void window.api.openInClaude(s.id);
+        }}
+      >
+        ↗
+      </button>
       <span className="sub">
         {s.project} · {ago(s.mtime, now)}
         {s.entrypoint === 'claude-desktop' ? ' · desktop' : s.entrypoint === 'cli' ? ' · cli' : ''}

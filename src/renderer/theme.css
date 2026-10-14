@@ -1179,6 +1179,8 @@ select:focus {
   text-align: right;
 }
 .meter.empty .m-pct {
+  min-width: 0;
+  font-weight: 400;
   color: var(--faint);
 }
 .m-reset {
@@ -1202,4 +1204,27 @@ select:focus {
 }
 .mini-usage {
   padding: 6px 10px 0;
+}
+
+/* open-in-Claude affordances */
+.session-row {
+  position: relative;
+}
+.row-claude {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 16px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.session-row:hover .row-claude {
+  opacity: 1;
+}
+.ov-claude {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  font-size: 11px;
 }

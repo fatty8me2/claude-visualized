@@ -12,12 +12,14 @@ const ROOT = path.resolve(__dirname, '../..');
 const ART = path.join(ROOT, 'tests/e2e/artifacts');
 const PORT = 47899;
 
+const freshLine = (sid: string) => JSON.stringify({ type: 'system', subtype: 'turn_duration', sessionId: sid, timestamp: new Date().toISOString() }) + '\n';
+
 async function launch(env: Record<string, string>) {
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-ud-'));
   const app = await electron.launch({
     args: [ROOT],
     cwd: ROOT,
-    env: { ...process.env, CLAUDE_VIS_USER_DATA: userData, CLAUDE_VIS_PORT: String(PORT), ...env } as Record<string, string>,
+    env: { ...process.env, CLAUDE_VIS_USER_DATA: userData, CLAUDE_VIS_PORT: String(PORT), CLAUDE_VIS_NO_EXTERNAL: '1', CLAUDE_VIS_DESKTOP_DIR: path.join(userData, 'no-desktop'), ...env } as Record<string, string>,
   });
   const page = await app.firstWindow();
   await page.setViewportSize({ width: 1440, height: 920 }).catch(() => {});
@@ -34,9 +36,8 @@ describe('app smoke (fixture data)', () => {
     fs.mkdirSync(ART, { recursive: true });
     home = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-home-'));
     writeFixture(home);
-    // make the fixture look live
-    const now = new Date();
-    for (const f of fs.readdirSync(path.join(home, 'projects', 'C--demo-app'))) fs.utimesSync(path.join(home, 'projects', 'C--demo-app', f), now, now);
+    // liveness comes from transcript timestamps: add a current one
+    fs.appendFileSync(path.join(home, 'projects', 'C--demo-app', `${SID}.jsonl`), freshLine(SID));
     ({ app, page, userData } = await launch({ CLAUDE_VIS_HOME: home }));
   });
 
@@ -107,7 +108,7 @@ describe('app smoke (fixture data)', () => {
       .replaceAll(SID, SID2)
       .replaceAll('Retry + docs', 'Second session')
       .replaceAll('C:\\\\demo\\\\app', 'C:\\\\other\\\\proj');
-    fs.writeFileSync(path.join(p2, `${SID2}.jsonl`), lines);
+    fs.writeFileSync(path.join(p2, `${SID2}.jsonl`), lines + freshLine(SID2));
     await page.getByRole('button', { name: /all sessions/ }).click();
     await page.locator(`.ov-panel[data-session="${SID2}"]`).waitFor({ timeout: 15_000 });
     expect(await page.locator('.ov-panel').count()).toBe(2);

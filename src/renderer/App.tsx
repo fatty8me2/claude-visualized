@@ -66,6 +66,7 @@ export function App() {
   const openSession = (id: string) => {
     void window.api.select(id);
     setPage('session');
+    if (config?.openInClaudeOnClick) void window.api.openInClaude(id);
   };
 
   // leaving the session ends replay and clears per-session selections
@@ -103,6 +104,9 @@ export function App() {
             </div>
             <UsageMeters />
             <div className="actions">
+              <button onClick={() => void window.api.openInClaude(view.id)} title="Open this session in the Claude desktop app">
+                ↗ open in Claude
+              </button>
               {replay ? (
                 <button className="on" onClick={stop}>
                   ■ back to live
