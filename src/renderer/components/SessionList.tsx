@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { SessionSummary } from '@core/state';
 import { ago } from '../util';
+import { PAGES, type PageId } from '../views/pages';
 
 function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: number; onSelect: (id: string) => void }) {
   const active = now - s.mtime < 60_000;
@@ -36,8 +37,6 @@ function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: 
   );
 }
 
-export type Page = 'session' | 'overview' | 'local';
-
 export function SessionList({
   sessions,
   selected,
@@ -63,8 +62,8 @@ export function SessionList({
   onFollow: (on: boolean) => void;
   collapsed: boolean;
   onCollapse: () => void;
-  page: Page;
-  onPage: (p: Page) => void;
+  page: PageId;
+  onPage: (p: PageId) => void;
   onHelp: () => void;
 }) {
   const [q, setQ] = useState('');
@@ -80,15 +79,11 @@ export function SessionList({
           <button onClick={onHelp} title="Welcome guide and tour">
             ?
           </button>
-          <button className={page === 'overview' ? 'on' : ''} onClick={() => onPage('overview')} title="All sessions">
-            ▦
-          </button>
-          <button className={page === 'session' ? 'on' : ''} onClick={() => onPage('session')} title="One session">
-            ◉
-          </button>
-          <button className={page === 'local' ? 'on' : ''} onClick={() => onPage('local')} title="Local models (Ollama, LM Studio, ...)">
-            ⌂
-          </button>
+          {PAGES.map((p) => (
+            <button key={p.id} className={page === p.id ? 'on' : ''} onClick={() => onPage(p.id)} title={p.collapsedTitle}>
+              {p.icon}
+            </button>
+          ))}
         </div>
       </div>
     );
@@ -114,21 +109,17 @@ export function SessionList({
       </div>
       <div className="sidebar-tools">
         <div className="page-switch" data-tour="overview">
-          <button className={page === 'overview' ? 'on' : ''} onClick={() => onPage('overview')} title="Every live session side by side">
-            ▦ all sessions
-          </button>
-          <button className={page === 'session' ? 'on' : ''} onClick={() => onPage('session')} title="One session in detail">
-            ◉ one session
-          </button>
+          {PAGES.filter((p) => p.group === 'switch').map((p) => (
+            <button key={p.id} className={page === p.id ? 'on' : ''} data-testid={p.testId} onClick={() => onPage(p.id)} title={p.title}>
+              {p.icon} {p.label}
+            </button>
+          ))}
         </div>
-        <button
-          className={`local-nav ${page === 'local' ? 'on' : ''}`}
-          data-testid="nav-local"
-          onClick={() => onPage('local')}
-          title="Ollama, LM Studio and other local model servers"
-        >
-          ⌂ local models
-        </button>
+        {PAGES.filter((p) => p.group === 'nav').map((p) => (
+          <button key={p.id} className={`local-nav ${page === p.id ? 'on' : ''}`} data-testid={p.testId} onClick={() => onPage(p.id)} title={p.title}>
+            {p.icon} {p.label}
+          </button>
+        ))}
         <input placeholder="search sessions…" value={q} onChange={(e) => setQ(e.target.value)} />
         <label className="follow" data-tour="follow">
           <input type="checkbox" checked={follow} onChange={(e) => onFollow(e.target.checked)} />

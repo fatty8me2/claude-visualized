@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notification, shell, Tray } from 'electron';
+import { app, BrowserWindow, globalShortcut, Menu, nativeImage, Notification, shell, Tray } from 'electron';
 import { loadConfig, saveConfig, type AppConfig } from './config';
 import type { SystemInfoView } from '@core/api';
 import { loginSupport, shouldShowOnSecondInstance, shouldStartHidden, validateHotkey } from '@core/system';
@@ -7,10 +7,9 @@ import { HookServer } from './hookServer';
 import fs from 'node:fs';
 import { applyQuota, applyStatusline, applyUsageApi, emptyUsage, settleUsage, type UsageView } from '@core/usage';
 import { fetchUsage } from './usageApi';
-import { settingsPath } from './paths';
-import { applyHooks, getHookState, previewHooks } from './installer';
+import { registerAllIpc } from './ipc/registry';
+import { getHookState } from './installer';
 import { writeStatusLineScript } from './statusline';
-import { projectsDir } from './paths';
 import { SessionManager, type NotifyRequest } from './manager';
 import { LocalMonitor } from './localMonitor';
 import { applyUrlOverrides, normalizeLocalConfig } from '@core/localModels';
@@ -379,87 +378,25 @@ function notify(n: NotifyRequest) {
   note.show();
 }
 
-/** webContents ids currently showing the overview page */
-const overviewWatchers = new Set<number>();
-
+/** Handlers live in src/main/ipc/*.ts (one module per area, listed in ipc/registry.ts); this hands them the app state they need. */
 function registerIpc() {
-  ipcMain.handle('usage:get', () => usage);
-  ipcMain.handle('local:get', () => localMonitor.view());
-  ipcMain.handle('local:refresh', () => localMonitor.refreshNow());
-  ipcMain.handle('claude:model', () => {
-    try {
-      const m = JSON.parse(fs.readFileSync(settingsPath(), 'utf8'))?.model;
-      return typeof m === 'string' ? m : null;
-    } catch {
-      return null;
-    }
-  });
-  ipcMain.handle('usage:refresh', () => pollUsageApi());
-  ipcMain.handle('session:openInClaude', async (_e, id: string) => {
-    const url = manager.deepLink(id);
-    // tests must not launch the real Claude app
-    if (process.env.CLAUDE_VIS_NO_EXTERNAL) return { ok: true, url };
-    try {
-      await shell.openExternal(url);
-      return { ok: true, url };
-    } catch (err) {
-      return { ok: false, url, error: (err as Error).message };
-    }
-  });
-  ipcMain.handle('overview:get', () => manager.overview());
-  ipcMain.handle('overview:watch', (e, on: boolean) => {
-    const id = e.sender.id;
-    if (on) {
-      overviewWatchers.add(id);
-      e.sender.once('destroyed', () => {
-        overviewWatchers.delete(id);
-        manager.overviewViewers = overviewWatchers.size;
-      });
-      manager.markOverviewDirty();
-    } else overviewWatchers.delete(id);
-    manager.overviewViewers = overviewWatchers.size;
-  });
-  ipcMain.handle('sessions:get', () => manager.getSummaries());
-  ipcMain.handle('state:get', () => manager.currentView());
-  ipcMain.handle('selected:get', () => manager.selected);
-  ipcMain.handle('session:select', (_e, id: string | null) => {
-    manager.select(id);
-    updateConfig({ followActive: false });
-  });
-  ipcMain.handle('follow:set', (_e, on: boolean) => {
-    updateConfig({ followActive: on });
-  });
-  ipcMain.handle('replay:events', (_e, id: string) => manager.replayEvents(id));
-  ipcMain.handle('config:get', () => config);
-  ipcMain.handle('config:set', (_e, patch: Partial<AppConfig>) => updateConfig(patch));
-  ipcMain.handle('hookserver:status', () => hookServer.status);
-  ipcMain.handle('hooks:state', () => getHookState(config.port));
-  ipcMain.handle('hooks:preview', (_e, action: 'install' | 'uninstall') => previewHooks(action, config.port));
-  ipcMain.handle('hooks:apply', async (_e, action: 'install' | 'uninstall') => {
-    try {
-      const r = await applyHooks(action, config.port, path.join(app.getPath('userData'), 'backups'));
-      return { ok: true, backup: r.backup };
-    } catch (e) {
-      return { ok: false, error: (e as Error).message };
-    }
-  });
-  ipcMain.handle('system:info', () => systemInfo());
-  ipcMain.handle('hotkey:apply', (_e, acc: string) => applyHotkey(String(acc ?? '')));
-  ipcMain.handle('ui:takeOpenSettings', () => {
-    const p = pendingOpenSettings;
-    pendingOpenSettings = false;
-    return p;
-  });
-  ipcMain.handle('mini:toggle', () => toggleMini());
-  ipcMain.handle('main:show', () => showMain());
-  ipcMain.handle('setup:status', () => ({
-    projectsDir: projectsDir(),
-    projectsDirExists: fs.existsSync(projectsDir()),
-    sessionCount: manager.getSummaries().length,
-    skipOnboarding: !!process.env.CLAUDE_VIS_SKIP_ONBOARDING,
-  }));
-  ipcMain.handle('path:open', (_e, p: string) => {
-    shell.showItemInFolder(p);
+  registerAllIpc({
+    manager,
+    hookServer,
+    getLocalMonitor: () => localMonitor,
+    getConfig: () => config,
+    updateConfig,
+    getUsage: () => usage,
+    pollUsageApi,
+    systemInfo,
+    applyHotkey,
+    toggleMini,
+    showMain,
+    takePendingOpenSettings: () => {
+      const p = pendingOpenSettings;
+      pendingOpenSettings = false;
+      return p;
+    },
   });
 }
 
