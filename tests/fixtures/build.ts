@@ -21,6 +21,20 @@ function asst(s: number, msgId: string, block: unknown, extra: Record<string, un
 }
 const toolUse = (id: string, name: string, input: unknown) => ({ type: 'tool_use', id, name, input });
 const toolResult = (id: string, isError = false) => ({ type: 'tool_result', tool_use_id: id, content: 'ok', is_error: isError });
+export const PLAN_PATH = 'C:\\demo\\plans\\retry-plan.md';
+export const PLAN_TEXT = `# Plan: retry in the api client
+
+## Context
+- The client has no retry today.
+
+## Steps
+1. Map the repo and find the api client
+2. Search the repo for existing retry code
+3. Run the tests as a baseline
+4. Add retry with backoff
+5. Design the docs update
+`;
+
 const notif = (taskId: string, status: string) => `<task-notification>\n<task-id>${taskId}</task-id>\n<status>${status}</status>\n<summary>Agent "x" finished</summary>\n</task-notification>`;
 
 export function mainLines(): string[] {
@@ -31,6 +45,8 @@ export function mainLines(): string[] {
     asst(1, 'msg_1', { type: 'thinking', thinking: 'hmm' }),
     asst(1, 'msg_1', toolUse('toolu_T1', 'TaskCreate', { subject: 'Map the repo', description: 'find the api client' })),
     user(2, [toolResult('toolu_T1')], { toolUseResult: { task: { id: '1', subject: 'Map the repo' } } }),
+    asst(2, 'msg_1', toolUse('toolu_PL', 'ExitPlanMode', { plan: PLAN_TEXT, planFilePath: PLAN_PATH })),
+    user(2, [toolResult('toolu_PL')]),
     asst(3, 'msg_2', toolUse('toolu_A1', 'Agent', { description: 'search repo', subagent_type: 'Explore', prompt: 'find it' })),
     asst(3, 'msg_2', toolUse('toolu_A2', 'Agent', { description: 'run tests', subagent_type: 'general-purpose', prompt: 'run', run_in_background: true })),
     user(4, [toolResult('toolu_A2')], { toolUseResult: { isAsync: true, status: 'async_launched', agentId: 'a2', description: 'run tests', resolvedModel: 'claude-sonnet-5-5' } }),
