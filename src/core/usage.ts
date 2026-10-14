@@ -11,7 +11,7 @@ export interface UsageWindow {
   resetsAt: number | null;
   /** epoch ms of the reading */
   at: number;
-  source: 'statusline' | 'transcript';
+  source: 'statusline' | 'transcript' | 'api';
 }
 
 export interface SpendWindow extends UsageWindow {
@@ -26,6 +26,10 @@ export interface UsageView {
   spend: SpendWindow | null;
   /** last status-line reading, null if the status line has never reported */
   statuslineAt: number | null;
+  /** per-model weekly windows from the usage API (e.g. "Opus", "Sonnet") */
+  models?: { label: string; window: UsageWindow }[];
+  /** state of the usage API poller */
+  api?: { state: 'ok' | 'no-login' | 'expired' | 'error'; message: string; at: number };
 }
 
 export const emptyUsage = (): UsageView => ({ fiveHour: null, sevenDay: null, spend: null, statuslineAt: null });
@@ -79,4 +83,39 @@ export function settleUsage(u: UsageView, now: number): UsageView {
     return w.resetsAt && w.resetsAt <= now ? { ...w, pct: 0, resetsAt: null, at: now } : w;
   };
   return { ...u, fiveHour: fix(u.fiveHour), sevenDay: fix(u.sevenDay), spend: fix(u.spend) };
+}
+
+/** "2026-10-14T18:00:00Z" | epoch s | epoch ms -> epoch ms */
+function toMs(v: unknown): number | null {
+  if (typeof v === 'number') return v < 1e12 ? v * 1000 : v;
+  if (typeof v === 'string') {
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? null : t;
+  }
+  return null;
+}
+
+function apiWin(w: Json | undefined, now: number): UsageWindow | null {
+  if (!w || typeof w !== 'object') return null;
+  const raw = typeof w.utilization === 'number' ? w.utilization : typeof w.used_percentage === 'number' ? w.used_percentage : null;
+  if (raw === null) return null;
+  return { pct: Math.max(0, Math.min(100, raw)), resetsAt: toMs(w.resets_at), at: now, source: 'api' };
+}
+
+/** Merge a response from Anthropic's OAuth usage endpoint (what Claude Code's /usage shows). */
+export function applyUsageApi(u: UsageView, body: Json, now: number): UsageView {
+  const next: UsageView = { ...u, api: { state: 'ok', message: 'usage API', at: now } };
+  const f = apiWin(body?.five_hour, now);
+  const s = apiWin(body?.seven_day, now);
+  // the API is authoritative when it answers: an absent window means no limit applies right now
+  next.fiveHour = f;
+  next.sevenDay = s;
+  const models: { label: string; window: UsageWindow }[] = [];
+  for (const [k, v] of Object.entries(body ?? {})) {
+    const m = /^seven_day_(\w+)$/.exec(k);
+    const w = m ? apiWin(v as Json, now) : null;
+    if (m && w) models.push({ label: m[1][0].toUpperCase() + m[1].slice(1), window: w });
+  }
+  next.models = models;
+  return next;
 }

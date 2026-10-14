@@ -3,7 +3,8 @@ import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, shell, Tr
 import { loadConfig, saveConfig, type AppConfig } from './config';
 import { HookServer } from './hookServer';
 import fs from 'node:fs';
-import { applyQuota, applyStatusline, emptyUsage, settleUsage, type UsageView } from '@core/usage';
+import { applyQuota, applyStatusline, applyUsageApi, emptyUsage, settleUsage, type UsageView } from '@core/usage';
+import { fetchUsage } from './usageApi';
 import { applyHooks, getHookState, previewHooks } from './installer';
 import { writeStatusLineScript } from './statusline';
 import { SessionManager, type NotifyRequest } from './manager';
@@ -30,6 +31,23 @@ function loadUsage() {
   } catch {
     usage = emptyUsage();
   }
+}
+
+const USAGE_POLL_MS = 3 * 60_000;
+let usageTimer: NodeJS.Timeout | null = null;
+
+/** Poll the plan usage API; on failure keep the last numbers but say why they may be stale. */
+async function pollUsageApi() {
+  if (usageTimer) clearTimeout(usageTimer);
+  const r = await fetchUsage();
+  let delay = USAGE_POLL_MS;
+  if (r.ok) setUsage(applyUsageApi(usage, r.body, Date.now()));
+  else {
+    setUsage({ ...usage, api: { state: r.state, message: r.message, at: Date.now() } });
+    if (r.retryAfterMs) delay = Math.max(delay, r.retryAfterMs);
+    else if (r.state !== 'error') delay = 60_000; // pick up a fresh `claude /login` quickly
+  }
+  usageTimer = setTimeout(() => void pollUsageApi(), delay);
 }
 
 function setUsage(next: UsageView) {
@@ -233,6 +251,7 @@ const overviewWatchers = new Set<number>();
 
 function registerIpc() {
   ipcMain.handle('usage:get', () => usage);
+  ipcMain.handle('usage:refresh', () => pollUsageApi());
   ipcMain.handle('session:openInClaude', async (_e, id: string) => {
     const url = manager.deepLink(id);
     // tests must not launch the real Claude app
@@ -312,6 +331,7 @@ if (!app.requestSingleInstanceLock()) {
     loadUsage();
     // windows that reset while the app was closed, and countdowns crossing a reset
     setInterval(() => setUsage(usage), 30_000);
+    if (!process.env.CLAUDE_VIS_NO_USAGE_API) void pollUsageApi();
     // keep the status-line forwarder in sync with the configured port
     void getHookState(config.port).then((h) => {
       if (h.statusLine === 'ours') void writeStatusLineScript(config.port);

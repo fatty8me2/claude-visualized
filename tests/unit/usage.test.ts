@@ -61,3 +61,26 @@ describe('status line install', () => {
     expect(uninstallHooks(kept).statusLine).toEqual(own.statusLine);
   });
 });
+
+describe('usage API', () => {
+  it('maps the OAuth usage response (utilization %, ISO resets_at) and per-model weekly windows', async () => {
+    const { applyUsageApi } = await import('@core/usage');
+    const u = applyUsageApi(
+      emptyUsage(),
+      {
+        five_hour: { utilization: 37, resets_at: '2026-10-14T18:00:00Z' },
+        seven_day: { utilization: 12.5, resets_at: '2026-10-18T09:00:00Z' },
+        seven_day_opus: { utilization: 40, resets_at: '2026-10-18T09:00:00Z' },
+        seven_day_sonnet: null,
+        extra_usage: { is_enabled: false },
+      },
+      NOW,
+    );
+    expect(u.fiveHour).toMatchObject({ pct: 37, resetsAt: Date.parse('2026-10-14T18:00:00Z'), source: 'api' });
+    expect(u.sevenDay?.pct).toBe(12.5);
+    expect(u.models).toEqual([{ label: 'Opus', window: expect.objectContaining({ pct: 40 }) }]);
+    expect(u.api?.state).toBe('ok');
+    // a window the API no longer reports is cleared rather than left stale
+    expect(applyUsageApi(u, { seven_day: { utilization: 1, resets_at: '2026-10-18T09:00:00Z' } }, NOW + 1).fiveHour).toBeNull();
+  });
+});

@@ -21,27 +21,29 @@ function untilText(resetsAt: number, now: number): string {
   return new Date(resetsAt).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 }
 
-function Meter({ label, w, span, now, compact }: { label: string; w: UsageWindow | null; span: number; now: number; compact?: boolean }) {
+function Meter({ label, w, span, now, compact, problem, extra }: { label: string; w: UsageWindow | null; span: number; now: number; compact?: boolean; problem?: string | null; extra?: string[] }) {
   if (!w) {
     return (
-      <div className="meter empty" title="No reading yet. Usage appears once a Claude Code session reports it (Pro/Max plans, with hooks installed from ⚙ hooks).">
+      <div className="meter empty" title={problem ?? 'No reading yet. Click to refresh.'}>
         <span className="m-label">{label}</span>
         <span className="m-bar">
           <i style={{ width: 0 }} />
         </span>
-        <span className="m-pct">no data</span>
+        <span className="m-pct">{problem ? 'login needed' : 'no data'}</span>
       </div>
     );
   }
   const pct = Math.round(w.pct);
   // how far through the window we are: usage ahead of this marker means burning faster than the window refills
   const elapsed = w.resetsAt ? Math.max(0, Math.min(100, 100 - ((w.resetsAt - now) / span) * 100)) : null;
-  const stale = now - w.at > STALE_MS;
+  const stale = now - w.at > STALE_MS || !!problem;
   const tip = [
     `${label}: ${pct}% used`,
     w.resetsAt ? `resets ${new Date(w.resetsAt).toLocaleString()}` : null,
     elapsed !== null ? `${Math.round(elapsed)}% of the window has elapsed` : null,
     `reading ${ago(w.at, now)}${w.source === 'transcript' ? ' (limit hit, from transcript)' : ''}`,
+    ...(extra ?? []),
+    problem ? `⚠ ${problem}` : null,
   ]
     .filter(Boolean)
     .join('\n');
@@ -63,10 +65,12 @@ export function UsageMeters({ compact = false, usage: given }: { compact?: boole
   const live = useUsage();
   const now = useNow(compact ? 30_000 : 15_000);
   const u = given ?? live;
+  const problem = u?.api && u.api.state !== 'ok' ? u.api.message : null;
+  const perModel = (u?.models ?? []).map((m) => `weekly ${m.label}: ${Math.round(m.window.pct)}%`);
   return (
-    <div className={`usage ${compact ? 'compact' : ''}`}>
-      <Meter label={compact ? '5h' : '5-HOUR'} w={u?.fiveHour ?? null} span={WINDOW_MS.fiveHour} now={now} compact={compact} />
-      <Meter label={compact ? 'wk' : 'WEEKLY'} w={u?.sevenDay ?? null} span={WINDOW_MS.sevenDay} now={now} compact={compact} />
+    <div className={`usage ${compact ? 'compact' : ''}`} onClick={() => void window.api.refreshUsage()} title="Click to refresh">
+      <Meter label={compact ? '5h' : '5-HOUR'} w={u?.fiveHour ?? null} span={WINDOW_MS.fiveHour} now={now} compact={compact} problem={problem} />
+      <Meter label={compact ? 'wk' : 'WEEKLY'} w={u?.sevenDay ?? null} span={WINDOW_MS.sevenDay} now={now} compact={compact} problem={problem} extra={perModel} />
     </div>
   );
 }

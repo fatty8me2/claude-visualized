@@ -9,8 +9,6 @@ export interface AppConfig {
   notifyAgentDone: boolean;
   closeToTray: boolean;
   miniAlwaysOnTop: boolean;
-  /** clicking a session also opens it in the Claude desktop app */
-  openInClaudeOnClick: boolean;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -20,7 +18,6 @@ export const DEFAULT_CONFIG: AppConfig = {
   notifyAgentDone: false,
   closeToTray: true,
   miniAlwaysOnTop: true,
-  openInClaudeOnClick: true,
 };
 
 function file() {
@@ -29,7 +26,9 @@ function file() {
 
 export function loadConfig(): AppConfig {
   try {
-    return { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(file(), 'utf8')) };
+    const saved = JSON.parse(fs.readFileSync(file(), 'utf8'));
+    delete saved.openInClaudeOnClick; // removed option: sessions only open in Claude via the button
+    return { ...DEFAULT_CONFIG, ...saved };
   } catch {
     return { ...DEFAULT_CONFIG };
   }

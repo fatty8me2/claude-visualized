@@ -136,10 +136,6 @@ export function SettingsDialog({ config, hookSrv, onClose }: { config: AppConfig
           Notify me when a subagent finishes
         </label>
         <label className="chk">
-          <input type="checkbox" checked={config.openInClaudeOnClick} onChange={(e) => set({ openInClaudeOnClick: e.target.checked })} />
-          Clicking a session also opens it in the Claude desktop app
-        </label>
-        <label className="chk">
           <input type="checkbox" checked={config.closeToTray} onChange={(e) => set({ closeToTray: e.target.checked })} />
           Closing the window keeps the app running in the tray
         </label>

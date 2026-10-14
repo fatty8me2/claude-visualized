@@ -31,6 +31,7 @@ const api: VisApi = {
   hookPreview: (action) => ipcRenderer.invoke('hooks:preview', action),
   hookApply: (action) => ipcRenderer.invoke('hooks:apply', action),
   getUsage: () => ipcRenderer.invoke('usage:get'),
+  refreshUsage: () => ipcRenderer.invoke('usage:refresh'),
   onUsage: (cb) => on('usage', cb),
   openInClaude: (id) => ipcRenderer.invoke('session:openInClaude', id),
   toggleMini: () => ipcRenderer.invoke('mini:toggle'),

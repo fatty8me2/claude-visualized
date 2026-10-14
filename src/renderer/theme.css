@@ -1111,6 +1111,7 @@ select:focus {
 
 /* ---------- usage limit meters ---------- */
 .usage {
+  cursor: pointer;
   display: flex;
   gap: 10px;
   flex-shrink: 0;

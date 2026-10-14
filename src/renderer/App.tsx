@@ -66,7 +66,6 @@ export function App() {
   const openSession = (id: string) => {
     void window.api.select(id);
     setPage('session');
-    if (config?.openInClaudeOnClick) void window.api.openInClaude(id);
   };
 
   // leaving the session ends replay and clears per-session selections
