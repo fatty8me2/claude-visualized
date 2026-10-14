@@ -107,6 +107,7 @@ npm run dev
 | `npm run test:e2e` | build, then run the Playwright e2e suite (set `E2E_PORT` to use another hook port) |
 | `REAL_DATA=1 npx vitest run tests/unit/real-data.test.ts` | fold every real session on this machine (read-only) |
 | `npm run build && npx vitest run --config vitest.e2e.config.ts` | launch the built app against fixture data with Playwright |
+| `PERF=1 npx vitest run --config vitest.e2e.config.ts tests/e2e/perf.test.ts` | opt-in performance benchmark on a synthetic 300-agent session (see [docs/PERF.md](docs/PERF.md)) |
 | `npm run dist:win` / `npm run dist:mac` | installers in `release/<version>/` |
 | `npm run icons` | regenerate `build/icon.png` and the tray icons |
 
