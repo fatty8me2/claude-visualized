@@ -36,7 +36,13 @@ describe('per-agent insight fields in the reducer', () => {
     ]);
     const a = s.agents.ag;
     expect(a.toolMix).toEqual({ search: 1, read: 1, edit: 1, test: 1, run: 1 });
-    expect(a.recent.map((r) => [r.name, r.ok])).toEqual([['Grep', true], ['Read', true], ['Edit', false], ['Bash', null], ['Bash', null]]);
+    expect(a.recent.map((r) => [r.name, r.ok])).toEqual([
+      ['Grep', true],
+      ['Read', true],
+      ['Edit', false],
+      ['Bash', null],
+      ['Bash', null],
+    ]);
     expect(a.files).toEqual(['C:\\app\\src\\api.ts']); // deduped
     expect(a.commands).toEqual(['npm test', 'git status']);
     expect(a.currentTool?.input).toEqual({ command: 'git status' });

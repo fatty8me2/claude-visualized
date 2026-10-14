@@ -20,10 +20,10 @@ export function desktopSessionsDir(): string {
   if (process.env.CLAUDE_VIS_DESKTOP_DIR) return process.env.CLAUDE_VIS_DESKTOP_DIR;
   const base =
     process.platform === 'win32'
-      ? process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming')
+      ? (process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'))
       : process.platform === 'darwin'
         ? path.join(os.homedir(), 'Library', 'Application Support')
-        : process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config');
+        : (process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config'));
   return path.join(base, 'Claude', 'claude-code-sessions');
 }
 

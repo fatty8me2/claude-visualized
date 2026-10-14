@@ -57,20 +57,30 @@ function LoadedRow({ m, views, now }: { m: LocalModelInfo; views: SessionView[] 
         {m.params && <span className="lm-pill">{m.params}</span>}
         {m.quant && <span className="lm-pill">{m.quant}</span>}
         {m.family && <span className="lm-pill">{m.family}</span>}
-        {m.capabilities.filter((c) => c !== 'completion').map((c) => (
-          <span key={c} className="lm-pill dim">{c}</span>
-        ))}
+        {m.capabilities
+          .filter((c) => c !== 'completion')
+          .map((c) => (
+            <span key={c} className="lm-pill dim">
+              {c}
+            </span>
+          ))}
       </div>
       <div className="lm-model-body">
         <MemBar m={m} />
         <span className="lm-ctx" data-testid="model-ctx" title={m.maxContext ? `model maximum ${formatTokens(m.maxContext)}` : undefined}>
           context {m.contextLength ? formatTokens(m.contextLength) : m.maxContext ? `max ${formatTokens(m.maxContext)}` : 'unknown'}
         </span>
-        <span className="lm-unload" data-testid="model-unload">{unload ? `unloads in ${unload}` : m.expiresAt == null ? 'stays loaded / unknown' : ''}</span>
+        <span className="lm-unload" data-testid="model-unload">
+          {unload ? `unloads in ${unload}` : m.expiresAt == null ? 'stays loaded / unknown' : ''}
+        </span>
       </div>
       {users.length > 0 && (
         <div className="lm-used" data-testid="used-by">
-          used by: {users.slice(0, 4).map((u) => `${u.session} / ${u.agent} (${ago(u.at, now)})`).join(' · ')}
+          used by:{' '}
+          {users
+            .slice(0, 4)
+            .map((u) => `${u.session} / ${u.agent} (${ago(u.at, now)})`)
+            .join(' · ')}
         </div>
       )}
     </div>
@@ -92,7 +102,9 @@ function ServerCard({ s, views, now }: { s: LocalServerStatus; views: SessionVie
         {s.kind === 'openai' && <span className="lm-pill dim">{serverKindName(s.kind)}</span>}
         <span className="lm-url">{s.baseUrl}</span>
         {s.version && <span className="lm-pill">v{s.version}</span>}
-        <span className="lm-faint" style={{ marginLeft: 'auto' }}>checked {ago(s.checkedAt, now)}</span>
+        <span className="lm-faint" style={{ marginLeft: 'auto' }}>
+          checked {ago(s.checkedAt, now)}
+        </span>
       </header>
       {stats.length > 0 && (
         <div className="lm-stats">
@@ -104,7 +116,11 @@ function ServerCard({ s, views, now }: { s: LocalServerStatus; views: SessionVie
         </div>
       )}
       <h5>loaded now · {s.loaded.length}</h5>
-      {s.loaded.length === 0 ? <div className="lm-faint">no model loaded in memory (the server loads one on the first request)</div> : s.loaded.map((m) => <LoadedRow key={m.id} m={m} views={views} now={now} />)}
+      {s.loaded.length === 0 ? (
+        <div className="lm-faint">no model loaded in memory (the server loads one on the first request)</div>
+      ) : (
+        s.loaded.map((m) => <LoadedRow key={m.id} m={m} views={views} now={now} />)
+      )}
       {s.installed.length > 0 && (
         <>
           <h5 className="lm-toggle" onClick={() => setOpen(!open)} data-testid="installed-toggle">
@@ -157,7 +173,10 @@ function Empty({ servers, onCheck, checking, onSettings }: { servers: LocalServe
       </div>
       {servers.length > 0 && (
         <div className="lm-faint lm-checked">
-          checked: {servers.map((s) => `${s.name} ${s.baseUrl} (${s.state === 'disabled' ? 'disabled' : s.state === 'checking' ? 'checking' : 'not running'})`).join(' · ')}
+          checked:{' '}
+          {servers
+            .map((s) => `${s.name} ${s.baseUrl} (${s.state === 'disabled' ? 'disabled' : s.state === 'checking' ? 'checking' : 'not running'})`)
+            .join(' · ')}
         </div>
       )}
     </div>

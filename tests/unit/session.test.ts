@@ -100,7 +100,17 @@ describe('session folding from transcripts', () => {
     const w = await load();
     const sub = path.join(w.dir, 'subagents');
     fs.writeFileSync(path.join(sub, 'agent-a9.meta.json'), JSON.stringify({ agentType: 'Plan', description: 'design it', toolUseId: 'toolu_A9' }));
-    fs.writeFileSync(path.join(sub, 'agent-a9.jsonl'), JSON.stringify({ type: 'assistant', isSidechain: true, agentId: 'a9', sessionId: SID, timestamp: new Date().toISOString(), message: { id: 'm9', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'toolu_q', name: 'Glob', input: { pattern: '**/*.ts' } }] } }) + '\n');
+    fs.writeFileSync(
+      path.join(sub, 'agent-a9.jsonl'),
+      JSON.stringify({
+        type: 'assistant',
+        isSidechain: true,
+        agentId: 'a9',
+        sessionId: SID,
+        timestamp: new Date().toISOString(),
+        message: { id: 'm9', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'toolu_q', name: 'Glob', input: { pattern: '**/*.ts' } }] },
+      }) + '\n',
+    );
     (w as unknown as { lastDirScan: number }).lastDirScan = 0;
     await w.poll();
     const a9 = w.state.agents.a9;
@@ -124,13 +134,30 @@ describe('hooks merged with transcripts', () => {
   it('counts a tool seen by both a hook and the transcript once', async () => {
     const w = await load();
     const before = w.state.agents.main.toolCount;
-    w.ingest(normalizeHook({ session_id: SID, hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_use_id: 'toolu_live', tool_input: { file_path: 'x.ts' }, permission_mode: 'acceptEdits' }, Date.now()));
+    w.ingest(
+      normalizeHook(
+        {
+          session_id: SID,
+          hook_event_name: 'PreToolUse',
+          tool_name: 'Edit',
+          tool_use_id: 'toolu_live',
+          tool_input: { file_path: 'x.ts' },
+          permission_mode: 'acceptEdits',
+        },
+        Date.now(),
+      ),
+    );
     expect(w.state.agents.main.toolCount).toBe(before + 1);
     expect(w.state.agents.main.currentTool?.name).toBe('Edit');
     expect(w.state.mode).toBe('acceptEdits');
     fs.appendFileSync(
       w.mainFile,
-      JSON.stringify({ type: 'assistant', sessionId: SID, timestamp: new Date(Date.now() - 1000).toISOString(), message: { id: 'm_live', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'toolu_live', name: 'Edit', input: { file_path: 'x.ts' } }] } }) + '\n',
+      JSON.stringify({
+        type: 'assistant',
+        sessionId: SID,
+        timestamp: new Date(Date.now() - 1000).toISOString(),
+        message: { id: 'm_live', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'toolu_live', name: 'Edit', input: { file_path: 'x.ts' } }] },
+      }) + '\n',
     );
     await w.poll();
     expect(w.state.agents.main.toolCount).toBe(before + 1);

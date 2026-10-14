@@ -217,7 +217,8 @@ function openSettings() {
   showMain();
   const wc = mainWin?.webContents;
   if (!wc) return;
-  if (fresh || wc.isLoading()) pendingOpenSettings = true; // the renderer asks for it once mounted
+  if (fresh || wc.isLoading())
+    pendingOpenSettings = true; // the renderer asks for it once mounted
   else wc.send('ui:openSettings');
 }
 
@@ -268,16 +269,32 @@ function updateTrayTooltip() {
   const sessions = manager.getSummaries().filter((s) => s.live);
   const running = sessions.reduce((n, s) => n + (s.running ?? 0), 0);
   const u = usageText();
-  tray.setToolTip(`Claude Visualized — ${sessions.length} live session${sessions.length === 1 ? '' : 's'}${running ? `, ${running} subagents running` : ''}${u ? `
-${u}` : ''}`);
+  tray.setToolTip(
+    `Claude Visualized — ${sessions.length} live session${sessions.length === 1 ? '' : 's'}${running ? `, ${running} subagents running` : ''}${
+      u
+        ? `
+${u}`
+        : ''
+    }`,
+  );
 }
 
 function rebuildTrayMenu() {
   if (!tray) return;
   updateTrayTooltip();
-  const sessions = manager.getSummaries().filter((s) => s.live).slice(0, 8);
+  const sessions = manager
+    .getSummaries()
+    .filter((s) => s.live)
+    .slice(0, 8);
   // rebuilding an open native menu makes it flicker; only rebuild when something visible changed
-  const sig = JSON.stringify([sessions.map((s) => [s.id, s.title, s.running, s.waiting]), !!miniWin, manager.followActive, config.launchAtLogin, config.miniHotkey, registeredHotkey]);
+  const sig = JSON.stringify([
+    sessions.map((s) => [s.id, s.title, s.running, s.waiting]),
+    !!miniWin,
+    manager.followActive,
+    config.launchAtLogin,
+    config.miniHotkey,
+    registeredHotkey,
+  ]);
   if (sig === traySignature) return;
   traySignature = sig;
   const items: Electron.MenuItemConstructorOptions[] = [

@@ -11,7 +11,13 @@ function UrlRow({ label, entry, def, onChange }: { label: string; entry: LocalSe
         <input type="checkbox" checked={entry.enabled} onChange={(e) => onChange({ ...entry, enabled: e.target.checked })} />
         {label}
       </label>
-      <input style={{ width: 250 }} aria-label={`${label} URL`} value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && norm && onChange({ ...entry, url: norm })} />
+      <input
+        style={{ width: 250 }}
+        aria-label={`${label} URL`}
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && norm && onChange({ ...entry, url: norm })}
+      />
       <button disabled={!norm || norm === entry.url} onClick={() => norm && onChange({ ...entry, url: norm })}>
         Apply
       </button>
@@ -41,18 +47,23 @@ export function LocalModelsSettings({ config }: { config: LocalModelsConfig }) {
     <div data-testid="local-settings">
       <h3 style={{ marginTop: 8 }}>Local models</h3>
       <p className="note">
-        Status of local model servers is polled from this app's main process (read-only, nothing from your sessions is sent). Defaults are this computer only; a remote address is
-        contacted only if you add it here.
+        Status of local model servers is polled from this app's main process (read-only, nothing from your sessions is sent). Defaults are this computer only; a
+        remote address is contacted only if you add it here.
       </p>
       <UrlRow label="Ollama" entry={config.ollama} def={DEFAULT_OLLAMA_URL} onChange={(ollama) => save({ ...config, ollama })} />
       <UrlRow label="LM Studio" entry={config.lmstudio} def={DEFAULT_LMSTUDIO_URL} onChange={(lmstudio) => save({ ...config, lmstudio })} />
       <div className="note" style={{ margin: '6px 0 2px' }}>
-        Other OpenAI-compatible servers (llama.cpp server, vLLM, LocalAI, Jan, ...): <code>GET /v1/models</code>, plus <code>/health</code>, <code>/props</code>, <code>/slots</code>, <code>/metrics</code> on llama.cpp.
+        Other OpenAI-compatible servers (llama.cpp server, vLLM, LocalAI, Jan, ...): <code>GET /v1/models</code>, plus <code>/health</code>, <code>/props</code>
+        , <code>/slots</code>, <code>/metrics</code> on llama.cpp.
       </div>
       {config.extra.map((e) => (
         <div className="row" key={e.id}>
           <label className="chk" style={{ minWidth: 110 }}>
-            <input type="checkbox" checked={e.enabled} onChange={(ev) => save({ ...config, extra: config.extra.map((x) => (x.id === e.id ? { ...x, enabled: ev.target.checked } : x)) })} />
+            <input
+              type="checkbox"
+              checked={e.enabled}
+              onChange={(ev) => save({ ...config, extra: config.extra.map((x) => (x.id === e.id ? { ...x, enabled: ev.target.checked } : x)) })}
+            />
             {e.name}
           </label>
           <code>{e.url}</code>
@@ -67,7 +78,10 @@ export function LocalModelsSettings({ config }: { config: LocalModelsConfig }) {
           disabled={!addrNorm || dup}
           onClick={() => {
             if (!addrNorm) return;
-            save({ ...config, extra: [...config.extra, { id: `openai:${addrNorm}`, name: name.trim() || new URL(addrNorm).host, url: addrNorm, enabled: true }] });
+            save({
+              ...config,
+              extra: [...config.extra, { id: `openai:${addrNorm}`, name: name.trim() || new URL(addrNorm).host, url: addrNorm, enabled: true }],
+            });
             setName('');
             setAddr('');
           }}
@@ -80,7 +94,10 @@ export function LocalModelsSettings({ config }: { config: LocalModelsConfig }) {
         <span>Poll interval</span>
         <input style={{ width: 60 }} aria-label="Poll interval seconds" value={poll} onChange={(e) => setPoll(e.target.value.replace(/\D/g, ''))} />
         <span>seconds</span>
-        <button disabled={!poll || Number(poll) < 2 || Number(poll) > 300 || Number(poll) === config.pollSec} onClick={() => save({ ...config, pollSec: Number(poll) })}>
+        <button
+          disabled={!poll || Number(poll) < 2 || Number(poll) > 300 || Number(poll) === config.pollSec}
+          onClick={() => save({ ...config, pollSec: Number(poll) })}
+        >
           Apply
         </button>
         <span className="note">2 to 300; default 5. A server that is down is retried less often (up to every 60 s).</span>

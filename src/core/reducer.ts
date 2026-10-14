@@ -2,16 +2,7 @@
 // (cheap for 10k+ event transcripts) and returns it; callers that need a new identity copy it.
 
 import type { AgentEvent, UsageNumbers } from './events';
-import {
-  ACTIVITY_CAP,
-  LOG_CAP,
-  MAIN,
-  newAgent,
-  newSession,
-  type AgentNode,
-  type LogKind,
-  type SessionState,
-} from './state';
+import { ACTIVITY_CAP, LOG_CAP, MAIN, newAgent, newSession, type AgentNode, type LogKind, type SessionState } from './state';
 import { summarizeTool, toolLabel } from './summarize';
 import { toolCategory } from './goal';
 import { COMMANDS_CAP, FILES_CAP, PROMPT_CAP, RECENT_CAP } from './state';

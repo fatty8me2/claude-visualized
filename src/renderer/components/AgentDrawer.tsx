@@ -61,7 +61,19 @@ function MixBars({ a }: { a: AgentNode }) {
   );
 }
 
-export function AgentDrawer({ view, id, now, onClose, onFilterLog }: { view: SessionView; id: string; now: number; onClose: () => void; onFilterLog: (id: string) => void }) {
+export function AgentDrawer({
+  view,
+  id,
+  now,
+  onClose,
+  onFilterLog,
+}: {
+  view: SessionView;
+  id: string;
+  now: number;
+  onClose: () => void;
+  onFilterLog: (id: string) => void;
+}) {
   const a = view.agents[id];
   if (!a) return null;
   const st = displayStatus(a, now);
@@ -93,7 +105,9 @@ export function AgentDrawer({ view, id, now, onClose, onFilterLog }: { view: Ses
         {isLocalModel(a.model) && (
           <>
             <span className="k">runs on</span>
-            <span className="v"><LocalLinkLine agent={a} /></span>
+            <span className="v">
+              <LocalLinkLine agent={a} />
+            </span>
           </>
         )}
         {a.kind !== 'main' && (

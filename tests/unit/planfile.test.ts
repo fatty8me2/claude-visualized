@@ -22,7 +22,15 @@ function setup(planBody: string) {
   const main = path.join(home, 'projects', 'p', `${SID}.jsonl`);
   fs.mkdirSync(path.dirname(main), { recursive: true });
   const ts = new Date().toISOString();
-  fs.writeFileSync(main, JSON.stringify({ type: 'attachment', sessionId: SID, timestamp: ts, attachment: { type: 'plan_mode', isSubAgent: false, planFilePath: planFile, planExists: true } }) + '\n');
+  fs.writeFileSync(
+    main,
+    JSON.stringify({
+      type: 'attachment',
+      sessionId: SID,
+      timestamp: ts,
+      attachment: { type: 'plan_mode', isSubAgent: false, planFilePath: planFile, planExists: true },
+    }) + '\n',
+  );
   return { planFile, main };
 }
 
@@ -55,7 +63,16 @@ describe('plan file', () => {
     const { planFile, main } = setup('## Steps\n1. a\n');
     fs.appendFileSync(
       main,
-      JSON.stringify({ type: 'assistant', sessionId: SID, timestamp: new Date().toISOString(), message: { id: 'm', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 't', name: 'ExitPlanMode', input: { plan: '## Steps\n1. from transcript\n', planFilePath: planFile } }] } }) + '\n',
+      JSON.stringify({
+        type: 'assistant',
+        sessionId: SID,
+        timestamp: new Date().toISOString(),
+        message: {
+          id: 'm',
+          model: 'claude-opus-5-5',
+          content: [{ type: 'tool_use', id: 't', name: 'ExitPlanMode', input: { plan: '## Steps\n1. from transcript\n', planFilePath: planFile } }],
+        },
+      }) + '\n',
     );
     fs.rmSync(planFile);
     const w = new SessionWatcher(SID, main);

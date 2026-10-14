@@ -41,7 +41,8 @@ const INFO_RE =
   /^(?:(?:part|section|phase|step)\s+\w+\s*[:.\-–—]\s*)?(context|background|overview|goals?|non-?goals?|summary|findings?|stack|data sources?|(?:user |key )?decisions?(?: \(.*\))?|notes?|risks?|assumptions?|open (?:questions?|problems?)|current state|measured|constraints?|out of scope|references?|motivation|problem|what (?:already )?exists|what the .* does|the experience|critical files|why|execution model|how (?:it|this) works)\b/i;
 
 /** sections that hold the actual work, when a plan has them the other sections are reference material */
-const WORK_RE = /^(?:\d+[.)]?\s*)?(?:the\s+)?(milestones?|steps?|phases?|tasks?|implementation(?:\s+(?:plan|steps|order))?|work\s*plan|roadmap|to-?dos?|order of work|execution plan|build order)\b/i;
+const WORK_RE =
+  /^(?:\d+[.)]?\s*)?(?:the\s+)?(milestones?|steps?|phases?|tasks?|implementation(?:\s+(?:plan|steps|order))?|work\s*plan|roadmap|to-?dos?|order of work|execution plan|build order)\b/i;
 
 export function isWorkHeading(title: string): boolean {
   return WORK_RE.test(title.trim().replace(/^[§#]\s*\d*\s*/, ''));
@@ -54,7 +55,12 @@ function isPathItem(raw: string): boolean {
 }
 
 export function isInfoHeading(title: string): boolean {
-  return INFO_RE.test(title.trim().replace(/^\d+[.)]?\s*/, '').replace(/^[§#]\s*\d*\s*/, ''));
+  return INFO_RE.test(
+    title
+      .trim()
+      .replace(/^\d+[.)]?\s*/, '')
+      .replace(/^[§#]\s*\d*\s*/, ''),
+  );
 }
 
 /** drop markdown decoration, keep the words */
@@ -178,7 +184,15 @@ export function parsePlan(md: string): ParsedPlan {
       }
       si = secIndex.get(sec)!;
     }
-    steps.push({ id: `s${steps.length + 1}`, text: cap(stripMd(text), TEXT_CAP), title: makeTitle(text), detail: cap(stripMd(detail), DETAIL_CAP), section: si, depth, checked });
+    steps.push({
+      id: `s${steps.length + 1}`,
+      text: cap(stripMd(text), TEXT_CAP),
+      title: makeTitle(text),
+      detail: cap(stripMd(detail), DETAIL_CAP),
+      section: si,
+      depth,
+      checked,
+    });
   };
 
   // when the plan names its work sections (Milestones, Steps, Phases…), only those hold steps;
@@ -198,7 +212,8 @@ export function parsePlan(md: string): ParsedPlan {
     if (workOnly && !workSecs.has(sec)) continue;
     const strong = sec.items.some((i) => i.depth === 0 && (i.numbered || i.checked !== null));
     // attach non-step items to their nearest step ancestor as detail
-    const isStep = (i: RawItem) => (strong ? i.numbered || i.checked !== null : i.depth === 0) && (i.depth === 0 || i.numbered || i.checked !== null) && !isPathItem(i.raw);
+    const isStep = (i: RawItem) =>
+      (strong ? i.numbered || i.checked !== null : i.depth === 0) && (i.depth === 0 || i.numbered || i.checked !== null) && !isPathItem(i.raw);
     for (const it of sec.items) {
       if (isStep(it)) continue;
       let p = it.parent;
@@ -231,7 +246,16 @@ export function todosToPlan(todos: { id: string; text: string; status: string }[
   const steps: PlanStep[] = todos
     .filter((t) => t.text.trim())
     .slice(0, MAX_STEPS)
-    .map((t, i) => ({ id: `t${i + 1}`, text: cap(stripMd(t.text), TEXT_CAP), title: makeTitle(t.text), detail: '', section: -1, depth: 0, checked: null, todoId: t.id }));
+    .map((t, i) => ({
+      id: `t${i + 1}`,
+      text: cap(stripMd(t.text), TEXT_CAP),
+      title: makeTitle(t.text),
+      detail: '',
+      section: -1,
+      depth: 0,
+      checked: null,
+      todoId: t.id,
+    }));
   return { title: null, sections: [], steps };
 }
 

@@ -36,7 +36,10 @@ export function LocalChip({ onOpen }: { onOpen: () => void }) {
   const { servers } = useLocalModels();
   const { up, loaded } = localSummary(servers);
   if (up === 0) return null;
-  const names = servers.filter((s) => s.state === 'up').map((s) => `${s.name} ${s.loaded.length} loaded`).join(' · ');
+  const names = servers
+    .filter((s) => s.state === 'up')
+    .map((s) => `${s.name} ${s.loaded.length} loaded`)
+    .join(' · ');
   return (
     <button className={`local-chip ${loaded ? 'active' : ''}`} data-testid="local-chip" onClick={onOpen} title={`${names}\nClick for the local models view`}>
       ⌂ {loaded === 0 ? 'no model loaded' : `${loaded} model${loaded === 1 ? '' : 's'} loaded`}

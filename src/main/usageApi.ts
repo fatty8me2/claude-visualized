@@ -13,8 +13,7 @@ import { claudeHome } from './paths';
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
 
 export type UsageApiResult =
-  | { ok: true; body: Record<string, unknown> }
-  | { ok: false; state: 'no-login' | 'expired' | 'error'; message: string; retryAfterMs?: number };
+  { ok: true; body: Record<string, unknown> } | { ok: false; state: 'no-login' | 'expired' | 'error'; message: string; retryAfterMs?: number };
 
 interface Login {
   token: string;
@@ -25,7 +24,8 @@ function fromJson(raw: string): Login | null {
   try {
     const j = JSON.parse(raw);
     const o = j?.claudeAiOauth;
-    if (o && typeof o.accessToken === 'string' && o.accessToken) return { token: o.accessToken, expiresAt: typeof o.expiresAt === 'number' ? o.expiresAt : null };
+    if (o && typeof o.accessToken === 'string' && o.accessToken)
+      return { token: o.accessToken, expiresAt: typeof o.expiresAt === 'number' ? o.expiresAt : null };
   } catch {
     /* not JSON */
   }
@@ -65,7 +65,12 @@ export async function fetchUsage(): Promise<UsageApiResult> {
     }
     if (res.status === 429) {
       const ra = Number(res.headers.get('retry-after'));
-      return { ok: false, state: 'error', message: 'Usage API is rate limiting; will retry.', retryAfterMs: Number.isFinite(ra) && ra > 0 ? ra * 1000 : 10 * 60_000 };
+      return {
+        ok: false,
+        state: 'error',
+        message: 'Usage API is rate limiting; will retry.',
+        retryAfterMs: Number.isFinite(ra) && ra > 0 ? ra * 1000 : 10 * 60_000,
+      };
     }
     if (!res.ok) return { ok: false, state: 'error', message: `Usage API answered ${res.status}.` };
     const body = (await res.json()) as Record<string, unknown>;

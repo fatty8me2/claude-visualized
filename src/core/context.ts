@@ -78,9 +78,25 @@ export function contextInfo(
       return { tokens: a.contextTokens, size: 0, estimated: false, windowKnown: false, fraction: 0, pct: 0, level: 'ok' };
     }
     const fraction = a.contextTokens / localWindow.size;
-    return { tokens: a.contextTokens, size: localWindow.size, estimated: localWindow.estimated, windowKnown: true, fraction, pct: Math.round(fraction * 100), level: contextLevel(fraction) };
+    return {
+      tokens: a.contextTokens,
+      size: localWindow.size,
+      estimated: localWindow.estimated,
+      windowKnown: true,
+      fraction,
+      pct: Math.round(fraction * 100),
+      level: contextLevel(fraction),
+    };
   }
   const w = contextWindow(a.model, Math.max(a.contextPeak, a.contextTokens), settingsModel);
   const fraction = a.contextTokens / w.size;
-  return { tokens: a.contextTokens, size: w.size, estimated: w.estimated, windowKnown: true, fraction, pct: Math.round(fraction * 100), level: contextLevel(fraction) };
+  return {
+    tokens: a.contextTokens,
+    size: w.size,
+    estimated: w.estimated,
+    windowKnown: true,
+    fraction,
+    pct: Math.round(fraction * 100),
+    level: contextLevel(fraction),
+  };
 }

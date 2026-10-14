@@ -8,7 +8,16 @@ const sec = (ms: number) => Math.floor(ms / 1000);
 
 describe('usage limits', () => {
   it('reads rate_limits from the status-line payload (percent 0-100, resets_at epoch seconds)', () => {
-    const u = applyStatusline(emptyUsage(), { rate_limits: { five_hour: { used_percentage: 23.5, resets_at: sec(NOW + 3600_000) }, seven_day: { used_percentage: 41.2, resets_at: sec(NOW + 3 * 86400_000) } } }, NOW);
+    const u = applyStatusline(
+      emptyUsage(),
+      {
+        rate_limits: {
+          five_hour: { used_percentage: 23.5, resets_at: sec(NOW + 3600_000) },
+          seven_day: { used_percentage: 41.2, resets_at: sec(NOW + 3 * 86400_000) },
+        },
+      },
+      NOW,
+    );
     expect(u.fiveHour).toMatchObject({ pct: 23.5, resetsAt: NOW + 3600_000, source: 'statusline' });
     expect(u.sevenDay?.pct).toBe(41.2);
     expect(u.statuslineAt).toBe(NOW);
@@ -40,7 +49,12 @@ describe('usage limits', () => {
   });
 
   it('parses quotaLimits from transcript lines', () => {
-    const line = JSON.stringify({ type: 'assistant', timestamp: '2026-09-24T22:54:47.021Z', quotaLimits: { status: 'rejected', resetsAt: 1790297400, rateLimitType: 'five_hour' }, message: { id: 'm', model: '<synthetic>', content: [] } });
+    const line = JSON.stringify({
+      type: 'assistant',
+      timestamp: '2026-09-24T22:54:47.021Z',
+      quotaLimits: { status: 'rejected', resetsAt: 1790297400, rateLimitType: 'five_hour' },
+      message: { id: 'm', model: '<synthetic>', content: [] },
+    });
     const q = normalizeLine(line, { sessionId: 's', agentId: null }).find((e) => e.k === 'quota');
     expect(q).toMatchObject({ limitType: 'five_hour', status: 'rejected', resetsAt: 1790297400_000 });
   });

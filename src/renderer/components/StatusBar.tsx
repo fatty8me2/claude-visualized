@@ -19,10 +19,17 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
         mode <b className="hl">[{view.mode === 'plan' ? 'plan' : 'build'}]</b>
       </span>
       <span>
-        subagents <b>[{running}/{subs.length}]</b>
+        subagents{' '}
+        <b>
+          [{running}/{subs.length}]
+        </b>
       </span>
       <span>
-        {modelLabel(main?.model).toLowerCase()} <b>[{st}{main?.currentTool ? ` · ${toolLabel(main.currentTool.name)}` : ''}]</b>
+        {modelLabel(main?.model).toLowerCase()}{' '}
+        <b>
+          [{st}
+          {main?.currentTool ? ` · ${toolLabel(main.currentTool.name)}` : ''}]
+        </b>
       </span>
       <span>
         tokens <b>{formatTokens(t.in + t.out + t.cacheRead + t.cacheWrite)}</b>
@@ -41,7 +48,9 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
       {replaying && <span className="hl">● replay</span>}
       <span>
         hooks{' '}
-        <b className={hooksLive ? 'ok' : ''}>{hooksLive ? '● live' : hookSrv?.listening ? `○ :${hookSrv.port}` : hookSrv?.error ? '✗ ' + hookSrv.error : '○ off'}</b>
+        <b className={hooksLive ? 'ok' : ''}>
+          {hooksLive ? '● live' : hookSrv?.listening ? `○ :${hookSrv.port}` : hookSrv?.error ? '✗ ' + hookSrv.error : '○ off'}
+        </b>
       </span>
       {view.warnings > 0 && <span title="Transcript lines this version doesn't understand (ignored)">unparsed {view.warnings}</span>}
       <span>{view.version ? `cc ${view.version}` : ''}</span>

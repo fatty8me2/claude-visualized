@@ -4,7 +4,8 @@ import { DEFAULT_MINI_HOTKEY, loginSupport, shouldShowOnSecondInstance, shouldSt
 describe('validateHotkey', () => {
   it('accepts the default and common accelerators', () => {
     expect(DEFAULT_MINI_HOTKEY).not.toBe('CommandOrControl+V');
-    for (const a of [DEFAULT_MINI_HOTKEY, 'Ctrl+Shift+F12', 'Alt+Space', 'Super+Plus', 'CmdOrCtrl+Shift+C', ' Ctrl+Alt+1 ']) expect(validateHotkey(a).ok, a).toBe(true);
+    for (const a of [DEFAULT_MINI_HOTKEY, 'Ctrl+Shift+F12', 'Alt+Space', 'Super+Plus', 'CmdOrCtrl+Shift+C', ' Ctrl+Alt+1 '])
+      expect(validateHotkey(a).ok, a).toBe(true);
   });
   it('rejects bad input', () => {
     for (const a of ['', '   ', 'V', 'Ctrl', 'Ctrl+', 'Ctrl++', 'Ctrl+A+B', 'Ctrl+Alt+Banana', 'Alt', 'Shift+F25']) expect(validateHotkey(a).ok, a).toBe(false);

@@ -84,7 +84,11 @@ export function LogPanel({ view, agentFilter, onAgentFilter }: { view: SessionVi
             </div>
           );
         })}
-        {rows.length === 0 && <div className="empty-note" style={{ padding: '8px 14px' }}>nothing yet</div>}
+        {rows.length === 0 && (
+          <div className="empty-note" style={{ padding: '8px 14px' }}>
+            nothing yet
+          </div>
+        )}
       </div>
     </div>
   );

@@ -10,7 +10,17 @@ const STATE_TEXT: Record<string, [string, string]> = {
   error: ['cannot read settings', 'err'],
 };
 
-export function SettingsDialog({ config, hookSrv, onClose, onWelcome }: { config: AppConfigView; hookSrv: HookServerStatusView | null; onClose: () => void; onWelcome: () => void }) {
+export function SettingsDialog({
+  config,
+  hookSrv,
+  onClose,
+  onWelcome,
+}: {
+  config: AppConfigView;
+  hookSrv: HookServerStatusView | null;
+  onClose: () => void;
+  onWelcome: () => void;
+}) {
   const [hs, setHs] = useState<HookStateView | null>(null);
   const [preview, setPreview] = useState<HookPreviewView | null>(null);
   const [result, setResult] = useState<string | null>(null);
@@ -47,7 +57,11 @@ export function SettingsDialog({ config, hookSrv, onClose, onWelcome }: { config
     setBusy(true);
     const r = await window.api.hookApply(preview.action);
     setBusy(false);
-    setResult(r.ok ? `Done. ${r.backup ? `Backup saved to ${r.backup}` : 'No previous settings file to back up.'} Takes effect in new Claude Code sessions.` : `Failed: ${r.error}`);
+    setResult(
+      r.ok
+        ? `Done. ${r.backup ? `Backup saved to ${r.backup}` : 'No previous settings file to back up.'} Takes effect in new Claude Code sessions.`
+        : `Failed: ${r.error}`,
+    );
     setPreview(null);
     refresh();
   };
@@ -62,20 +76,17 @@ export function SettingsDialog({ config, hookSrv, onClose, onWelcome }: { config
           <button onClick={onClose}>×</button>
         </div>
         <p>
-          Without hooks, the app reads Claude Code's transcript files (about a second behind, no setup). Installing hooks makes Claude Code send each event to this app instantly
-          (tool starts, permission prompts, subagent start/stop, plan/build mode). Hooks only talk to <code>127.0.0.1:{config.port}</code>; if the app isn't running they fail
-          instantly and Claude Code carries on.
+          Without hooks, the app reads Claude Code's transcript files (about a second behind, no setup). Installing hooks makes Claude Code send each event to
+          this app instantly (tool starts, permission prompts, subagent start/stop, plan/build mode). Hooks only talk to <code>127.0.0.1:{config.port}</code>;
+          if the app isn't running they fail instantly and Claude Code carries on.
         </p>
         <p className="note">
-          While this app is closed, Claude Code may note "hook failed: connection refused" for these hooks. That's harmless; remove the hooks here if you stop using the app.
+          While this app is closed, Claude Code may note "hook failed: connection refused" for these hooks. That's harmless; remove the hooks here if you stop
+          using the app.
         </p>
         <div className="row">
           <span>receiver:</span>
-          {hookSrv?.listening ? (
-            <span className="pill ok">listening on :{hookSrv.port}</span>
-          ) : (
-            <span className="pill err">{hookSrv?.error ?? 'stopped'}</span>
-          )}
+          {hookSrv?.listening ? <span className="pill ok">listening on :{hookSrv.port}</span> : <span className="pill err">{hookSrv?.error ?? 'stopped'}</span>}
           <span className="note">{hookSrv?.received ? `${hookSrv.received} events received` : 'no events yet'}</span>
         </div>
         <div className="row">
@@ -115,7 +126,8 @@ export function SettingsDialog({ config, hookSrv, onClose, onWelcome }: { config
             <p>
               {preview.changed ? (
                 <>
-                  Review the <code>hooks</code> section of <code>{preview.settingsFile}</code>. Everything else in the file is kept as-is, and a backup is written first.
+                  Review the <code>hooks</code> section of <code>{preview.settingsFile}</code>. Everything else in the file is kept as-is, and a backup is
+                  written first.
                 </>
               ) : (
                 'Nothing would change.'
@@ -161,7 +173,9 @@ export function SettingsDialog({ config, hookSrv, onClose, onWelcome }: { config
         <label className="chk">
           <input type="checkbox" checked={config.launchAtLogin} onChange={(e) => set({ launchAtLogin: e.target.checked })} />
           {loginName} (opens hidden in the tray)
-          {sys && sys.login !== 'active' && <span className="note"> {sys.login === 'dev' ? '— takes effect in the installed app' : '— disabled in this run'}</span>}
+          {sys && sys.login !== 'active' && (
+            <span className="note"> {sys.login === 'dev' ? '— takes effect in the installed app' : '— disabled in this run'}</span>
+          )}
         </label>
         <div className="row">
           <span>Mini view hotkey</span>
@@ -192,10 +206,7 @@ export function SettingsDialog({ config, hookSrv, onClose, onWelcome }: { config
         <div className="row">
           <span>Receiver port</span>
           <input style={{ width: 90 }} value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))} />
-          <button
-            disabled={!port || Number(port) === config.port || Number(port) < 1024 || Number(port) > 65535}
-            onClick={() => set({ port: Number(port) })}
-          >
+          <button disabled={!port || Number(port) === config.port || Number(port) < 1024 || Number(port) > 65535} onClick={() => set({ port: Number(port) })}>
             Apply
           </button>
           <span className="note">after changing the port, reinstall hooks</span>

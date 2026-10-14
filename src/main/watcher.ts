@@ -122,7 +122,14 @@ export class SessionWatcher {
     return {
       state: this.state,
       main: this.main.snapshot(),
-      agents: [...this.agents.values()].map((a) => ({ file: a.tail.file, agentId: a.agentId, workflowRunId: a.workflowRunId, spawned: a.spawned, firstSeen: a.firstSeen, tail: a.tail.snapshot() })),
+      agents: [...this.agents.values()].map((a) => ({
+        file: a.tail.file,
+        agentId: a.agentId,
+        workflowRunId: a.workflowRunId,
+        spawned: a.spawned,
+        firstSeen: a.firstSeen,
+        tail: a.tail.snapshot(),
+      })),
       journals: [...this.journals.entries()].map(([runId, t]) => ({ runId, file: t.file, tail: t.snapshot() })),
       titleMtime: this.titleMtime,
       planKey: this.planKey,
@@ -289,7 +296,9 @@ export class SessionWatcher {
         this.titleMtime = st.mtimeMs;
         const t = JSON.parse(await fs.readFile(tf, 'utf8'));
         if (typeof t?.customTitle === 'string') {
-          this.ingest([{ ts: st.mtimeMs, src: 'transcript', ref: { sessionId: this.sessionId, agentId: null }, k: 'title', title: t.customTitle, kind: 'custom' }]);
+          this.ingest([
+            { ts: st.mtimeMs, src: 'transcript', ref: { sessionId: this.sessionId, agentId: null }, k: 'title', title: t.customTitle, kind: 'custom' },
+          ]);
         }
       }
     } catch {

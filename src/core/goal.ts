@@ -30,7 +30,8 @@ export const GOAL_INFO: Record<Goal, { glyph: string; word: string; title: strin
   general: { glyph: '◇', word: 'general', title: 'General task' },
 };
 
-const TEST_CMD = /\b(npm (run )?test|npm t\b|pnpm (run )?test|yarn test|vitest|jest|mocha|playwright test|pytest|py\.test|unittest|cargo test|go test|dotnet test|mvn test|gradle test|rspec|phpunit|ctest|npx (vitest|jest|playwright)|tsc --noEmit|gut\b|godot .*(--test|gut))/i;
+const TEST_CMD =
+  /\b(npm (run )?test|npm t\b|pnpm (run )?test|yarn test|vitest|jest|mocha|playwright test|pytest|py\.test|unittest|cargo test|go test|dotnet test|mvn test|gradle test|rspec|phpunit|ctest|npx (vitest|jest|playwright)|tsc --noEmit|gut\b|godot .*(--test|gut))/i;
 const SEARCH_CMD = /^\s*(rg|grep|egrep|fgrep|find|fd|ls|dir|tree|where|which|Select-String|Get-ChildItem|gci|sls|git (grep|ls-files|log|blame))\b/i;
 const READ_CMD = /^\s*(cat|head|tail|less|more|sed -n|type|Get-Content|gc|wc|stat|file)\b/i;
 
@@ -120,9 +121,21 @@ const DESC_PREFIX: { re: RegExp; goal: Goal; weight: number }[] = [
 
 const PHASES: { re: RegExp; ev: [Goal, number][] }[] = [
   { re: /implement|build|construct|content|generate|write/i, ev: [['build', 3.5]] },
-  { re: /fix|repair|patch/i, ev: [['debug', 3], ['build', 1]] },
+  {
+    re: /fix|repair|patch/i,
+    ev: [
+      ['debug', 3],
+      ['build', 1],
+    ],
+  },
   { re: /review|judge|select|critique|audit|dedup/i, ev: [['review', 3.5]] },
-  { re: /verif|validate|check/i, ev: [['review', 2.5], ['test', 1.5]] },
+  {
+    re: /verif|validate|check/i,
+    ev: [
+      ['review', 2.5],
+      ['test', 1.5],
+    ],
+  },
   { re: /find|scan|search|discover|map/i, ev: [['search', 3.5]] },
   { re: /research|investigat/i, ev: [['research', 3.5]] },
   { re: /plan|design/i, ev: [['plan', 3.5]] },
@@ -147,7 +160,10 @@ function usablePrompt(prompt: string | null | undefined): string {
   const p = (prompt ?? '').trim();
   if (!p || /^\[Workflow harness/i.test(p)) return '';
   // file paths and urls say where the work is, not what it is
-  return p.slice(0, 500).replace(/\S*[\\/]\S*/g, ' ').slice(0, 400);
+  return p
+    .slice(0, 500)
+    .replace(/\S*[\\/]\S*/g, ' ')
+    .slice(0, 400);
 }
 
 function words(re: RegExp, text: string): string | null {

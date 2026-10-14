@@ -36,7 +36,12 @@ export const emptyUsage = (): UsageView => ({ fiveHour: null, sevenDay: null, sp
 
 function win(w: Json | undefined, at: number): UsageWindow | null {
   if (!w || typeof w.used_percentage !== 'number') return null;
-  return { pct: Math.max(0, Math.min(100, w.used_percentage)), resetsAt: typeof w.resets_at === 'number' ? w.resets_at * 1000 : null, at, source: 'statusline' };
+  return {
+    pct: Math.max(0, Math.min(100, w.used_percentage)),
+    resetsAt: typeof w.resets_at === 'number' ? w.resets_at * 1000 : null,
+    at,
+    source: 'statusline',
+  };
 }
 
 /** Merge a status-line payload. Payloads without rate_limits (API-key users, before the first response) change nothing. */

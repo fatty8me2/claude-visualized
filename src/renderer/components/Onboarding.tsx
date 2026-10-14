@@ -83,10 +83,12 @@ export function Welcome({ onTour, onSkip, onOpenSettings }: { onTour: () => void
         </div>
         <h2>Welcome</h2>
         <p>
-          This app shows what Claude Code is doing, live. You get a picture of the main agent and every helper it starts, whether it is planning or building, and how much of your 5-hour
-          and weekly limits you have used.
+          This app shows what Claude Code is doing, live. You get a picture of the main agent and every helper it starts, whether it is planning or building,
+          and how much of your 5-hour and weekly limits you have used.
         </p>
-        <p>It only reads files Claude Code already writes on your computer. It does not change anything, and nothing leaves your machine except the usage check.</p>
+        <p>
+          It only reads files Claude Code already writes on your computer. It does not change anything, and nothing leaves your machine except the usage check.
+        </p>
 
         <div className="w-sub">SETUP CHECKLIST</div>
         <div className="checks">
@@ -99,7 +101,8 @@ export function Welcome({ onTour, onSkip, onOpenSettings }: { onTour: () => void
                   <CopyButton text={LOGIN_COMMAND} />
                 </div>
                 <div className="hint">
-                  Open a terminal (Windows Terminal is recommended), paste the command with <b>Ctrl+Shift+V</b>, press Enter and follow the steps. This page updates by itself afterwards.
+                  Open a terminal (Windows Terminal is recommended), paste the command with <b>Ctrl+Shift+V</b>, press Enter and follow the steps. This page
+                  updates by itself afterwards.
                 </div>
               </div>
             )}

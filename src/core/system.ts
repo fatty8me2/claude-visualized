@@ -4,12 +4,42 @@ export const DEFAULT_MINI_HOTKEY = 'CommandOrControl+Alt+V';
 
 const MODIFIERS = new Set(['command', 'cmd', 'control', 'ctrl', 'commandorcontrol', 'cmdorctrl', 'alt', 'option', 'altgr', 'shift', 'super', 'meta']);
 const NAMED_KEYS = new Set([
-  'plus', 'space', 'tab', 'capslock', 'numlock', 'scrolllock', 'backspace', 'delete', 'insert', 'return', 'enter',
-  'up', 'down', 'left', 'right', 'home', 'end', 'pageup', 'pagedown', 'escape', 'esc',
-  'volumeup', 'volumedown', 'volumemute', 'medianexttrack', 'mediaprevioustrack', 'mediastop', 'mediaplaypause', 'printscreen',
+  'plus',
+  'space',
+  'tab',
+  'capslock',
+  'numlock',
+  'scrolllock',
+  'backspace',
+  'delete',
+  'insert',
+  'return',
+  'enter',
+  'up',
+  'down',
+  'left',
+  'right',
+  'home',
+  'end',
+  'pageup',
+  'pagedown',
+  'escape',
+  'esc',
+  'volumeup',
+  'volumedown',
+  'volumemute',
+  'medianexttrack',
+  'mediaprevioustrack',
+  'mediastop',
+  'mediaplaypause',
+  'printscreen',
 ]);
 const isKey = (k: string) =>
-  /^[a-z0-9]$/i.test(k) || /^[`\-=[\]\\;',./]$/.test(k) || /^f([1-9]|1\d|2[0-4])$/i.test(k) || /^num([0-9]|dec|add|sub|mult|div)$/i.test(k) || NAMED_KEYS.has(k.toLowerCase());
+  /^[a-z0-9]$/i.test(k) ||
+  /^[`\-=[\]\\;',./]$/.test(k) ||
+  /^f([1-9]|1\d|2[0-4])$/i.test(k) ||
+  /^num([0-9]|dec|add|sub|mult|div)$/i.test(k) ||
+  NAMED_KEYS.has(k.toLowerCase());
 const isPrimary = (m: string) => ['command', 'cmd', 'control', 'ctrl', 'commandorcontrol', 'cmdorctrl'].includes(m.toLowerCase());
 
 /**

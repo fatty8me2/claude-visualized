@@ -34,9 +34,11 @@ const LOCAL_FAMILIES: [string, RegExp, string, boolean][] = [
 ];
 
 /** Path prefixes that mean the model is served from this machine. */
-const LOCAL_PREFIX = /^(ollama|ollama_chat|lm[-_]?studio|lmstudio-community|lmstudio|llamacpp|llama[-_.]cpp|llamafile|jan|localai|vllm|hosted_vllm|mlx-community|hf\.co|huggingface\.co|bartowski|unsloth|thebloke)$/i;
+const LOCAL_PREFIX =
+  /^(ollama|ollama_chat|lm[-_]?studio|lmstudio-community|lmstudio|llamacpp|llama[-_.]cpp|llamafile|jan|localai|vllm|hosted_vllm|mlx-community|hf\.co|huggingface\.co|bartowski|unsloth|thebloke)$/i;
 /** Prefixes of hosted gateways: the model is not local, but the label is still prettified. */
-const CLOUD_PREFIX = /^(openrouter|together|togetherai|groq|fireworks|fireworks_ai|deepinfra|openai|azure|vertex_ai|gemini|google|bedrock|mistralai|meta-llama|deepseek-ai|qwen|huggingface)$/i;
+const CLOUD_PREFIX =
+  /^(openrouter|together|togetherai|groq|fireworks|fireworks_ai|deepinfra|openai|azure|vertex_ai|gemini|google|bedrock|mistralai|meta-llama|deepseek-ai|qwen|huggingface)$/i;
 
 const QUANT = /^(q\d(?:_[a-z0-9]+)*|iq\d(?:_[a-z0-9]+)*|fp16|f16|bf16|fp8|int4|int8|\d+bit)$/i;
 const SIZE = /^\d+(?:\.\d+)?[bkmt]$/i;
@@ -61,7 +63,14 @@ function titleWord(w: string): string {
   return w[0].toUpperCase() + w.slice(1);
 }
 
-const SPECIAL_HEAD: Record<string, string> = { mixtral: 'Mixtral', ministral: 'Ministral', qwq: 'QwQ', codegemma: 'CodeGemma', chatglm: 'ChatGLM', tinyllama: 'TinyLlama' };
+const SPECIAL_HEAD: Record<string, string> = {
+  mixtral: 'Mixtral',
+  ministral: 'Ministral',
+  qwq: 'QwQ',
+  codegemma: 'CodeGemma',
+  chatglm: 'ChatGLM',
+  tinyllama: 'TinyLlama',
+};
 
 function prettyLocalLabel(name: string, famIdx: number): string {
   // "model@q4_k_m" (LM Studio) and "model:tag" (Ollama)
@@ -151,7 +160,11 @@ export function modelMatchKeys(model: string | null | undefined): string[] {
   };
   add(name);
   // "ollama/qwen3" -> "qwen3"; keep the multi-segment form too for LM Studio "publisher/model" ids
-  const noProvider = raw.split('/').filter(Boolean).filter((p, i, a) => i === a.length - 1 || !LOCAL_PREFIX.test(p) && !CLOUD_PREFIX.test(p)).join('/');
+  const noProvider = raw
+    .split('/')
+    .filter(Boolean)
+    .filter((p, i, a) => i === a.length - 1 || (!LOCAL_PREFIX.test(p) && !CLOUD_PREFIX.test(p)))
+    .join('/');
   add(noProvider);
   return [...keys];
 }

@@ -69,7 +69,16 @@ export function usePlanModel(view: SessionView | null): PlanModel | null {
     if (!view) return null;
     const r = resolvePlan(view.plan, view.todos);
     if (!r) return null;
-    const agents = Object.values(view.agents).map((a) => ({ id: a.id, kind: a.kind, agentType: a.agentType, description: a.description, status: a.status, lastText: a.lastText, prompt: a.prompt, startedAt: a.startedAt }));
+    const agents = Object.values(view.agents).map((a) => ({
+      id: a.id,
+      kind: a.kind,
+      agentType: a.agentType,
+      description: a.description,
+      status: a.status,
+      lastText: a.lastText,
+      prompt: a.prompt,
+      startedAt: a.startedAt,
+    }));
     const statuses = computeStepStatus(r.parsed.steps, view.todos, agents, { since: r.origin === 'todos' ? undefined : view.plan?.since });
     const p = planProgress(statuses);
     return { parsed: r.parsed, origin: r.origin, statuses, ...p };
@@ -80,7 +89,12 @@ export function usePlanModel(view: SessionView | null): PlanModel | null {
 
 export function PlanToggle({ plan, prefs }: { plan: PlanModel; prefs: PlanPrefsApi }) {
   return (
-    <button className={prefs.prefs.open ? 'on' : ''} onClick={() => prefs.set((p) => ({ ...p, open: !p.open }))} title="Show or hide the plan beside the graph" data-testid="plan-toggle">
+    <button
+      className={prefs.prefs.open ? 'on' : ''}
+      onClick={() => prefs.set((p) => ({ ...p, open: !p.open }))}
+      title="Show or hide the plan beside the graph"
+      data-testid="plan-toggle"
+    >
       ▤ plan {plan.done}/{plan.total}
     </button>
   );
@@ -217,7 +231,12 @@ export function PlanRail({
   });
 
   return (
-    <aside className={`plan-rail side-${prefs.prefs.side} ${finished ? 'finished' : ''}`} style={{ width: prefs.prefs.width }} data-testid="plan-rail" data-tour="plan">
+    <aside
+      className={`plan-rail side-${prefs.prefs.side} ${finished ? 'finished' : ''}`}
+      style={{ width: prefs.prefs.width }}
+      data-testid="plan-rail"
+      data-tour="plan"
+    >
       <ResizeEdge prefs={prefs} />
       <div className="pr-head">
         <div className="pr-h1">

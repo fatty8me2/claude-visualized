@@ -58,8 +58,20 @@ const OLLAMA_PS = {
 };
 const OLLAMA_TAGS = {
   models: [
-    { name: 'qwen2.5-coder:32b', model: 'qwen2.5-coder:32b', modified_at: '2026-09-01T10:00:00Z', size: 19_851_336_192, digest: 'b', details: { family: 'qwen2', parameter_size: '32.8B', quantization_level: 'Q4_K_M' } },
-    { name: 'llama3.2:latest', model: 'llama3.2:latest', size: 2_019_393_189, details: { family: 'llama', parameter_size: '3.2B', quantization_level: 'Q4_K_M' } },
+    {
+      name: 'qwen2.5-coder:32b',
+      model: 'qwen2.5-coder:32b',
+      modified_at: '2026-09-01T10:00:00Z',
+      size: 19_851_336_192,
+      digest: 'b',
+      details: { family: 'qwen2', parameter_size: '32.8B', quantization_level: 'Q4_K_M' },
+    },
+    {
+      name: 'llama3.2:latest',
+      model: 'llama3.2:latest',
+      size: 2_019_393_189,
+      details: { family: 'llama', parameter_size: '3.2B', quantization_level: 'Q4_K_M' },
+    },
   ],
 };
 const OLLAMA_SHOW = {
@@ -71,19 +83,54 @@ const OLLAMA_SHOW = {
 const LMSTUDIO_V0 = {
   object: 'list',
   data: [
-    { id: 'qwen2.5-coder-32b-instruct', object: 'model', type: 'llm', publisher: 'lmstudio-community', arch: 'qwen2', compatibility_type: 'gguf', quantization: 'Q4_K_M', state: 'loaded', max_context_length: 32768 },
-    { id: 'llama-3.2-3b-instruct', object: 'model', type: 'llm', publisher: 'lmstudio-community', arch: 'llama', quantization: 'Q4_K_M', state: 'not-loaded', max_context_length: 131072 },
+    {
+      id: 'qwen2.5-coder-32b-instruct',
+      object: 'model',
+      type: 'llm',
+      publisher: 'lmstudio-community',
+      arch: 'qwen2',
+      compatibility_type: 'gguf',
+      quantization: 'Q4_K_M',
+      state: 'loaded',
+      max_context_length: 32768,
+    },
+    {
+      id: 'llama-3.2-3b-instruct',
+      object: 'model',
+      type: 'llm',
+      publisher: 'lmstudio-community',
+      arch: 'llama',
+      quantization: 'Q4_K_M',
+      state: 'not-loaded',
+      max_context_length: 131072,
+    },
     { id: 'text-embedding-nomic-embed-text-v1.5', object: 'model', type: 'embeddings', state: 'not-loaded', max_context_length: 2048 },
   ],
 };
 const LMSTUDIO_V1 = {
   models: [
-    { type: 'llm', publisher: 'google', key: 'google/gemma-3-27b', display_name: 'Gemma 3 27B', architecture: 'gemma3', quantization: { name: 'Q4_K_M', bits_per_weight: 4 }, size_bytes: 16_000_000_000, params_string: '27B', loaded_instances: [{ id: 'google/gemma-3-27b', config: { context_length: 8192 } }], max_context_length: 131072 },
+    {
+      type: 'llm',
+      publisher: 'google',
+      key: 'google/gemma-3-27b',
+      display_name: 'Gemma 3 27B',
+      architecture: 'gemma3',
+      quantization: { name: 'Q4_K_M', bits_per_weight: 4 },
+      size_bytes: 16_000_000_000,
+      params_string: '27B',
+      loaded_instances: [{ id: 'google/gemma-3-27b', config: { context_length: 8192 } }],
+      max_context_length: 131072,
+    },
     { type: 'llm', key: 'x/y', loaded_instances: [], max_context_length: 4096 },
   ],
 };
 const OPENAI_MODELS = { object: 'list', data: [{ id: 'Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf', object: 'model', created: 0, owned_by: 'llamacpp' }] };
-const LLAMA_PROPS = { default_generation_settings: { n_ctx: 8192 }, total_slots: 2, model_path: '../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf', build_info: 'b4567-abc' };
+const LLAMA_PROPS = {
+  default_generation_settings: { n_ctx: 8192 },
+  total_slots: 2,
+  model_path: '../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
+  build_info: 'b4567-abc',
+};
 const LLAMA_SLOTS = [
   { id: 0, n_ctx: 4096, is_processing: true },
   { id: 1, n_ctx: 4096, is_processing: false },
@@ -110,7 +157,15 @@ describe('Ollama parsers', () => {
 
   it('parses /api/ps with the VRAM/RAM split, expiry and context', () => {
     const [q, l] = parseOllamaPs(OLLAMA_PS, NOW);
-    expect(q).toMatchObject({ id: 'qwen2.5-coder:32b', label: 'Qwen2.5 Coder 32B', loaded: true, params: '32.8B', quant: 'Q4_K_M', family: 'qwen2', contextLength: null });
+    expect(q).toMatchObject({
+      id: 'qwen2.5-coder:32b',
+      label: 'Qwen2.5 Coder 32B',
+      loaded: true,
+      params: '32.8B',
+      quant: 'Q4_K_M',
+      family: 'qwen2',
+      contextLength: null,
+    });
     expect(q.expiresAt).toBe(Date.parse('2026-10-14T12:04:12Z'));
     const split = memorySplit(q)!;
     expect(split.vram).toBe(19_551_000_000);
@@ -150,7 +205,15 @@ describe('LM Studio parsers', () => {
 
   it('parses the newer /api/v1/models shape', () => {
     const m = parseLmStudioModels(LMSTUDIO_V1);
-    expect(m[0]).toMatchObject({ id: 'google/gemma-3-27b', loaded: true, contextLength: 8192, maxContext: 131072, quant: 'Q4_K_M', params: '27B', sizeBytes: 16_000_000_000 });
+    expect(m[0]).toMatchObject({
+      id: 'google/gemma-3-27b',
+      loaded: true,
+      contextLength: 8192,
+      maxContext: 131072,
+      quant: 'Q4_K_M',
+      params: '27B',
+      sizeBytes: 16_000_000_000,
+    });
     expect(m[1].loaded).toBe(false);
   });
 });
@@ -166,7 +229,12 @@ describe('OpenAI-compatible / llama.cpp parsers', () => {
   it('parses /health, /props, /slots and /metrics', () => {
     expect(parseLlamaHealth(200, { status: 'ok' })).toEqual({ ok: true, loading: false });
     expect(parseLlamaHealth(503, { error: { code: 503, message: 'Loading model' } })).toEqual({ ok: false, loading: true });
-    expect(parseLlamaProps(LLAMA_PROPS)).toEqual({ nCtx: 8192, totalSlots: 2, modelPath: '../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf', version: 'b4567-abc' });
+    expect(parseLlamaProps(LLAMA_PROPS)).toEqual({
+      nCtx: 8192,
+      totalSlots: 2,
+      modelPath: '../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
+      version: 'b4567-abc',
+    });
     expect(parseLlamaSlots(LLAMA_SLOTS)).toEqual({ total: 2, busy: 1, nCtx: 4096 });
     expect(parseLlamaSlots({ error: 'disabled' })).toBeNull();
     expect(parseLlamaMetrics(LLAMA_METRICS)).toEqual({ processing: 1, deferred: 0, generationTps: 31.25, promptTps: 102.5 });
@@ -243,7 +311,11 @@ describe('pollServer', () => {
 
   it('polls a llama.cpp server for slots, context and metrics', async () => {
     const t = { id: 'openai:x', kind: 'openai' as const, name: 'llama.cpp', baseUrl: 'x' };
-    const s = await pollServer(t, fake({ '/v1/models': OPENAI_MODELS, '/health': { status: 'ok' }, '/props': LLAMA_PROPS, '/slots': LLAMA_SLOTS, '/metrics': LLAMA_METRICS }).req, NOW);
+    const s = await pollServer(
+      t,
+      fake({ '/v1/models': OPENAI_MODELS, '/health': { status: 'ok' }, '/props': LLAMA_PROPS, '/slots': LLAMA_SLOTS, '/metrics': LLAMA_METRICS }).req,
+      NOW,
+    );
     expect(s.state).toBe('up');
     expect(s.version).toBe('b4567-abc');
     expect(s.loaded[0].contextLength).toBe(8192);
@@ -312,13 +384,24 @@ describe('config', () => {
 });
 
 // ---- linking and context ----
-function up(id: string, kind: LocalServerStatus['kind'], name: string, loaded: ReturnType<typeof parseOllamaPs>, installed: ReturnType<typeof parseOllamaPs> = []): LocalServerStatus {
+function up(
+  id: string,
+  kind: LocalServerStatus['kind'],
+  name: string,
+  loaded: ReturnType<typeof parseOllamaPs>,
+  installed: ReturnType<typeof parseOllamaPs> = [],
+): LocalServerStatus {
   return { ...baseStatus({ id, kind, name, baseUrl: 'x' }, NOW), state: 'up', loaded, installed };
 }
 
 describe('linking agents to servers', () => {
   const ollama = up('ollama', 'ollama', 'Ollama', parseOllamaPs(OLLAMA_PS, NOW));
-  const lm = up('lmstudio', 'lmstudio', 'LM Studio', parseLmStudioModels(LMSTUDIO_V0).filter((m) => m.loaded));
+  const lm = up(
+    'lmstudio',
+    'lmstudio',
+    'LM Studio',
+    parseLmStudioModels(LMSTUDIO_V0).filter((m) => m.loaded),
+  );
 
   it('finds the server that has the agent’s model loaded', () => {
     const l = findLoadedModel('qwen2.5-coder:32b', [lm, ollama])!;
@@ -379,7 +462,12 @@ describe('context length for local agents', () => {
   });
 
   it('keeps the Claude window logic unchanged and ignores servers for Claude models', () => {
-    expect(contextInfo(agent('claude-opus-5-5', 100_000), null, { size: 5, estimated: false })).toMatchObject({ size: 200_000, estimated: true, windowKnown: true, pct: 50 });
+    expect(contextInfo(agent('claude-opus-5-5', 100_000), null, { size: 5, estimated: false })).toMatchObject({
+      size: 200_000,
+      estimated: true,
+      windowKnown: true,
+      pct: 50,
+    });
     expect(localWindowFor('claude-opus-5-5', servers)).toBeNull();
   });
 });

@@ -492,7 +492,9 @@ select:focus {
     box-shadow 0.3s;
 }
 .node.running {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fam) 25%, transparent), 0 0 18px -6px var(--fam);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--fam) 25%, transparent),
+    0 0 18px -6px var(--fam);
 }
 .node.waiting {
   border-color: var(--warn);
@@ -652,11 +654,7 @@ select:focus {
 .bar.indet > i {
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--fam) 0 6px,
-    color-mix(in srgb, var(--fam) 35%, transparent) 6px 12px
-  );
+  background: repeating-linear-gradient(-45deg, var(--fam) 0 6px, color-mix(in srgb, var(--fam) 35%, transparent) 6px 12px);
   background-size: 34px 34px;
   animation: stripes 0.9s linear infinite;
   opacity: 0.85;
@@ -1394,7 +1392,11 @@ select:focus {
   border: 2px solid var(--opus);
   box-shadow: 0 0 0 9999px rgba(5, 4, 9, 0.72);
   pointer-events: none;
-  transition: left 0.18s, top 0.18s, width 0.18s, height 0.18s;
+  transition:
+    left 0.18s,
+    top 0.18s,
+    width 0.18s,
+    height 0.18s;
 }
 .tour-card {
   position: absolute;
@@ -1680,7 +1682,9 @@ body.resizing .rz-right {
   background: var(--panel-2);
   color: var(--text);
   white-space: nowrap;
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5), 0 0 26px -8px var(--opus);
+  box-shadow:
+    0 12px 34px rgba(0, 0, 0, 0.5),
+    0 0 26px -8px var(--opus);
 }
 .drag-ghost span {
   color: var(--opus);
@@ -1856,7 +1860,9 @@ body.resizing .rz-right {
   background: repeating-linear-gradient(90deg, var(--run) 0 6px, color-mix(in srgb, var(--run) 35%, transparent) 6px 12px);
   background-size: 24px 100%;
   animation: pr-stripes 0.9s linear infinite;
-  transition: left 0.5s ease, width 0.5s ease;
+  transition:
+    left 0.5s ease,
+    width 0.5s ease;
 }
 @keyframes pr-stripes {
   to {
@@ -2067,7 +2073,9 @@ body.resizing .rz-right {
 
 /* agent card lit by hovering a plan step */
 .node.hl {
-  box-shadow: 0 0 0 2px var(--fam, var(--opus)), 0 0 22px -2px var(--fam, var(--opus));
+  box-shadow:
+    0 0 0 2px var(--fam, var(--opus)),
+    0 0 22px -2px var(--fam, var(--opus));
   z-index: 2;
 }
 

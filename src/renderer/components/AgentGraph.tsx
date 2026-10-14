@@ -31,9 +31,24 @@ function Spark({ activity, now }: { activity: number[]; now: number }) {
 
 /** No fake percentages: full when finished, animated stripes while working, empty when idle. */
 function Bar({ status }: { status: DisplayStatus }) {
-  if (status === 'done') return <div className="bar full"><i /></div>;
-  if (status === 'error') return <div className="bar full" style={{ ['--fam' as string]: 'var(--err)' }}><i /></div>;
-  if (status === 'running' || status === 'quiet') return <div className={`bar indet ${status === 'quiet' ? 'quiet' : ''}`}><i /></div>;
+  if (status === 'done')
+    return (
+      <div className="bar full">
+        <i />
+      </div>
+    );
+  if (status === 'error')
+    return (
+      <div className="bar full" style={{ ['--fam' as string]: 'var(--err)' }}>
+        <i />
+      </div>
+    );
+  if (status === 'running' || status === 'quiet')
+    return (
+      <div className={`bar indet ${status === 'quiet' ? 'quiet' : ''}`}>
+        <i />
+      </div>
+    );
   return <div className="bar" />;
 }
 
@@ -41,7 +56,29 @@ function totalTokens(a: AgentNode) {
   return a.tokens.in + a.tokens.out + a.tokens.cacheRead + a.tokens.cacheWrite;
 }
 
-function NodeCard({ a, view, now, x, y, w, h, selected, hl, onSelect }: { a: AgentNode; view: SessionView; now: number; x: number; y: number; w: number; h: number; selected: boolean; hl?: boolean; onSelect: (id: string) => void }) {
+function NodeCard({
+  a,
+  view,
+  now,
+  x,
+  y,
+  w,
+  h,
+  selected,
+  hl,
+  onSelect,
+}: {
+  a: AgentNode;
+  view: SessionView;
+  now: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  selected: boolean;
+  hl?: boolean;
+  onSelect: (id: string) => void;
+}) {
   const st = displayStatus(a, now);
   const elapsed = (a.endedAt ?? (st === 'running' || st === 'waiting' ? now : a.lastActivity)) - a.startedAt;
   const isMain = a.kind === 'main';
@@ -66,9 +103,7 @@ function NodeCard({ a, view, now, x, y, w, h, selected, hl, onSelect }: { a: Age
       </div>
       {isMain ? (
         <>
-          <div className="model">
-            {modeLabel(view.mode).short === 'PLAN' ? 'plan mode · reads, designs' : `building · ${modeLabel(view.mode).detail}`}
-          </div>
+          <div className="model">{modeLabel(view.mode).short === 'PLAN' ? 'plan mode · reads, designs' : `building · ${modeLabel(view.mode).detail}`}</div>
           <div className={`status ${st}`}>
             {STATUS_GLYPH[st]}
             {a.effort ? ` · effort ${a.effort}` : ''}
@@ -91,7 +126,11 @@ function NodeCard({ a, view, now, x, y, w, h, selected, hl, onSelect }: { a: Age
         <span className="lbl">now:</span> {act.phrase}
         {act.since != null && now - act.since >= 1000 && <span className="dur"> · {formatDuration(now - act.since)}</span>}
       </div>
-      {!isMain && <div className="says" title={a.lastText ?? ''}>{says ? <>says: {says}</> : null}</div>}
+      {!isMain && (
+        <div className="says" title={a.lastText ?? ''}>
+          {says ? <>says: {says}</> : null}
+        </div>
+      )}
       <div className="meta">
         <span>
           {a.toolCount} tools · {formatDuration(elapsed)} · {formatTokens(totalTokens(a))} tok
@@ -154,7 +193,13 @@ export function AgentGraph({
 
   // local-model cards carry two extra rows (model id, where it is loaded)
   const extra = Object.values(view.agents).some((a) => isLocalModel(a.model)) ? LOCAL_ROWS_H : 0;
-  const layout = layoutAgents(view.agents, { ...DEFAULT_LAYOUT, nodeH: DEFAULT_LAYOUT.nodeH + extra, mainH: DEFAULT_LAYOUT.mainH + extra, showFinished, expanded });
+  const layout = layoutAgents(view.agents, {
+    ...DEFAULT_LAYOUT,
+    nodeH: DEFAULT_LAYOUT.nodeH + extra,
+    mainH: DEFAULT_LAYOUT.mainH + extra,
+    showFinished,
+    expanded,
+  });
   const pad = compact ? 14 : 36;
   const scale = compact
     ? Math.max(0.28, Math.min(1, (wrapW - pad * 2) / Math.max(1, layout.width), (wrapH - pad * 2) / Math.max(1, layout.height)))
@@ -167,25 +212,36 @@ export function AgentGraph({
   return (
     <div className={`graph-wrap ${compact ? 'compact' : ''}`} data-tour="graph" ref={wrapRef} onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
       {!compact && (
-      <div className="graph-tools">
-        <button className={fit ? 'on' : ''} onClick={() => setFit(!fit)} title="Fit graph to width">
-          {fit ? '⤢ fit' : '1:1'}
-        </button>
-        <button className={showFinished ? '' : 'on'} onClick={onToggleFinished} title="Hide or show finished subagents">
-          {showFinished ? 'hide finished' : 'show finished'}
-        </button>
-        <span className="badge" style={{ alignSelf: 'center' }}>
-          subagents {running}/{total}
-        </span>
-        {extraTools}
-      </div>
+        <div className="graph-tools">
+          <button className={fit ? 'on' : ''} onClick={() => setFit(!fit)} title="Fit graph to width">
+            {fit ? '⤢ fit' : '1:1'}
+          </button>
+          <button className={showFinished ? '' : 'on'} onClick={onToggleFinished} title="Hide or show finished subagents">
+            {showFinished ? 'hide finished' : 'show finished'}
+          </button>
+          <span className="badge" style={{ alignSelf: 'center' }}>
+            subagents {running}/{total}
+          </span>
+          {extraTools}
+        </div>
       )}
       <div
         className="graph-canvas"
         onMouseOver={onHoverAgent ? (e) => onHoverAgent((e.target as HTMLElement).closest<HTMLElement>('[data-agent]')?.dataset.agent ?? null) : undefined}
         onMouseLeave={onHoverAgent ? () => onHoverAgent(null) : undefined}
-        style={{ width: layout.width * scale + pad * 2, height: layout.height * scale + pad * 2 }}>
-        <div style={{ position: 'absolute', left: pad, top: pad, width: layout.width, height: layout.height, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+        style={{ width: layout.width * scale + pad * 2, height: layout.height * scale + pad * 2 }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            left: pad,
+            top: pad,
+            width: layout.width,
+            height: layout.height,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+          }}
+        >
           <svg className="edges" width={layout.width} height={layout.height}>
             {layout.edges.map((e) => (
               <g key={`${e.from}>${e.to}`}>
@@ -216,7 +272,21 @@ export function AgentGraph({
             }
             const a = view.agents[n.id];
             if (!a) return null;
-            return <NodeCard key={n.id} a={a} view={view} now={now} x={n.x} y={n.y} w={n.w} h={n.h} selected={selectedAgent === n.id} hl={highlight?.has(n.id)} onSelect={onSelect} />;
+            return (
+              <NodeCard
+                key={n.id}
+                a={a}
+                view={view}
+                now={now}
+                x={n.x}
+                y={n.y}
+                w={n.w}
+                h={n.h}
+                selected={selectedAgent === n.id}
+                hl={highlight?.has(n.id)}
+                onSelect={onSelect}
+              />
+            );
           })}
         </div>
       </div>

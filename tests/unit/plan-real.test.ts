@@ -17,7 +17,9 @@ describe.skipIf(!process.env.PLAN_REAL)('real plans', () => {
     for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.md'))) {
       const p = parsePlan(fs.readFileSync(path.join(dir, f), 'utf8'));
       console.log(`\n=== ${f.slice(0, 50)} title=${p.title} sections=${p.sections.length} steps=${p.steps.length}`);
-      p.steps.slice(0, 40).forEach((s) => console.log(`  ${'  '.repeat(s.depth)}[${s.section}] ${s.checked === null ? '' : s.checked ? '[x] ' : '[ ] '}${s.title}`));
+      p.steps
+        .slice(0, 40)
+        .forEach((s) => console.log(`  ${'  '.repeat(s.depth)}[${s.section}] ${s.checked === null ? '' : s.checked ? '[x] ' : '[ ] '}${s.title}`));
     }
   });
 
@@ -39,7 +41,16 @@ describe.skipIf(!process.env.PLAN_REAL)('real plans', () => {
             try {
               const m = JSON.parse(fs.readFileSync(path.join(subDir, sf), 'utf8'));
               const id = sf.replace('agent-', '').replace('.meta.json', '');
-              s.agents[id] ??= { ...s.agents.main, id, kind: 'agent', parentId: 'main', agentType: m.agentType ?? 'agent', description: m.description ?? '', status: 'done', prompt: undefined } as never;
+              s.agents[id] ??= {
+                ...s.agents.main,
+                id,
+                kind: 'agent',
+                parentId: 'main',
+                agentType: m.agentType ?? 'agent',
+                description: m.description ?? '',
+                status: 'done',
+                prompt: undefined,
+              } as never;
               s.agents[id].description = m.description ?? '';
               s.agents[id].agentType = m.agentType ?? 'agent';
             } catch {
@@ -53,12 +64,21 @@ describe.skipIf(!process.env.PLAN_REAL)('real plans', () => {
         const agents = Object.values(s.agents).filter((a) => a.kind !== 'main');
         const st = computeStepStatus(p.steps, s.todos, agents, { since: s.plan?.since });
         const prog = planProgress(st);
-        console.log(`\n### ${sid.slice(0, 8)} ${s.title?.slice(0, 50)} steps=${p.steps.length} agents=${agents.length} todos=${s.todos.length} done=${prog.done} active=${prog.active}`);
+        console.log(
+          `\n### ${sid.slice(0, 8)} ${s.title?.slice(0, 50)} steps=${p.steps.length} agents=${agents.length} todos=${s.todos.length} done=${prog.done} active=${prog.active}`,
+        );
         p.steps.forEach((step, i) => {
-          if (st[i].linkedAgents.length || st[i].status !== 'pending') console.log(`  ${st[i].status.padEnd(11)} ${step.title.slice(0, 60)}  <- ${st[i].reasons.slice(0, 3).join(' | ').slice(0, 160)}`);
+          if (st[i].linkedAgents.length || st[i].status !== 'pending')
+            console.log(`  ${st[i].status.padEnd(11)} ${step.title.slice(0, 60)}  <- ${st[i].reasons.slice(0, 3).join(' | ').slice(0, 160)}`);
         });
         const linked = new Set(st.flatMap((x) => x.linkedAgents));
-        console.log(`  UNLINKED agents: ${agents.filter((a) => !linked.has(a.id)).map((a) => a.description.slice(0, 40)).slice(0, 12).join(' ; ')}`);
+        console.log(
+          `  UNLINKED agents: ${agents
+            .filter((a) => !linked.has(a.id))
+            .map((a) => a.description.slice(0, 40))
+            .slice(0, 12)
+            .join(' ; ')}`,
+        );
       }
     }
   });

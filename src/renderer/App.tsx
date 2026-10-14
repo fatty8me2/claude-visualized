@@ -40,7 +40,12 @@ function Legend({ view }: { view: SessionView }) {
         <span key={key} className={`fam-${g.fam}`} data-testid="legend-item">
           <span className="sw" />
           {modelLabel(g.model).toLowerCase()} · {g.count > 1 ? `${g.count} agents` : FAMILY_ROLE[g.fam]}
-          {g.fam === 'local' && <> <LocalTag /></>}
+          {g.fam === 'local' && (
+            <>
+              {' '}
+              <LocalTag />
+            </>
+          )}
         </span>
       ))}
     </div>
@@ -148,22 +153,22 @@ export function App() {
   return (
     <div className={`app sidebar-${layout.sidebar.side}`}>
       <div className="sidebar-wrap" data-flip="sidebar" style={collapsed ? undefined : { width: layout.sidebar.width }}>
-      <SessionList
-        sessions={sessions}
-        selected={selected}
-        now={wallNow}
-        follow={config?.followActive ?? true}
-        onSelect={openSession}
-        onFollow={(on) => void window.api.setFollow(on)}
-        collapsed={collapsed}
-        onCollapse={() => setCollapsed(!collapsed)}
-        page={page}
-        onPage={setPage}
-        onHelp={() => setOnboarding('welcome')}
-        activeOnly={activeOnly}
-        onActiveOnly={setActiveOnly}
-      />
-      {!collapsed && <SidebarResizeHandle api={layoutApi} />}
+        <SessionList
+          sessions={sessions}
+          selected={selected}
+          now={wallNow}
+          follow={config?.followActive ?? true}
+          onSelect={openSession}
+          onFollow={(on) => void window.api.setFollow(on)}
+          collapsed={collapsed}
+          onCollapse={() => setCollapsed(!collapsed)}
+          page={page}
+          onPage={setPage}
+          onHelp={() => setOnboarding('welcome')}
+          activeOnly={activeOnly}
+          onActiveOnly={setActiveOnly}
+        />
+        {!collapsed && <SidebarResizeHandle api={layoutApi} />}
       </div>
       {page === 'local' ? (
         <LocalModelsPage onOpenSession={openSession} onSettings={() => setShowSettings(true)} />
@@ -196,13 +201,22 @@ export function App() {
               <button data-tour="hooks" onClick={() => setShowSettings(true)} title="Hooks and settings">
                 ⚙ hooks
               </button>
-              <button className={editingLayout ? 'on' : ''} onClick={() => setEditingLayout(!editingLayout)} title="Rearrange and resize the panels" data-testid="layout-toggle">
+              <button
+                className={editingLayout ? 'on' : ''}
+                onClick={() => setEditingLayout(!editingLayout)}
+                title="Rearrange and resize the panels"
+                data-testid="layout-toggle"
+              >
                 ⧉ layout
               </button>
             </div>
           </div>
           {editingLayout && <LayoutToolbar api={layoutApi} onDone={() => setEditingLayout(false)} />}
-          {!layout.hidden.legend && <div data-flip="legend"><Legend view={view} /></div>}
+          {!layout.hidden.legend && (
+            <div data-flip="legend">
+              <Legend view={view} />
+            </div>
+          )}
           {replay && (
             <div className="replaybar">
               <button onClick={() => setPlaying(!replay.playing)}>{replay.playing ? '❚❚' : '▶'}</button>
@@ -239,14 +253,26 @@ export function App() {
                     {agentSel && <AgentDrawer view={view} id={agentSel} now={now} onClose={() => setAgentSel(null)} onFilterLog={setLogAgent} />}
                   </div>
                   {plan && planPrefs.prefs.open && (
-                    <PlanRail view={view} plan={plan} prefs={planPrefs} hoverAgent={hoverAgent} onHighlight={setHlAgents} onSelect={setAgentSel} onFilterLog={setLogAgent} />
+                    <PlanRail
+                      view={view}
+                      plan={plan}
+                      prefs={planPrefs}
+                      hoverAgent={hoverAgent}
+                      onHighlight={setHlAgents}
+                      onSelect={setAgentSel}
+                      onFilterLog={setLogAgent}
+                    />
                   )}
                 </div>
               ),
               log: <LogPanel view={view} agentFilter={logAgent} onAgentFilter={setLogAgent} />,
             }}
           />
-          {!layout.hidden.status && <div data-flip="status"><StatusBar view={view} now={now} hookSrv={hookSrv} replaying={!!replay} /></div>}
+          {!layout.hidden.status && (
+            <div data-flip="status">
+              <StatusBar view={view} now={now} hookSrv={hookSrv} replaying={!!replay} />
+            </div>
+          )}
         </div>
       ) : (
         <div className="empty">
@@ -256,9 +282,13 @@ export function App() {
             <div className="getting-started" data-testid="empty-state">
               <div className="gs-title">No Claude Code sessions found yet</div>
               <ol>
-                <li>Install Claude Code: the <b>Code</b> tab in the Claude desktop app, or the <code>claude</code> command in a terminal.</li>
+                <li>
+                  Install Claude Code: the <b>Code</b> tab in the Claude desktop app, or the <code>claude</code> command in a terminal.
+                </li>
                 <li>Start a session and ask Claude something. It will show up here within a second or two, and this page fills in by itself.</li>
-                <li>Optional: run <code>claude /login</code> once so the usage meters work.</li>
+                <li>
+                  Optional: run <code>claude /login</code> once so the usage meters work.
+                </li>
               </ol>
               <button className="primary" onClick={() => setOnboarding('welcome')}>
                 open the welcome guide
@@ -267,7 +297,17 @@ export function App() {
           )}
         </div>
       )}
-      {showSettings && config && <SettingsDialog config={config} hookSrv={hookSrv} onClose={() => setShowSettings(false)} onWelcome={() => { setShowSettings(false); setOnboarding('welcome'); }} />}
+      {showSettings && config && (
+        <SettingsDialog
+          config={config}
+          hookSrv={hookSrv}
+          onClose={() => setShowSettings(false)}
+          onWelcome={() => {
+            setShowSettings(false);
+            setOnboarding('welcome');
+          }}
+        />
+      )}
       {onboarding === 'welcome' && (
         <Welcome
           onTour={startTour}

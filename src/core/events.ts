@@ -48,7 +48,13 @@ export type AgentEvent = Base &
     | { k: 'tool.end'; toolUseId: string; ok: boolean; result?: unknown; durationMs?: number; name?: string }
     | { k: 'usage'; msgId: string; usage: UsageNumbers }
     | { k: 'agent.spawn'; spawn: SpawnInfo }
-    | { k: 'agent.stop'; childId: string; status: 'done' | 'error'; detail?: string; /** event time is only a file mtime: end at the agent's last activity instead */ atLastActivity?: boolean }
+    | {
+        k: 'agent.stop';
+        childId: string;
+        status: 'done' | 'error';
+        detail?: string;
+        /** event time is only a file mtime: end at the agent's last activity instead */ atLastActivity?: boolean;
+      }
     | { k: 'task.notification'; taskId: string; status: string; summary?: string }
     | { k: 'todos.replace'; items: TodoInput[] }
     /**

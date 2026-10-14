@@ -18,7 +18,19 @@ afterEach(() => {
 const cloning: BacklogLoader = async (...a) => structuredClone(await loadBacklogInProcess(...a));
 
 const asstLine = (agentId: string | null, id: string, tool: string, ts: number) =>
-  JSON.stringify({ type: 'assistant', isSidechain: !!agentId, ...(agentId ? { agentId } : {}), sessionId: SID, timestamp: new Date(ts).toISOString(), message: { id, model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: `toolu_${id}`, name: tool, input: { command: 'echo' } }], usage: { input_tokens: 7, output_tokens: 3 } } }) + '\n';
+  JSON.stringify({
+    type: 'assistant',
+    isSidechain: !!agentId,
+    ...(agentId ? { agentId } : {}),
+    sessionId: SID,
+    timestamp: new Date(ts).toISOString(),
+    message: {
+      id,
+      model: 'claude-opus-5-5',
+      content: [{ type: 'tool_use', id: `toolu_${id}`, name: tool, input: { command: 'echo' } }],
+      usage: { input_tokens: 7, output_tokens: 3 },
+    },
+  }) + '\n';
 
 const mainBash = (w: SessionWatcher) => w.state.log.filter((l) => l.text.startsWith('Bash') && l.agentId === 'main').length;
 

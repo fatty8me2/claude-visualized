@@ -90,7 +90,11 @@ describe('parsePlan', () => {
 
   it('handles CRLF and tab-indented children', () => {
     const p = parsePlan('## A\r\n1. one\r\n\t1. nested one\r\n2. two\r\n');
-    expect(p.steps.map((s) => [s.title, s.depth])).toEqual([['one', 0], ['nested one', 1], ['two', 0]]);
+    expect(p.steps.map((s) => [s.title, s.depth])).toEqual([
+      ['one', 0],
+      ['nested one', 1],
+      ['two', 0],
+    ]);
   });
 });
 
@@ -113,7 +117,13 @@ describe('matching', () => {
   });
 });
 
-const agent = (id: string, description: string, status: string, extra: Partial<PlanAgent> = {}): PlanAgent => ({ id, agentType: 'general-purpose', description, status, ...extra });
+const agent = (id: string, description: string, status: string, extra: Partial<PlanAgent> = {}): PlanAgent => ({
+  id,
+  agentType: 'general-purpose',
+  description,
+  status,
+  ...extra,
+});
 
 describe('computeStepStatus', () => {
   const plan = parsePlan(`## Steps
@@ -136,7 +146,14 @@ describe('computeStepStatus', () => {
   });
 
   it('a matching todo gives its status and the reason', () => {
-    const st = computeStepStatus(plan.steps, [{ id: '1', text: 'Add retry with exponential backoff', status: 'in_progress' }, { id: '2', text: 'Update docs', status: 'completed' }], []);
+    const st = computeStepStatus(
+      plan.steps,
+      [
+        { id: '1', text: 'Add retry with exponential backoff', status: 'in_progress' },
+        { id: '2', text: 'Update docs', status: 'completed' },
+      ],
+      [],
+    );
     expect(st[1].status).toBe('in_progress');
     expect(st[1].reasons[0]).toBe("todo 'Add retry with exponential backoff' in progress");
     expect(st[3].status).toBe('done');
@@ -175,7 +192,12 @@ describe('computeStepStatus', () => {
   });
 
   it('ignores the main agent, and agents that started before the plan was submitted', () => {
-    const st = computeStepStatus(plan.steps, [], [agent('main', 'run the tests', 'running', { kind: 'main' }), agent('a1', 'run the tests', 'running', { startedAt: 1000 })], { since: 50_000 });
+    const st = computeStepStatus(
+      plan.steps,
+      [],
+      [agent('main', 'run the tests', 'running', { kind: 'main' }), agent('a1', 'run the tests', 'running', { startedAt: 1000 })],
+      { since: 50_000 },
+    );
     expect(st[2].linkedAgents).toEqual([]);
     const later = computeStepStatus(plan.steps, [], [agent('a1', 'run the tests', 'running', { startedAt: 60_000 })], { since: 50_000 });
     expect(later[2].linkedAgents).toEqual(['a1']);
@@ -194,16 +216,30 @@ describe('computeStepStatus', () => {
   });
 
   it('progress counts', () => {
-    const p = planProgress([{ status: 'done', linkedAgents: [], reasons: [] }, { status: 'in_progress', linkedAgents: [], reasons: [] }, { status: 'pending', linkedAgents: [], reasons: [] }]);
+    const p = planProgress([
+      { status: 'done', linkedAgents: [], reasons: [] },
+      { status: 'in_progress', linkedAgents: [], reasons: [] },
+      { status: 'pending', linkedAgents: [], reasons: [] },
+    ]);
     expect(p).toEqual({ done: 1, active: 1, total: 3 });
   });
 });
 
 describe('plan source', () => {
   it('uses the todo list when there is no plan', () => {
-    const r = resolvePlan(null, [{ id: '1', text: 'Map the repo', status: 'completed' }, { id: '2', text: 'Add retry', status: 'in_progress' }]);
+    const r = resolvePlan(null, [
+      { id: '1', text: 'Map the repo', status: 'completed' },
+      { id: '2', text: 'Add retry', status: 'in_progress' },
+    ]);
     expect(r?.origin).toBe('todos');
-    const st = computeStepStatus(r!.parsed.steps, [{ id: '1', text: 'Map the repo', status: 'completed' }, { id: '2', text: 'Add retry', status: 'in_progress' }], []);
+    const st = computeStepStatus(
+      r!.parsed.steps,
+      [
+        { id: '1', text: 'Map the repo', status: 'completed' },
+        { id: '2', text: 'Add retry', status: 'in_progress' },
+      ],
+      [],
+    );
     expect(st.map((s) => s.status)).toEqual(['done', 'in_progress']);
   });
 
@@ -225,7 +261,15 @@ describe('plan source', () => {
 describe('plan events', () => {
   const att = (a: object, ts = '2026-10-01T10:00:00Z') => line({ type: 'attachment', timestamp: ts, attachment: a });
   const exit = (plan: string, id = 'toolu_X', ts = '2026-10-01T10:05:00Z') =>
-    line({ type: 'assistant', timestamp: ts, message: { id: 'm1', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id, name: 'ExitPlanMode', input: { plan, planFilePath: 'C:\\p\\plan.md' } }] } });
+    line({
+      type: 'assistant',
+      timestamp: ts,
+      message: {
+        id: 'm1',
+        model: 'claude-opus-5-5',
+        content: [{ type: 'tool_use', id, name: 'ExitPlanMode', input: { plan, planFilePath: 'C:\\p\\plan.md' } }],
+      },
+    });
 
   it('plan_mode attachments reveal the plan file path', () => {
     const evs = normalizeLine(att({ type: 'plan_mode', isSubAgent: false, planFilePath: 'C:\\p\\plan.md', planExists: false }), ctx);
@@ -254,7 +298,10 @@ describe('plan events', () => {
   it('records approval from the tool result, and ignores subagent plan events', () => {
     const evs = [
       ...normalizeLine(exit('## A\n1. x'), ctx),
-      ...normalizeLine(line({ type: 'user', timestamp: '2026-10-01T10:06:00Z', message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_X', is_error: true }] } }), ctx),
+      ...normalizeLine(
+        line({ type: 'user', timestamp: '2026-10-01T10:06:00Z', message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_X', is_error: true }] } }),
+        ctx,
+      ),
     ];
     const s = foldEvents('s1', evs);
     expect(s.plan?.approved).toBe(false);
@@ -278,14 +325,36 @@ describe('plan events', () => {
   });
 
   it('hooks: ExitPlanMode PreToolUse yields a plan', () => {
-    const evs = normalizeHook({ session_id: 's1', hook_event_name: 'PreToolUse', tool_name: 'ExitPlanMode', tool_use_id: 'toolu_H', tool_input: { plan: '## A\n1. x' } }, 1000);
+    const evs = normalizeHook(
+      { session_id: 's1', hook_event_name: 'PreToolUse', tool_name: 'ExitPlanMode', tool_use_id: 'toolu_H', tool_input: { plan: '## A\n1. x' } },
+      1000,
+    );
     expect(evs.find((e) => e.k === 'plan')).toMatchObject({ text: '## A\n1. x', source: 'exit' });
   });
 
   it('Agent tool_use input gives the spawned agent its prompt', () => {
     const evs = [
-      ...normalizeLine(line({ type: 'assistant', timestamp: '2026-10-01T10:00:00Z', message: { id: 'm', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'toolu_A', name: 'Agent', input: { description: 'run tests', prompt: 'please run the unit tests' } }] } }), ctx),
-      ...normalizeLine(line({ type: 'user', timestamp: '2026-10-01T10:00:05Z', toolUseResult: { isAsync: true, status: 'async_launched', agentId: 'a2', description: 'run tests' }, message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_A' }] } }), ctx),
+      ...normalizeLine(
+        line({
+          type: 'assistant',
+          timestamp: '2026-10-01T10:00:00Z',
+          message: {
+            id: 'm',
+            model: 'claude-opus-5-5',
+            content: [{ type: 'tool_use', id: 'toolu_A', name: 'Agent', input: { description: 'run tests', prompt: 'please run the unit tests' } }],
+          },
+        }),
+        ctx,
+      ),
+      ...normalizeLine(
+        line({
+          type: 'user',
+          timestamp: '2026-10-01T10:00:05Z',
+          toolUseResult: { isAsync: true, status: 'async_launched', agentId: 'a2', description: 'run tests' },
+          message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_A' }] },
+        }),
+        ctx,
+      ),
     ];
     expect(foldEvents('s1', evs).agents.a2.prompt).toBe('please run the unit tests');
   });

@@ -48,7 +48,9 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
           <span className="ov-sub">
             <CtxChip agent={main} />
             {main && main.contextTokens > 0 ? ' · ' : ''}
-            agents {running}/{subs.length}{localAgents > 0 && !isLocalModel(main?.model) ? ` · ⌂ ${localAgents} local` : ''} · {formatTokens(tokens)} tok{v.costUSD != null ? ` · $${v.costUSD.toFixed(2)}` : ''}
+            agents {running}/{subs.length}
+            {localAgents > 0 && !isLocalModel(main?.model) ? ` · ⌂ ${localAgents} local` : ''} · {formatTokens(tokens)} tok
+            {v.costUSD != null ? ` · $${v.costUSD.toFixed(2)}` : ''}
           </span>
         </div>
         <button
@@ -109,7 +111,10 @@ export function Overview({ onOpen, onLocal, activeOnly = false }: { onOpen: (id:
     <div className="overview">
       <div className="topbar">
         <div className="title">
-          ALL SESSIONS <span className="proj">· {n} live · {running} subagents running · click a panel to open it</span>
+          ALL SESSIONS{' '}
+          <span className="proj">
+            · {n} live · {running} subagents running · click a panel to open it
+          </span>
         </div>
         <UsageMeters />
         <LocalChip onOpen={onLocal} />

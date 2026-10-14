@@ -174,7 +174,10 @@ export class SessionManager extends EventEmitter {
         if (act > s.mtime) s.mtime = act;
         const main = w.state.agents[MAIN];
         // a long tool call writes nothing until it returns, but the session is still working
-        const busy = !!main?.currentTool || main?.status === 'waiting' || agents.some((a) => a.status === 'running' && a.currentTool && Date.now() - a.lastActivity < 30 * 60_000);
+        const busy =
+          !!main?.currentTool ||
+          main?.status === 'waiting' ||
+          agents.some((a) => a.status === 'running' && a.currentTool && Date.now() - a.lastActivity < 30 * 60_000);
         s.live = !w.state.ended && (Date.now() - s.mtime < LIVE_MS || (busy && Date.now() - s.mtime < 60 * 60_000));
       }
     }

@@ -24,9 +24,12 @@ async function readSettings(): Promise<{ raw: string | null; json: Record<string
 }
 
 /** the part of settings.json we touch, for the preview */
-const hooksSection = (j: Record<string, unknown>) => JSON.stringify(j.statusLine ? { statusLine: j.statusLine, hooks: j.hooks ?? {} } : { hooks: j.hooks ?? {} }, null, 2);
+const hooksSection = (j: Record<string, unknown>) =>
+  JSON.stringify(j.statusLine ? { statusLine: j.statusLine, hooks: j.hooks ?? {} } : { hooks: j.hooks ?? {} }, null, 2);
 
-export async function getHookState(port: number): Promise<{ state: HookInstallState | 'error'; statusLine: StatusLineState; error?: string; settingsFile: string }> {
+export async function getHookState(
+  port: number,
+): Promise<{ state: HookInstallState | 'error'; statusLine: StatusLineState; error?: string; settingsFile: string }> {
   try {
     const { json } = await readSettings();
     return { state: hookStatus(json, port), statusLine: statusLineState(json), settingsFile: settingsPath() };

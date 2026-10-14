@@ -14,10 +14,13 @@ export function MiniView() {
   const main = view?.agents[MAIN];
   const subs = view ? Object.values(view.agents).filter((a) => a.kind !== 'main') : [];
   const running = subs.filter((a) => a.status === 'running' || a.status === 'waiting');
-  const recentDone = subs
-    .filter((a) => (a.status === 'done' || a.status === 'error') && a.endedAt && now - a.endedAt < 5 * 60_000)
-    .slice(-3);
-  const log = view ? [...view.log].filter((l) => l.kind !== 'text').sort((a, b) => a.ts - b.ts || a.seq - b.seq).slice(-4) : [];
+  const recentDone = subs.filter((a) => (a.status === 'done' || a.status === 'error') && a.endedAt && now - a.endedAt < 5 * 60_000).slice(-3);
+  const log = view
+    ? [...view.log]
+        .filter((l) => l.kind !== 'text')
+        .sort((a, b) => a.ts - b.ts || a.seq - b.seq)
+        .slice(-4)
+    : [];
   const plan = view?.mode === 'plan';
   const st = main ? displayStatus(main, now) : 'idle';
   return (
@@ -69,7 +72,11 @@ export function MiniView() {
           <div className="mini-log">
             {log.map((l) => (
               <div key={l.seq}>
-                <span style={{ color: 'var(--faint)' }}>{clock(l.ts)}</span> <span className={famClass(view.agents[l.agentId]?.model)} style={{ color: 'var(--fam)' }}>{agentName(view.agents[l.agentId])}</span> {l.text}
+                <span style={{ color: 'var(--faint)' }}>{clock(l.ts)}</span>{' '}
+                <span className={famClass(view.agents[l.agentId]?.model)} style={{ color: 'var(--fam)' }}>
+                  {agentName(view.agents[l.agentId])}
+                </span>{' '}
+                {l.text}
               </div>
             ))}
           </div>

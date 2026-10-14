@@ -21,7 +21,17 @@ async function launch(env: Record<string, string>, existingUserData?: string) {
   const app = await electron.launch({
     args: [ROOT],
     cwd: ROOT,
-    env: { ...process.env, CLAUDE_VIS_USER_DATA: userData, CLAUDE_VIS_PORT: String(PORT), CLAUDE_VIS_NO_EXTERNAL: '1', CLAUDE_VIS_NO_SYSTEM_INTEGRATION: '1', CLAUDE_VIS_NO_USAGE_API: '1', CLAUDE_VIS_SKIP_ONBOARDING: '1', CLAUDE_VIS_DESKTOP_DIR: path.join(userData, 'no-desktop'), ...env } as Record<string, string>,
+    env: {
+      ...process.env,
+      CLAUDE_VIS_USER_DATA: userData,
+      CLAUDE_VIS_PORT: String(PORT),
+      CLAUDE_VIS_NO_EXTERNAL: '1',
+      CLAUDE_VIS_NO_SYSTEM_INTEGRATION: '1',
+      CLAUDE_VIS_NO_USAGE_API: '1',
+      CLAUDE_VIS_SKIP_ONBOARDING: '1',
+      CLAUDE_VIS_DESKTOP_DIR: path.join(userData, 'no-desktop'),
+      ...env,
+    } as Record<string, string>,
   });
   const page = await app.firstWindow();
   await page.setViewportSize({ width: 1440, height: 920 }).catch(() => {});
@@ -88,10 +98,20 @@ describe('app smoke (fixture data)', () => {
 
   it('picks up a new subagent written to disk', async () => {
     const sub = path.join(home, 'projects', 'C--demo-app', SID, 'subagents');
-    fs.writeFileSync(path.join(sub, 'agent-a9.meta.json'), JSON.stringify({ agentType: 'Plan', description: 'design the docs update', toolUseId: 'toolu_new' }));
+    fs.writeFileSync(
+      path.join(sub, 'agent-a9.meta.json'),
+      JSON.stringify({ agentType: 'Plan', description: 'design the docs update', toolUseId: 'toolu_new' }),
+    );
     fs.writeFileSync(
       path.join(sub, 'agent-a9.jsonl'),
-      JSON.stringify({ type: 'assistant', isSidechain: true, agentId: 'a9', sessionId: SID, timestamp: new Date().toISOString(), message: { id: 'm9', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'toolu_q', name: 'Glob', input: { pattern: 'docs/**/*.md' } }] } }) + '\n',
+      JSON.stringify({
+        type: 'assistant',
+        isSidechain: true,
+        agentId: 'a9',
+        sessionId: SID,
+        timestamp: new Date().toISOString(),
+        message: { id: 'm9', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'toolu_q', name: 'Glob', input: { pattern: 'docs/**/*.md' } }] },
+      }) + '\n',
     );
     const card = page.locator('[data-agent="a9"]');
     await card.waitFor({ timeout: 10_000 });
@@ -159,14 +179,27 @@ describe('app smoke (fixture data)', () => {
     const post = (body: object) => fetch(`http://127.0.0.1:${PORT}/hook?src=claude-visualized`, { method: 'POST', body: JSON.stringify(body) });
     const health = await fetch(`http://127.0.0.1:${PORT}/health`).then((r) => r.json());
     expect(health.ok).toBe(true);
-    const res = await post({ session_id: SID, hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_use_id: 'toolu_hook1', tool_input: { file_path: 'C:\\demo\\app\\README.md' }, permission_mode: 'acceptEdits' });
+    const res = await post({
+      session_id: SID,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_use_id: 'toolu_hook1',
+      tool_input: { file_path: 'C:\\demo\\app\\README.md' },
+      permission_mode: 'acceptEdits',
+    });
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('');
     await page.locator('.modebox .big', { hasText: 'BUILD MODE' }).waitFor({ timeout: 5000 });
     await page.locator('[data-agent="main"]', { hasText: 'README.md' }).waitFor({ timeout: 5000 });
     // status-line payloads feed the 5-hour / weekly meters
     const resets = Math.floor(Date.now() / 1000) + 2 * 3600;
-    await fetch(`http://127.0.0.1:${PORT}/statusline`, { method: 'POST', body: JSON.stringify({ session_id: SID, rate_limits: { five_hour: { used_percentage: 23.5, resets_at: resets }, seven_day: { used_percentage: 87, resets_at: resets + 3 * 86400 } } }) });
+    await fetch(`http://127.0.0.1:${PORT}/statusline`, {
+      method: 'POST',
+      body: JSON.stringify({
+        session_id: SID,
+        rate_limits: { five_hour: { used_percentage: 23.5, resets_at: resets }, seven_day: { used_percentage: 87, resets_at: resets + 3 * 86400 } },
+      }),
+    });
     await page.locator('.topbar .meter.ok .m-pct', { hasText: '24%' }).waitFor({ timeout: 5000 });
     expect(await page.locator('.topbar .meter.hot .m-pct').innerText()).toBe('87%');
     await post({ session_id: SID, hook_event_name: 'PermissionRequest', tool_name: 'Bash' });
@@ -302,7 +335,10 @@ describe('app smoke (fixture data)', () => {
   });
 
   it('opens the hooks dialog with a preview that keeps existing hooks', async () => {
-    fs.writeFileSync(path.join(home, 'settings.json'), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'node', args: ['x.mjs'], async: true }] }] } }, null, 2));
+    fs.writeFileSync(
+      path.join(home, 'settings.json'),
+      JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'node', args: ['x.mjs'], async: true }] }] } }, null, 2),
+    );
     await page.getByRole('button', { name: /hooks/ }).click();
     await page.getByText('not installed').first().waitFor();
     await page.getByRole('button', { name: /Install hooks/ }).click();
@@ -349,7 +385,12 @@ function startFakeOllama(): Promise<{ server: http.Server; url: string }> {
     '/api/tags': {
       models: [
         { name: LOCAL_MAIN_MODEL, model: LOCAL_MAIN_MODEL, size, details: { family: 'qwen2', parameter_size: '32.8B', quantization_level: 'Q4_K_M' } },
-        { name: 'llama3.2:latest', model: 'llama3.2:latest', size: 2_019_393_189, details: { family: 'llama', parameter_size: '3.2B', quantization_level: 'Q4_K_M' } },
+        {
+          name: 'llama3.2:latest',
+          model: 'llama3.2:latest',
+          size: 2_019_393_189,
+          details: { family: 'llama', parameter_size: '3.2B', quantization_level: 'Q4_K_M' },
+        },
       ],
     },
     '/api/show': { model_info: { 'qwen2.context_length': 32768 }, capabilities: ['completion', 'tools'] },
@@ -399,7 +440,11 @@ describe('local models (fake Ollama, qwen + llama fixture session)', () => {
     expect(await main.innerText()).toContain('Qwen2.5 Coder 32B');
     expect(await sub.innerText()).toContain('Llama 3.1 8B');
     // the link needs the first poll to have landed
-    await page.waitForFunction(() => document.querySelector('[data-agent="main"] [data-testid="local-link"]')?.textContent?.includes('loaded in Ollama'), null, { timeout: 15_000 });
+    await page.waitForFunction(
+      () => document.querySelector('[data-agent="main"] [data-testid="local-link"]')?.textContent?.includes('loaded in Ollama'),
+      null,
+      { timeout: 15_000 },
+    );
     expect(await main.getByTestId('local-link').innerText()).toContain('qwen2.5-coder:32b');
     expect(await main.getByTestId('local-link').innerText()).toContain('loaded in Ollama · 18.2 GB VRAM');
     expect(await sub.getByTestId('local-link').innerText()).toContain('not loaded right now');
@@ -540,7 +585,7 @@ describe('first-run welcome and tour', () => {
       await page.getByTestId('tour').waitFor();
       let n = 0;
       for (;;) {
-        const label = await page.getByTestId('tour-count').textContent() ?? '';
+        const label = (await page.getByTestId('tour-count').textContent()) ?? '';
         n++;
         const total = Number(/of (\d+)/.exec(label)![1]);
         expect(label).toContain(`step ${n} of`);

@@ -46,7 +46,9 @@ describe('describeActivity', () => {
     expect(waiting.phrase).toBe('waiting on 3 subagents');
     expect(describeActivity(agent(), { now: NOW, runningChildren: 1 }).phrase).toBe('waiting on 1 subagent');
     // an Agent call whose child has not appeared yet is still just starting
-    expect(describeActivity(agent({ currentTool: tool('Agent', { description: 'dig' }) }), { now: NOW, runningChildren: 0 }).phrase).toBe('starting a subagent: dig');
+    expect(describeActivity(agent({ currentTool: tool('Agent', { description: 'dig' }) }), { now: NOW, runningChildren: 0 }).phrase).toBe(
+      'starting a subagent: dig',
+    );
     // a normal tool wins over background children
     expect(describeActivity(agent({ currentTool: tool('Read', { file_path: 'q.ts' }) }), { now: NOW, runningChildren: 2 }).phrase).toBe('reading q.ts');
   });
@@ -64,7 +66,9 @@ describe('describeActivity', () => {
     expect(r.phrase).toBe('finished: Found it in src/api.ts');
     expect(r.line).toBe(r.phrase);
     expect(describeActivity(agent({ status: 'error' }), { now: NOW }).phrase).toBe('failed');
-    expect(describeActivity(agent({ status: 'idle', kind: 'main', lastText: 'All done: retry added.' }), { now: NOW }).phrase).toBe('finished: All done: retry added.');
+    expect(describeActivity(agent({ status: 'idle', kind: 'main', lastText: 'All done: retry added.' }), { now: NOW }).phrase).toBe(
+      'finished: All done: retry added.',
+    );
     expect(describeActivity(agent({ status: 'idle', kind: 'main' }), { now: NOW }).phrase).toBe('waiting for your next prompt');
   });
 

@@ -10,7 +10,11 @@ function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: 
       <span className={`dot ${dot}`} />
       <span className="t">{s.title ?? '(untitled)'}</span>
       <span style={{ display: 'flex', gap: 4 }}>
-        {s.archived && <span className="badge" title="Archived in the Claude desktop app (hidden from its sidebar)">archived</span>}
+        {s.archived && (
+          <span className="badge" title="Archived in the Claude desktop app (hidden from its sidebar)">
+            archived
+          </span>
+        )}
         {s.mode === 'plan' && s.live && <span className="badge plan">plan</span>}
         {!!s.running && <span className="badge run">{s.running}▸</span>}
       </span>
@@ -34,7 +38,35 @@ function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: 
 
 export type Page = 'session' | 'overview' | 'local';
 
-export function SessionList({ sessions, selected, now, follow, onSelect, onFollow, collapsed, onCollapse, page, onPage, onHelp, activeOnly = false, onActiveOnly }: { activeOnly?: boolean; onActiveOnly?: (on: boolean) => void; sessions: SessionSummary[]; selected: string | null; now: number; follow: boolean; onSelect: (id: string) => void; onFollow: (on: boolean) => void; collapsed: boolean; onCollapse: () => void; page: Page; onPage: (p: Page) => void; onHelp: () => void }) {
+export function SessionList({
+  sessions,
+  selected,
+  now,
+  follow,
+  onSelect,
+  onFollow,
+  collapsed,
+  onCollapse,
+  page,
+  onPage,
+  onHelp,
+  activeOnly = false,
+  onActiveOnly,
+}: {
+  activeOnly?: boolean;
+  onActiveOnly?: (on: boolean) => void;
+  sessions: SessionSummary[];
+  selected: string | null;
+  now: number;
+  follow: boolean;
+  onSelect: (id: string) => void;
+  onFollow: (on: boolean) => void;
+  collapsed: boolean;
+  onCollapse: () => void;
+  page: Page;
+  onPage: (p: Page) => void;
+  onHelp: () => void;
+}) {
   const [q, setQ] = useState('');
   if (collapsed) {
     return (
@@ -89,7 +121,12 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
             ◉ one session
           </button>
         </div>
-        <button className={`local-nav ${page === 'local' ? 'on' : ''}`} data-testid="nav-local" onClick={() => onPage('local')} title="Ollama, LM Studio and other local model servers">
+        <button
+          className={`local-nav ${page === 'local' ? 'on' : ''}`}
+          data-testid="nav-local"
+          onClick={() => onPage('local')}
+          title="Ollama, LM Studio and other local model servers"
+        >
           ⌂ local models
         </button>
         <input placeholder="search sessions…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -104,14 +141,21 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
       </div>
       <div className="session-list">
         <div className="group-label">live · {live.length}</div>
-        {live.length === 0 && <div className="empty-note" style={{ padding: '2px 12px' }}>no session active in the last 10 min</div>}
+        {live.length === 0 && (
+          <div className="empty-note" style={{ padding: '2px 12px' }}>
+            no session active in the last 10 min
+          </div>
+        )}
         {live.map((s) => (
           <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />
         ))}
         {!activeOnly && <div className="group-label">recent</div>}
-        {!activeOnly &&
-          recent.map((s) => <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />)}
-        {activeOnly && <div className="empty-note" style={{ padding: '10px 12px' }}>recent sessions hidden · untick “active only” to see them</div>}
+        {!activeOnly && recent.map((s) => <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />)}
+        {activeOnly && (
+          <div className="empty-note" style={{ padding: '10px 12px' }}>
+            recent sessions hidden · untick “active only” to see them
+          </div>
+        )}
       </div>
     </div>
   );

@@ -66,7 +66,8 @@ function bashPhrase(i: Json, summary: string): string {
   const short = clip(cmd.split(/\s*(?:&&|;|\|)\s*/)[0] || cmd, 40);
   if (isTestCommand(cmd)) return `running the tests (${short})`;
   if (/^\s*git\b/.test(cmd)) return `running ${clip(cmd.split(/\s*(?:&&|;|\|)\s*/)[0], 40)}`;
-  if (/\b(npm|pnpm|yarn)\s+(run\s+)?(build|dev|start|compile)|\btsc\b|\bcargo build\b|\bgo build\b|\bmake\b|electron-vite|\bvite build\b/.test(cmd)) return `building (${short})`;
+  if (/\b(npm|pnpm|yarn)\s+(run\s+)?(build|dev|start|compile)|\btsc\b|\bcargo build\b|\bgo build\b|\bmake\b|electron-vite|\bvite build\b/.test(cmd))
+    return `building (${short})`;
   if (/\b(npm|pnpm|yarn|pip|pip3|cargo|go)\s+(install|add|get|i)\b/.test(cmd)) return `installing dependencies (${short})`;
   if (/^\s*(rg|grep|find|fd|ls|dir|tree|Select-String|Get-ChildItem)\b/i.test(cmd)) return `searching the shell (${short})`;
   if (!cmd && summary) return `running ${clip(summary, 50)}`;

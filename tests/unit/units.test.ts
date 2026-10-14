@@ -14,7 +14,14 @@ const USER_SETTINGS = {
     Stop: [
       {
         hooks: [
-          { type: 'command', command: 'node', args: ['C:/Users/me/tools/export.mjs', '--quiet'], timeout: 120, statusMessage: 'Archiving session to Markdown', async: true },
+          {
+            type: 'command',
+            command: 'node',
+            args: ['C:/Users/me/tools/export.mjs', '--quiet'],
+            timeout: 120,
+            statusMessage: 'Archiving session to Markdown',
+            async: true,
+          },
         ],
       },
     ],
@@ -60,12 +67,22 @@ describe('normalizer', () => {
     expect(e[0].k).toBe('unknown');
   });
   it('parses task notifications only at the start of the text', () => {
-    expect(parseTaskNotification('<task-notification>\n<task-id>abc</task-id>\n<status>completed</status>\n</task-notification>')).toEqual({ taskId: 'abc', status: 'completed', summary: undefined });
+    expect(parseTaskNotification('<task-notification>\n<task-id>abc</task-id>\n<status>completed</status>\n</task-notification>')).toEqual({
+      taskId: 'abc',
+      status: 'completed',
+      summary: undefined,
+    });
     expect(parseTaskNotification('echo "<task-notification><task-id>x</task-id><status>completed</status>"')).toBeNull();
   });
   it('compacts large tool inputs', () => {
     const big = 'x'.repeat(5000);
-    const e = normalizeLine(JSON.stringify({ type: 'assistant', message: { id: 'm', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 't', name: 'Write', input: { file_path: 'a.ts', content: big } }] } }), ctx);
+    const e = normalizeLine(
+      JSON.stringify({
+        type: 'assistant',
+        message: { id: 'm', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 't', name: 'Write', input: { file_path: 'a.ts', content: big } }] },
+      }),
+      ctx,
+    );
     const start = e.find((x) => x.k === 'tool.start');
     expect(start && start.k === 'tool.start' && (start.input as { content: string }).content.length).toBe(300);
   });

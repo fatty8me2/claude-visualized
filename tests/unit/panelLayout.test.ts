@@ -1,10 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { ARRANGEMENTS, DEFAULT_LAYOUT, gridStyle, resizeDelta, sanitizeLayout, shuffled, slotOf, swapPanels, visibleAreas, type PanelLayout } from '@core/panelLayout';
+import {
+  ARRANGEMENTS,
+  DEFAULT_LAYOUT,
+  gridStyle,
+  resizeDelta,
+  sanitizeLayout,
+  shuffled,
+  slotOf,
+  swapPanels,
+  visibleAreas,
+  type PanelLayout,
+} from '@core/panelLayout';
 
 function rectangular(grid: string[][]): boolean {
   for (const n of new Set(grid.flat())) {
     const cells = grid.flatMap((row, r) => row.flatMap((v, c) => (v === n ? [[r, c]] : [])));
-    const rs = cells.map(([r]) => r), cs = cells.map(([, c]) => c);
+    const rs = cells.map(([r]) => r),
+      cs = cells.map(([, c]) => c);
     const area = (Math.max(...rs) - Math.min(...rs) + 1) * (Math.max(...cs) - Math.min(...cs) + 1);
     if (area !== cells.length) return false;
   }
@@ -53,7 +65,7 @@ describe('panel layout', () => {
 
   it('shuffle picks a different arrangement and a valid permutation', () => {
     let seed = 1;
-    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     for (let i = 0; i < 20; i++) {
       const s = shuffled(DEFAULT_LAYOUT, rand);
       expect(s.arrangement).not.toBe('classic');

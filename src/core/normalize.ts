@@ -176,8 +176,7 @@ export function normalizeLine(line: string, ctx: LineContext, fallbackTs = 0): A
         if (str(a?.planFilePath)) ev({ k: 'plan', path: a!.planFilePath, source: 'path' });
       } else if (at === 'plan_file_reference') {
         if (str(a?.planFilePath)) ev({ k: 'plan', path: a!.planFilePath, text: str(a?.planContent)?.slice(0, PLAN_CAP), source: 'reference' });
-      }
-      else if (at === 'auto_mode') ev({ k: 'mode', mode: 'auto' });
+      } else if (at === 'auto_mode') ev({ k: 'mode', mode: 'auto' });
       else if (at === 'auto_mode_exit') ev({ k: 'mode', mode: 'default' });
       else if (at === 'model' && str(a?.identity?.modelId)) ev({ k: 'model', model: a!.identity.modelId });
       else if (at === 'queued_command' && str(a?.prompt)) {
@@ -245,7 +244,8 @@ export function normalizeLine(line: string, ctx: LineContext, fallbackTs = 0): A
         ev({ k: 'tool.start', toolUseId: b.id, name: b.name, input: compactInput(b.input) });
         if (b.name === 'ExitPlanMode') {
           const text = str(b.input?.plan);
-          if (text || str(b.input?.planFilePath)) ev({ k: 'plan', text: text?.slice(0, PLAN_CAP), path: str(b.input?.planFilePath), source: 'exit', toolUseId: b.id });
+          if (text || str(b.input?.planFilePath))
+            ev({ k: 'plan', text: text?.slice(0, PLAN_CAP), path: str(b.input?.planFilePath), source: 'exit', toolUseId: b.id });
         }
         if (b.name === 'TodoWrite') {
           const items = todoWriteItems(b.input);
@@ -272,7 +272,20 @@ export function compactInput(input: unknown): unknown {
   return out;
 }
 
-const RESULT_KEYS = ['task', 'taskId', 'statusChange', 'agentId', 'resolvedModel', 'description', 'isAsync', 'status', 'runId', 'workflowName', 'summary', 'resumedAgentId'];
+const RESULT_KEYS = [
+  'task',
+  'taskId',
+  'statusChange',
+  'agentId',
+  'resolvedModel',
+  'description',
+  'isAsync',
+  'status',
+  'runId',
+  'workflowName',
+  'summary',
+  'resumedAgentId',
+];
 
 /** Keep only the tool-result fields the reducer reads. */
 export function compactResult(r: unknown): unknown {
@@ -297,7 +310,17 @@ export function normalizeJournalLine(line: string, sessionId: string, ts: number
     return [];
   }
   if (o?.type === 'result' && typeof o.agentId === 'string') {
-    return [{ ts, src: 'transcript', ref: { sessionId, agentId: null }, k: 'agent.stop', childId: o.agentId, status: o.error ? 'error' : 'done', atLastActivity: true }];
+    return [
+      {
+        ts,
+        src: 'transcript',
+        ref: { sessionId, agentId: null },
+        k: 'agent.stop',
+        childId: o.agentId,
+        status: o.error ? 'error' : 'done',
+        atLastActivity: true,
+      },
+    ];
   }
   return [];
 }
@@ -354,7 +377,8 @@ export function normalizeHook(p: Json, now: number): AgentEvent[] {
       if (agentId) ev({ k: 'agent.spawn', spawn: { childId: agentId, agentType: str(p.agent_type) } }, { sessionId, agentId: null });
       break;
     case 'SubagentStop':
-      if (agentId) ev({ k: 'agent.stop', childId: agentId, status: 'done', detail: str(p.last_assistant_message)?.slice(0, 300) }, { sessionId, agentId: null });
+      if (agentId)
+        ev({ k: 'agent.stop', childId: agentId, status: 'done', detail: str(p.last_assistant_message)?.slice(0, 300) }, { sessionId, agentId: null });
       break;
     case 'PermissionRequest':
       ev({ k: 'attention', kind: 'permission', detail: `Permission needed: ${str(p.tool_name) ?? 'tool'}` });

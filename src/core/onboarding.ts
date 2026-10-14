@@ -41,13 +41,33 @@ export function buildChecklist(i: SetupInput): CheckItem[] {
   const c = i.claude;
   if (!c) items.push({ id: 'claude', status: 'todo', optional: false, title: 'Claude Code data', detail: 'Checking…' });
   else if (!c.projectsDirExists)
-    items.push({ id: 'claude', status: 'warn', optional: false, title: 'Claude Code data', detail: 'Not found yet. Install Claude Code (the Code tab in the Claude desktop app, or the claude command), then run one session.' });
+    items.push({
+      id: 'claude',
+      status: 'warn',
+      optional: false,
+      title: 'Claude Code data',
+      detail: 'Not found yet. Install Claude Code (the Code tab in the Claude desktop app, or the claude command), then run one session.',
+    });
   else if (c.sessionCount === 0)
-    items.push({ id: 'claude', status: 'warn', optional: false, title: 'Claude Code data', detail: 'Found the folder, but no sessions yet. Start a session in Claude Code and it will show up here.' });
-  else items.push({ id: 'claude', status: 'ok', optional: false, title: 'Claude Code data', detail: `Found ${c.sessionCount} session${c.sessionCount === 1 ? '' : 's'}.` });
+    items.push({
+      id: 'claude',
+      status: 'warn',
+      optional: false,
+      title: 'Claude Code data',
+      detail: 'Found the folder, but no sessions yet. Start a session in Claude Code and it will show up here.',
+    });
+  else
+    items.push({
+      id: 'claude',
+      status: 'ok',
+      optional: false,
+      title: 'Claude Code data',
+      detail: `Found ${c.sessionCount} session${c.sessionCount === 1 ? '' : 's'}.`,
+    });
 
   const u = i.usageState;
-  if (u === 'ok') items.push({ id: 'usage', status: 'ok', optional: false, title: 'Usage meters', detail: 'Connected. Your 5-hour and weekly limits show at the top.' });
+  if (u === 'ok')
+    items.push({ id: 'usage', status: 'ok', optional: false, title: 'Usage meters', detail: 'Connected. Your 5-hour and weekly limits show at the top.' });
   else if (u === undefined) items.push({ id: 'usage', status: 'todo', optional: false, title: 'Usage meters', detail: 'Checking…' });
   else
     items.push({
@@ -55,12 +75,23 @@ export function buildChecklist(i: SetupInput): CheckItem[] {
       status: 'warn',
       optional: false,
       title: 'Usage meters',
-      detail: u === 'error' ? 'Could not reach the usage service. It will retry; check your internet connection.' : 'Needs a login. Run the command below in a terminal and follow the steps.',
+      detail:
+        u === 'error'
+          ? 'Could not reach the usage service. It will retry; check your internet connection.'
+          : 'Needs a login. Run the command below in a terminal and follow the steps.',
     });
 
   const h = i.hooks;
   if (h === 'installed') items.push({ id: 'hooks', status: 'ok', optional: true, title: 'Live hooks', detail: 'Installed. Updates arrive instantly.' });
-  else items.push({ id: 'hooks', status: 'todo', optional: true, title: 'Live hooks', detail: h === 'error' ? 'Could not read your Claude settings file.' : 'Optional. Without them the app is about a second behind, which is fine for most people.' });
+  else
+    items.push({
+      id: 'hooks',
+      status: 'todo',
+      optional: true,
+      title: 'Live hooks',
+      detail:
+        h === 'error' ? 'Could not read your Claude settings file.' : 'Optional. Without them the app is about a second behind, which is fine for most people.',
+    });
 
   const key = i.hotkey ? i.hotkey.replace('CommandOrControl', 'Ctrl') : null;
   items.push({

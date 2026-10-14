@@ -21,7 +21,23 @@ function untilText(resetsAt: number, now: number): string {
   return new Date(resetsAt).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 }
 
-function Meter({ label, w, span, now, compact, problem, extra }: { label: string; w: UsageWindow | null; span: number; now: number; compact?: boolean; problem?: string | null; extra?: string[] }) {
+function Meter({
+  label,
+  w,
+  span,
+  now,
+  compact,
+  problem,
+  extra,
+}: {
+  label: string;
+  w: UsageWindow | null;
+  span: number;
+  now: number;
+  compact?: boolean;
+  problem?: string | null;
+  extra?: string[];
+}) {
   if (!w) {
     return (
       <div className="meter empty" title={problem ?? 'No reading yet. Click to refresh.'}>
@@ -70,7 +86,15 @@ export function UsageMeters({ compact = false, usage: given }: { compact?: boole
   return (
     <div className={`usage ${compact ? 'compact' : ''}`} data-tour="usage" onClick={() => void window.api.refreshUsage()} title="Click to refresh">
       <Meter label={compact ? '5h' : '5-HOUR'} w={u?.fiveHour ?? null} span={WINDOW_MS.fiveHour} now={now} compact={compact} problem={problem} />
-      <Meter label={compact ? 'wk' : 'WEEKLY'} w={u?.sevenDay ?? null} span={WINDOW_MS.sevenDay} now={now} compact={compact} problem={problem} extra={perModel} />
+      <Meter
+        label={compact ? 'wk' : 'WEEKLY'}
+        w={u?.sevenDay ?? null}
+        span={WINDOW_MS.sevenDay}
+        now={now}
+        compact={compact}
+        problem={problem}
+        extra={perModel}
+      />
     </div>
   );
 }

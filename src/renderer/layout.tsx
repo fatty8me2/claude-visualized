@@ -59,7 +59,13 @@ function play() {
     const b = el.getBoundingClientRect();
     if (!a || !b.width || !b.height) {
       // newly shown: grow in
-      el.animate([{ opacity: 0, transform: 'scale(0.92)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,1.2,.3,1)' });
+      el.animate(
+        [
+          { opacity: 0, transform: 'scale(0.92)' },
+          { opacity: 1, transform: 'none' },
+        ],
+        { duration: 420, easing: 'cubic-bezier(.2,1.2,.3,1)' },
+      );
       return;
     }
     const dx = a.left - b.left;
@@ -70,8 +76,18 @@ function play() {
     const delay = i++ * 45;
     el.animate(
       [
-        { transformOrigin: 'top left', transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, filter: 'brightness(1.25)', boxShadow: '0 0 0 1px var(--opus), 0 0 40px -8px var(--opus)' },
-        { transformOrigin: 'top left', transform: 'translate(0, 0) scale(1, 1)', filter: 'brightness(1)', boxShadow: '0 0 0 1px transparent, 0 0 0 0 transparent' },
+        {
+          transformOrigin: 'top left',
+          transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`,
+          filter: 'brightness(1.25)',
+          boxShadow: '0 0 0 1px var(--opus), 0 0 40px -8px var(--opus)',
+        },
+        {
+          transformOrigin: 'top left',
+          transform: 'translate(0, 0) scale(1, 1)',
+          filter: 'brightness(1)',
+          boxShadow: '0 0 0 1px transparent, 0 0 0 0 transparent',
+        },
       ],
       { duration: 680, delay, easing: 'cubic-bezier(.18,1.28,.32,1)', fill: 'backwards' },
     );
@@ -175,7 +191,8 @@ export function PanelGrid({ api, editing, panels }: { api: LayoutApi; editing: b
     target.setPointerCapture(e.pointerId);
     setDrag({ panel, x: e.clientX, y: e.clientY, over: null });
     const overAt = (x: number, y: number): PanelId | null => {
-      const el = document.elementsFromPoint(x, y).find((n) => (n as HTMLElement).dataset?.panel && (n as HTMLElement).dataset.panel !== panel) as HTMLElement | undefined;
+      const el = document.elementsFromPoint(x, y).find((n) => (n as HTMLElement).dataset?.panel && (n as HTMLElement).dataset.panel !== panel) as
+        HTMLElement | undefined;
       return (el?.dataset.panel as PanelId) ?? null;
     };
     const move = (ev: PointerEvent) => setDrag({ panel, x: ev.clientX, y: ev.clientY, over: overAt(ev.clientX, ev.clientY) });
@@ -196,7 +213,13 @@ export function PanelGrid({ api, editing, panels }: { api: LayoutApi; editing: b
         const p = layout.slots[slot];
         if (!areas.has(slot)) return null;
         return (
-          <div key={p} className={`lp lp-${p} ${drag?.over === p ? 'drop-target' : ''} ${drag?.panel === p ? 'dragging' : ''}`} style={{ gridArea: slot }} data-flip={`panel-${p}`} data-panel={p}>
+          <div
+            key={p}
+            className={`lp lp-${p} ${drag?.over === p ? 'drop-target' : ''} ${drag?.panel === p ? 'dragging' : ''}`}
+            style={{ gridArea: slot }}
+            data-flip={`panel-${p}`}
+            data-panel={p}
+          >
             {panels[p]}
             {(arr.handles[slot] ?? []).map((h) => (
               <ResizeHandle key={h.edge} edge={h.edge} sizeKey={h.key} api={api} />
@@ -208,10 +231,7 @@ export function PanelGrid({ api, editing, panels }: { api: LayoutApi; editing: b
                   <b>{PANEL_LABEL[p]}</b>
                   <span>drag onto another panel to swap</span>
                   {p !== 'graph' && (
-                    <button
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={() => api.change((l) => ({ ...l, hidden: { ...l.hidden, [p]: true } }))}
-                    >
+                    <button onPointerDown={(e) => e.stopPropagation()} onClick={() => api.change((l) => ({ ...l, hidden: { ...l.hidden, [p]: true } }))}>
                       hide
                     </button>
                   )}
@@ -243,7 +263,8 @@ function ArrangementThumb({ a, layout }: { a: Arrangement; layout: PanelLayout }
     row.forEach((slot, c) => {
       if (seen.has(slot)) return;
       seen.add(slot);
-      let rs = 1, cs = 1;
+      let rs = 1,
+        cs = 1;
       while (a.areas[r + rs]?.[c] === slot) rs++;
       while (row[c + cs] === slot) cs++;
       cells.push({ slot, r, c, rs, cs });
@@ -252,7 +273,15 @@ function ArrangementThumb({ a, layout }: { a: Arrangement; layout: PanelLayout }
   return (
     <svg viewBox={`0 0 ${cols * 10} ${rows * 10}`} width={46} height={32} preserveAspectRatio="none" aria-hidden>
       {cells.map((x) => (
-        <rect key={x.slot} className={`th th-${layout.slots[x.slot]}`} x={x.c * 10 + 0.8} y={x.r * 10 + 0.8} width={x.cs * 10 - 1.6} height={x.rs * 10 - 1.6} rx={1.2} />
+        <rect
+          key={x.slot}
+          className={`th th-${layout.slots[x.slot]}`}
+          x={x.c * 10 + 0.8}
+          y={x.r * 10 + 0.8}
+          width={x.cs * 10 - 1.6}
+          height={x.rs * 10 - 1.6}
+          rx={1.2}
+        />
       ))}
     </svg>
   );
@@ -271,20 +300,37 @@ export function LayoutToolbar({ api, onDone }: { api: LayoutApi; onDone: () => v
       <span className="lb-title">LAYOUT</span>
       <div className="lb-presets">
         {ARRANGEMENTS.map((a) => (
-          <button key={a.id} className={`lb-preset ${layout.arrangement === a.id ? 'on' : ''}`} title={a.label} onClick={() => change((l) => ({ ...l, arrangement: a.id }))} data-testid={`preset-${a.id}`}>
+          <button
+            key={a.id}
+            className={`lb-preset ${layout.arrangement === a.id ? 'on' : ''}`}
+            title={a.label}
+            onClick={() => change((l) => ({ ...l, arrangement: a.id }))}
+            data-testid={`preset-${a.id}`}
+          >
             <ArrangementThumb a={a} layout={layout} />
             <span>{a.label}</span>
           </button>
         ))}
       </div>
       <div className="lb-group">
-        <button className={layout.hidden.mode ? '' : 'on'} onClick={() => toggle('mode')}>◆ mode</button>
-        <button className={layout.hidden.log ? '' : 'on'} onClick={() => toggle('log')}>≡ log</button>
-        <button className={layout.hidden.legend ? '' : 'on'} onClick={() => toggle('legend')}>legend</button>
-        <button className={layout.hidden.status ? '' : 'on'} onClick={() => toggle('status')}>status bar</button>
+        <button className={layout.hidden.mode ? '' : 'on'} onClick={() => toggle('mode')}>
+          ◆ mode
+        </button>
+        <button className={layout.hidden.log ? '' : 'on'} onClick={() => toggle('log')}>
+          ≡ log
+        </button>
+        <button className={layout.hidden.legend ? '' : 'on'} onClick={() => toggle('legend')}>
+          legend
+        </button>
+        <button className={layout.hidden.status ? '' : 'on'} onClick={() => toggle('status')}>
+          status bar
+        </button>
       </div>
       <div className="lb-group">
-        <button onClick={() => change((l) => ({ ...l, sidebar: { ...l.sidebar, side: l.sidebar.side === 'left' ? 'right' : 'left' } }))} title="Move the session list to the other side">
+        <button
+          onClick={() => change((l) => ({ ...l, sidebar: { ...l.sidebar, side: l.sidebar.side === 'left' ? 'right' : 'left' } }))}
+          title="Move the session list to the other side"
+        >
           ⇆ sessions {layout.sidebar.side === 'left' ? 'right' : 'left'}
         </button>
         <button onClick={() => change((l) => shuffled(l))} title="Surprise me">

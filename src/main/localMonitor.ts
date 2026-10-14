@@ -31,7 +31,7 @@ export function httpRequester(baseUrl: string): PollRequest {
     } catch (e) {
       const err = e as Error & { cause?: { code?: string } };
       const code = err.cause?.code;
-      throw new Error(ctl.signal.aborted ? 'timed out' : code === 'ECONNREFUSED' ? 'connection refused (not running)' : code ?? err.message);
+      throw new Error(ctl.signal.aborted ? 'timed out' : code === 'ECONNREFUSED' ? 'connection refused (not running)' : (code ?? err.message));
     } finally {
       clearTimeout(timer);
     }
@@ -91,7 +91,9 @@ export class LocalMonitor extends EventEmitter {
       const old = this.slots.get(target.id);
       if (old?.timer) clearTimeout(old.timer);
       const same = old && old.target.baseUrl === target.baseUrl && old.enabled === enabled;
-      const status: LocalServerStatus = same ? { ...old.status, name: target.name } : { ...baseStatus(target, Date.now()), state: enabled ? 'checking' : 'disabled' };
+      const status: LocalServerStatus = same
+        ? { ...old.status, name: target.name }
+        : { ...baseStatus(target, Date.now()), state: enabled ? 'checking' : 'disabled' };
       next.set(target.id, { target, enabled, status, failures: same ? old.failures : 0, timer: null, showCache: same ? old.showCache : new Map() });
     }
     this.slots = next;

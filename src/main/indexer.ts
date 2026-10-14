@@ -107,7 +107,15 @@ export class SessionIndexer {
   private async meta(file: string, id: string, mtime: number, size: number): Promise<Cached | null> {
     const c = this.cache.get(file);
     if (c && c.size === size && c.mtime === mtime) return c;
-    const next: Cached = { mtime, size, title: c?.title ?? null, titleRank: c?.titleRank ?? 0, cwd: c?.cwd ?? null, entrypoint: c?.entrypoint ?? null, lastTs: c?.lastTs ?? 0 };
+    const next: Cached = {
+      mtime,
+      size,
+      title: c?.title ?? null,
+      titleRank: c?.titleRank ?? 0,
+      cwd: c?.cwd ?? null,
+      entrypoint: c?.entrypoint ?? null,
+      lastTs: c?.lastTs ?? 0,
+    };
     try {
       const head = c ? '' : await readRange(file, 0, Math.min(size, HEAD));
       const tail = size > HEAD || c ? await readRange(file, Math.max(0, size - TAIL), Math.min(size, TAIL)) : '';

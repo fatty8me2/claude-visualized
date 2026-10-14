@@ -38,7 +38,24 @@ export interface PollTarget {
 const ok = (r: PollResponse) => r.status >= 200 && r.status < 300;
 
 export function baseStatus(t: PollTarget, now: number): LocalServerStatus {
-  return { id: t.id, kind: t.kind, name: t.name, baseUrl: t.baseUrl, state: 'checking', version: null, error: null, loaded: [], installed: [], inFlight: null, slots: null, tokensPerSec: null, notes: [], checkedAt: now, failures: 0, nextPollAt: null };
+  return {
+    id: t.id,
+    kind: t.kind,
+    name: t.name,
+    baseUrl: t.baseUrl,
+    state: 'checking',
+    version: null,
+    error: null,
+    loaded: [],
+    installed: [],
+    inFlight: null,
+    slots: null,
+    tokensPerSec: null,
+    notes: [],
+    checkedAt: now,
+    failures: 0,
+    nextPollAt: null,
+  };
 }
 
 async function tryReq(req: PollRequest, path: string, init?: Parameters<PollRequest>[1]): Promise<PollResponse | null> {

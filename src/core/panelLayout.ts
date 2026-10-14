@@ -21,7 +21,10 @@ export const ARRANGEMENTS: Arrangement[] = [
   {
     id: 'classic',
     label: 'Classic',
-    areas: [['A', 'B'], ['C', 'C']],
+    areas: [
+      ['A', 'B'],
+      ['C', 'C'],
+    ],
     cols: (s) => `${s}px minmax(0, 1fr)`,
     rows: (_s, d) => `minmax(0, 1fr) ${d}px`,
     handles: { A: [{ edge: 'right', key: 'side' }], C: [{ edge: 'top', key: 'dock' }] },
@@ -29,7 +32,10 @@ export const ARRANGEMENTS: Arrangement[] = [
   {
     id: 'mirror',
     label: 'Mirror',
-    areas: [['B', 'A'], ['C', 'C']],
+    areas: [
+      ['B', 'A'],
+      ['C', 'C'],
+    ],
     cols: (s) => `minmax(0, 1fr) ${s}px`,
     rows: (_s, d) => `minmax(0, 1fr) ${d}px`,
     handles: { A: [{ edge: 'left', key: 'side' }], C: [{ edge: 'top', key: 'dock' }] },
@@ -45,7 +51,10 @@ export const ARRANGEMENTS: Arrangement[] = [
   {
     id: 'top',
     label: 'Log on top',
-    areas: [['C', 'C'], ['A', 'B']],
+    areas: [
+      ['C', 'C'],
+      ['A', 'B'],
+    ],
     cols: (s) => `${s}px minmax(0, 1fr)`,
     rows: (_s, d) => `${d}px minmax(0, 1fr)`,
     handles: { A: [{ edge: 'right', key: 'side' }], C: [{ edge: 'bottom', key: 'dock' }] },
@@ -53,18 +62,36 @@ export const ARRANGEMENTS: Arrangement[] = [
   {
     id: 'focus',
     label: 'Graph focus',
-    areas: [['B', 'A'], ['B', 'C']],
+    areas: [
+      ['B', 'A'],
+      ['B', 'C'],
+    ],
     cols: (s) => `minmax(0, 1fr) ${Math.max(s, 300)}px`,
     rows: (_s, d) => `minmax(0, 1fr) ${d}px`,
-    handles: { A: [{ edge: 'left', key: 'side' }], C: [{ edge: 'left', key: 'side' }, { edge: 'top', key: 'dock' }] },
+    handles: {
+      A: [{ edge: 'left', key: 'side' }],
+      C: [
+        { edge: 'left', key: 'side' },
+        { edge: 'top', key: 'dock' },
+      ],
+    },
   },
   {
     id: 'theater',
     label: 'Theater',
-    areas: [['B', 'B'], ['A', 'C']],
+    areas: [
+      ['B', 'B'],
+      ['A', 'C'],
+    ],
     cols: (s) => `${s}px minmax(0, 1fr)`,
     rows: (_s, d) => `minmax(0, 1fr) ${d}px`,
-    handles: { A: [{ edge: 'top', key: 'dock' }, { edge: 'right', key: 'side' }], C: [{ edge: 'top', key: 'dock' }] },
+    handles: {
+      A: [
+        { edge: 'top', key: 'dock' },
+        { edge: 'right', key: 'side' },
+      ],
+      C: [{ edge: 'top', key: 'dock' }],
+    },
   },
   {
     id: 'stacked',
@@ -140,7 +167,11 @@ export function swapPanels(l: PanelLayout, a: PanelId, b: PanelId): PanelLayout 
 function isRectangular(grid: string[][]): boolean {
   const names = new Set(grid.flat());
   for (const n of names) {
-    let r0 = Infinity, r1 = -1, c0 = Infinity, c1 = -1, count = 0;
+    let r0 = Infinity,
+      r1 = -1,
+      c0 = Infinity,
+      c1 = -1,
+      count = 0;
     grid.forEach((row, r) =>
       row.forEach((v, c) => {
         if (v !== n) return;
@@ -161,8 +192,14 @@ const DIRS: [number, number][][] = [
   [[1, 0]],
   [[0, -1]],
   [[0, 1]],
-  [[-1, 0], [0, -1]],
-  [[1, 0], [0, 1]],
+  [
+    [-1, 0],
+    [0, -1],
+  ],
+  [
+    [1, 0],
+    [0, 1],
+  ],
 ];
 
 /**
@@ -182,7 +219,8 @@ export function visibleAreas(l: PanelLayout): string[][] {
         for (let c = 0; c < g[r].length; c++) {
           if (!hiddenSlots.has(g[r][c] as Slot)) continue;
           for (const [dr, dc] of dirs) {
-            let rr = r + dr, cc = c + dc;
+            let rr = r + dr,
+              cc = c + dc;
             while (g[rr]?.[cc] !== undefined && hiddenSlots.has(g[rr][cc] as Slot)) {
               rr += dr;
               cc += dc;

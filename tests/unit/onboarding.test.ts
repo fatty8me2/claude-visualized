@@ -25,8 +25,10 @@ describe('buildChecklist', () => {
     expect(c.status).toBe('warn');
     expect(c.detail).toMatch(/Install Claude Code/);
   });
-  it('empty projects dir warns', () => expect(by(buildChecklist({ ...base, claude: { projectsDirExists: true, sessionCount: 0 } }), 'claude').status).toBe('warn'));
-  it('singular session', () => expect(by(buildChecklist({ ...base, claude: { projectsDirExists: true, sessionCount: 1 } }), 'claude').detail).toBe('Found 1 session.'));
+  it('empty projects dir warns', () =>
+    expect(by(buildChecklist({ ...base, claude: { projectsDirExists: true, sessionCount: 0 } }), 'claude').status).toBe('warn'));
+  it('singular session', () =>
+    expect(by(buildChecklist({ ...base, claude: { projectsDirExists: true, sessionCount: 1 } }), 'claude').detail).toBe('Found 1 session.'));
   it('usage states', () => {
     expect(by(buildChecklist({ ...base, usageState: 'no-login' }), 'usage').status).toBe('warn');
     expect(by(buildChecklist({ ...base, usageState: 'expired' }), 'usage').detail).toMatch(/login/i);

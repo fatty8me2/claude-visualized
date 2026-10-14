@@ -32,7 +32,10 @@ describe('session index', () => {
     const { mainFile, sessionDir } = writeFixture(home);
     ageTree(sessionDir);
     // the desktop app appends untimestamped bookkeeping to old transcripts, bumping mtime
-    fs.appendFileSync(mainFile, JSON.stringify({ type: 'mode', mode: 'normal', sessionId: SID }) + '\n' + JSON.stringify({ type: 'atis-latch', atis: '', sessionId: SID }) + '\n');
+    fs.appendFileSync(
+      mainFile,
+      JSON.stringify({ type: 'mode', mode: 'normal', sessionId: SID }) + '\n' + JSON.stringify({ type: 'atis-latch', atis: '', sessionId: SID }) + '\n',
+    );
     const [s] = await new SessionIndexer().scan();
     expect(s.id).toBe(SID);
     expect(s.live).toBe(false);
@@ -50,7 +53,10 @@ describe('session index', () => {
     writeFixture(home);
     const d = path.join(desk, 'acct', 'org');
     fs.mkdirSync(d, { recursive: true });
-    fs.writeFileSync(path.join(d, 'local_abc-123.json'), JSON.stringify({ sessionId: 'local_abc-123', cliSessionId: SID, title: 'Desktop title', isArchived: true, lastActivityAt: Date.now() }));
+    fs.writeFileSync(
+      path.join(d, 'local_abc-123.json'),
+      JSON.stringify({ sessionId: 'local_abc-123', cliSessionId: SID, title: 'Desktop title', isArchived: true, lastActivityAt: Date.now() }),
+    );
     const idx = new SessionIndexer();
     const [s] = await idx.scan();
     expect(s.desktopId).toBe('local_abc-123');

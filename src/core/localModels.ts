@@ -157,7 +157,10 @@ export function normalizeLocalConfig(raw: unknown): LocalModelsConfig {
 /** Test/override hooks: CLAUDE_VIS_OLLAMA_URL / CLAUDE_VIS_LMSTUDIO_URL ("off" disables that server). */
 export function applyUrlOverrides(c: LocalModelsConfig, env: Record<string, string | undefined>): LocalModelsConfig {
   const next = { ...c, ollama: { ...c.ollama }, lmstudio: { ...c.lmstudio } };
-  for (const [key, field] of [['CLAUDE_VIS_OLLAMA_URL', 'ollama'], ['CLAUDE_VIS_LMSTUDIO_URL', 'lmstudio']] as const) {
+  for (const [key, field] of [
+    ['CLAUDE_VIS_OLLAMA_URL', 'ollama'],
+    ['CLAUDE_VIS_LMSTUDIO_URL', 'lmstudio'],
+  ] as const) {
     const v = env[key];
     if (!v) continue;
     if (v === 'off') next[field].enabled = false;
@@ -187,7 +190,20 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : nul
 const arr = (v: unknown): any[] => (Array.isArray(v) ? v : []);
 
 function blankModel(id: string, loaded: boolean): LocalModelInfo {
-  return { id, label: classifyModel(id).label, loaded, sizeBytes: null, vramBytes: null, params: null, quant: null, family: null, contextLength: null, maxContext: null, expiresAt: null, capabilities: [] };
+  return {
+    id,
+    label: classifyModel(id).label,
+    loaded,
+    sizeBytes: null,
+    vramBytes: null,
+    params: null,
+    quant: null,
+    family: null,
+    contextLength: null,
+    maxContext: null,
+    expiresAt: null,
+    capabilities: [],
+  };
 }
 
 /** Ollama writes far-future or zero-year timestamps for keep_alive = -1 ("never unload"). */

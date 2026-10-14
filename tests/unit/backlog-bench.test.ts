@@ -58,7 +58,9 @@ async function measure(label: string, make: () => SessionWatcher) {
   h.disable();
   clearInterval(probe);
   const maxMs = h.max / 1e6;
-  console.log(`${label}: load ${total.toFixed(0)}ms, max loop delay ${maxMs.toFixed(0)}ms, max timer drift ${maxDrift.toFixed(0)}ms, p99 ${(h.percentile(99) / 1e6).toFixed(0)}ms`);
+  console.log(
+    `${label}: load ${total.toFixed(0)}ms, max loop delay ${maxMs.toFixed(0)}ms, max timer drift ${maxDrift.toFixed(0)}ms, p99 ${(h.percentile(99) / 1e6).toFixed(0)}ms`,
+  );
   return { w, total, maxMs, maxDrift };
 }
 
@@ -77,7 +79,10 @@ describe.skipIf(!process.env.REAL_DATA || !file || !workerFile)('big session loa
     expect(b.todos.length).toBe(a.todos.length);
     expect(b.eventCount).toBe(a.eventCount);
     expect(b).toEqual(a);
-    for (const [label, l] of [['replay sync  ', undefined], ['replay worker', loader]] as const) {
+    for (const [label, l] of [
+      ['replay sync  ', undefined],
+      ['replay worker', loader],
+    ] as const) {
       const h = monitorEventLoopDelay({ resolution: 1 });
       h.enable();
       const t = performance.now();

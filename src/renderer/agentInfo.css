@@ -15,16 +15,36 @@
   border-style: dashed;
   opacity: 0.85;
 }
-.g-search { --g: #5fc7d9; }
-.g-research { --g: #e08ad0; }
-.g-plan { --g: #f2c45a; }
-.g-build { --g: #6fd08c; }
-.g-test { --g: #f0925f; }
-.g-review { --g: #8fb5ff; }
-.g-debug { --g: #ff6b7a; }
-.g-docs { --g: #b5c98a; }
-.g-workflow { --g: #a79fbd; }
-.g-general { --g: #7d7591; }
+.g-search {
+  --g: #5fc7d9;
+}
+.g-research {
+  --g: #e08ad0;
+}
+.g-plan {
+  --g: #f2c45a;
+}
+.g-build {
+  --g: #6fd08c;
+}
+.g-test {
+  --g: #f0925f;
+}
+.g-review {
+  --g: #8fb5ff;
+}
+.g-debug {
+  --g: #ff6b7a;
+}
+.g-docs {
+  --g: #b5c98a;
+}
+.g-workflow {
+  --g: #a79fbd;
+}
+.g-general {
+  --g: #7d7591;
+}
 
 .node .model2 {
   display: flex;
