@@ -15,6 +15,16 @@ A desktop app (Windows + macOS) that shows what your Claude Code sessions are do
 
 It works with both the Claude desktop app's Code tab and the `claude` CLI, because both write the same transcripts.
 
+## First run
+
+On first launch the app shows a welcome screen with a live setup checklist:
+
+- **Claude Code data**: it found `~/.claude/projects` and N sessions. If not, install Claude Code (the Code tab in the Claude desktop app, or the `claude` CLI) and run one session.
+- **Usage meters**: if they say "login needed", open a terminal (Windows Terminal is recommended), run `claude /login` (the welcome screen has a copy button) and paste the code with Ctrl+Shift+V.
+- **Live hooks** (optional): without them the app is about a second behind. The button opens the hooks dialog, which shows a preview before writing anything.
+
+Then "Take the tour" walks through the sidebar, the agent graph, the mode panel, the log, the usage meters and the buttons in the top bar. Reopen it any time with **? help** in the sidebar, **Show welcome & tour** in the tray menu, or the button in the settings dialog. Tour versions are tracked in `src/core/onboarding.ts` (`ONBOARDING_VERSION`); bumping it shows the welcome screen again to existing users.
+
 ## How it gets data
 
 1. **Transcripts (default, zero setup).** The app tails `~/.claude/projects/<project>/<session>.jsonl`, the
@@ -82,6 +92,7 @@ Environment overrides (mainly for tests):
 | `CLAUDE_VIS_PORT` | hook receiver port |
 | `CLAUDE_VIS_NO_HOOK_SERVER` | don't start the hook receiver |
 | `CLAUDE_VIS_NO_TRAY` | don't create a tray icon |
+| `CLAUDE_VIS_SKIP_ONBOARDING` | don't show the first-run welcome screen (tests) |
 
 ### Layout
 

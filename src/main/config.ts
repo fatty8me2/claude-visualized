@@ -12,6 +12,8 @@ export interface AppConfig {
   miniAlwaysOnTop: boolean;
   launchAtLogin: boolean;
   miniHotkey: string;
+  onboardingDone?: boolean;
+  onboardingVersion?: number;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {

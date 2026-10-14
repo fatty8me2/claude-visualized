@@ -43,7 +43,7 @@ export function LogPanel({ view, agentFilter, onAgentFilter }: { view: SessionVi
 
   const agents = Object.values(view.agents);
   return (
-    <div className="log">
+    <div className="log" data-tour="log">
       <div className="log-head">
         <span className="lbl">session log</span>
         {GROUPS.map((g) => (

@@ -13,6 +13,8 @@ export interface AppConfigView {
   miniAlwaysOnTop: boolean;
   launchAtLogin: boolean;
   miniHotkey: string;
+  onboardingDone?: boolean;
+  onboardingVersion?: number;
 }
 
 export interface SystemInfoView {
@@ -21,6 +23,14 @@ export interface SystemInfoView {
   /** whether the global hotkey is currently registered, and why not if it isn't */
   hotkey: { registered: boolean; error: string | null };
   platform: string;
+}
+
+export interface SetupStatusView {
+  projectsDir: string;
+  projectsDirExists: boolean;
+  sessionCount: number;
+  /** tests set CLAUDE_VIS_SKIP_ONBOARDING so the welcome screen doesn't cover the app */
+  skipOnboarding: boolean;
 }
 
 export interface HookServerStatusView {
@@ -87,4 +97,7 @@ export interface VisApi {
   toggleMini(): Promise<void>;
   showMain(): Promise<void>;
   openPath(p: string): Promise<void>;
+  setupStatus(): Promise<SetupStatusView>;
+  /** the tray menu asks the window to show the welcome screen */
+  onShowOnboarding(cb: () => void): () => void;
 }

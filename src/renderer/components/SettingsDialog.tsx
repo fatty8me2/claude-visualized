@@ -9,7 +9,7 @@ const STATE_TEXT: Record<string, [string, string]> = {
   error: ['cannot read settings', 'err'],
 };
 
-export function SettingsDialog({ config, hookSrv, onClose }: { config: AppConfigView; hookSrv: HookServerStatusView | null; onClose: () => void }) {
+export function SettingsDialog({ config, hookSrv, onClose, onWelcome }: { config: AppConfigView; hookSrv: HookServerStatusView | null; onClose: () => void; onWelcome: () => void }) {
   const [hs, setHs] = useState<HookStateView | null>(null);
   const [preview, setPreview] = useState<HookPreviewView | null>(null);
   const [result, setResult] = useState<string | null>(null);
@@ -184,6 +184,9 @@ export function SettingsDialog({ config, hookSrv, onClose }: { config: AppConfig
           ) : (
             <span className="note">toggles the mini view from anywhere, e.g. CommandOrControl+Alt+V</span>
           )}
+        </div>
+        <div className="row">
+          <button onClick={onWelcome}>Show welcome &amp; tour</button>
         </div>
         <div className="row">
           <span>Receiver port</span>
