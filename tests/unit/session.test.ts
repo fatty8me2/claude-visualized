@@ -172,6 +172,22 @@ describe('graph layout', () => {
     expect(chip?.collapsed?.count).toBeGreaterThanOrEqual(10);
   });
 
+  it('gives the finished chip its own space next to running siblings', async () => {
+    const { state } = await load();
+    const agents = { ...state.agents };
+    // one running sibling plus a crowd of finished ones under main
+    agents.r1 = { ...state.agents.a2, id: 'r1', parentId: MAIN, status: 'running', startedAt: 1 };
+    for (let i = 0; i < 9; i++) agents[`f${i}`] = { ...state.agents.a2, id: `f${i}`, parentId: MAIN, status: 'done', startedAt: 2 + i };
+    const lay = layoutAgents(agents);
+    const chip = lay.nodes.find((n) => n.collapsed)!;
+    expect(chip).toBeTruthy();
+    for (const n of lay.nodes) {
+      if (n === chip) continue;
+      const overlap = n.x < chip.x + chip.w && chip.x < n.x + n.w && n.y < chip.y + chip.h && chip.y < n.y + n.h;
+      expect(overlap, `chip overlaps ${n.id}`).toBe(false);
+    }
+  });
+
   it('never re-adds collapsed subtrees as orphans', async () => {
     const { state } = await load();
     const agents = { ...state.agents };

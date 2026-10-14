@@ -111,8 +111,9 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
           collapsed: { count: ids.size, ids: [...ids], parentId: a.id },
           children: [],
           grid: false,
-          sw: 0,
-          sh: 0,
+          // sized up front: a zero-width chip gets placed on top of its neighbour
+          sw: opt.nodeW,
+          sh: 64,
         };
       }
     }
