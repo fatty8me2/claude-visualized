@@ -10,7 +10,7 @@ import { SID, writeFixture } from '../fixtures/build';
 
 const ROOT = path.resolve(__dirname, '../..');
 const ART = path.join(ROOT, 'tests/e2e/artifacts');
-const PORT = 47899;
+const PORT = Number(process.env.E2E_PORT ?? 47899);
 
 const freshLine = (sid: string) => JSON.stringify({ type: 'system', subtype: 'turn_duration', sessionId: sid, timestamp: new Date().toISOString() }) + '\n';
 
