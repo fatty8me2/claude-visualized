@@ -1,5 +1,7 @@
 // Short human-readable one-liners for tool calls and model names.
 
+import { classifyModel } from './models';
+
 type Json = Record<string, any>;
 
 function basename(p: string): string {
@@ -83,24 +85,20 @@ export function summarizeTool(name: string, input: unknown): string {
   return '';
 }
 
-export type ModelFamily = 'opus' | 'sonnet' | 'haiku' | 'fable' | 'other';
+export type ModelFamily = 'opus' | 'sonnet' | 'haiku' | 'fable' | 'local' | 'other';
 
+/** Visual family: the Claude families, 'local' for any local model, else 'other'. */
 export function modelFamily(model: string | null | undefined): ModelFamily {
-  const m = (model ?? '').toLowerCase();
-  if (m.includes('opus')) return 'opus';
-  if (m.includes('sonnet')) return 'sonnet';
-  if (m.includes('haiku')) return 'haiku';
-  if (m.includes('fable')) return 'fable';
+  const c = classifyModel(model);
+  if (c.provider === 'local') return 'local';
+  if (c.provider === 'anthropic' && (c.family === 'opus' || c.family === 'sonnet' || c.family === 'haiku' || c.family === 'fable')) return c.family;
   return 'other';
 }
 
-/** "claude-opus-5-5" -> "Opus 5.5", "claude-haiku-4-5-20251001" -> "Haiku 4.5" */
+/** "claude-opus-5-5" -> "Opus 5.5", "claude-haiku-4-5-20251001" -> "Haiku 4.5", "qwen2.5-coder:32b" -> "Qwen2.5 Coder 32B" */
 export function modelLabel(model: string | null | undefined): string {
   if (!model) return '—';
-  const m = /claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?/i.exec(model);
-  if (!m) return model.replace(/^claude-/, '');
-  const fam = m[1][0].toUpperCase() + m[1].slice(1);
-  return m[3] ? `${fam} ${m[2]}.${m[3]}` : `${fam} ${m[2]}`;
+  return classifyModel(model).label;
 }
 
 export function formatTokens(n: number): string {

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import { DEFAULT_MINI_HOTKEY } from '@core/system';
+import { DEFAULT_LOCAL_CONFIG, normalizeLocalConfig, type LocalModelsConfig } from '@core/localModels';
 
 export interface AppConfig {
   port: number;
@@ -14,6 +15,7 @@ export interface AppConfig {
   miniHotkey: string;
   onboardingDone?: boolean;
   onboardingVersion?: number;
+  localModels: LocalModelsConfig;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -25,6 +27,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   miniAlwaysOnTop: true,
   launchAtLogin: false,
   miniHotkey: DEFAULT_MINI_HOTKEY,
+  localModels: DEFAULT_LOCAL_CONFIG,
 };
 
 function file() {
@@ -35,7 +38,7 @@ export function loadConfig(): AppConfig {
   try {
     const saved = JSON.parse(fs.readFileSync(file(), 'utf8'));
     delete saved.openInClaudeOnClick; // removed option: sessions only open in Claude via the button
-    return { ...DEFAULT_CONFIG, ...saved };
+    return { ...DEFAULT_CONFIG, ...saved, localModels: normalizeLocalConfig(saved.localModels) };
   } catch {
     return { ...DEFAULT_CONFIG };
   }

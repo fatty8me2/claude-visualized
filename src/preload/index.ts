@@ -45,6 +45,9 @@ const api: VisApi = {
   openPath: (p) => ipcRenderer.invoke('path:open', p),
   setupStatus: () => ipcRenderer.invoke('setup:status'),
   onShowOnboarding: (cb) => on<void>('onboarding:show', () => cb()),
+  getLocalModels: () => ipcRenderer.invoke('local:get'),
+  onLocalModels: (cb) => on('local', cb),
+  refreshLocalModels: () => ipcRenderer.invoke('local:refresh'),
 };
 
 contextBridge.exposeInMainWorld('api', api);

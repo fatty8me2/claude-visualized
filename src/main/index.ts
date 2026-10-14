@@ -12,6 +12,8 @@ import { applyHooks, getHookState, previewHooks } from './installer';
 import { writeStatusLineScript } from './statusline';
 import { projectsDir } from './paths';
 import { SessionManager, type NotifyRequest } from './manager';
+import { LocalMonitor } from './localMonitor';
+import { applyUrlOverrides, normalizeLocalConfig } from '@core/localModels';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 
@@ -97,6 +99,7 @@ function applyHotkey(raw: string): { ok: boolean; error?: string; accelerator?: 
 }
 
 const manager = new SessionManager();
+let localMonitor: LocalMonitor;
 // ---- 5-hour / weekly usage limits, persisted so they show right after a restart ----
 const usageFile = () => path.join(app.getPath('userData'), 'usage.json');
 let usage: UsageView = emptyUsage();
@@ -336,6 +339,11 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
     applyLoginItem(config.launchAtLogin);
     saveConfig(config); // may differ from the request if the OS refused
   }
+  if (patch.localModels !== undefined) {
+    config.localModels = normalizeLocalConfig(patch.localModels);
+    saveConfig(config);
+    localMonitor.setConfig(config.localModels);
+  }
   if (config.port !== prevPort) hookServer.start(config.port);
   if (miniWin && patch.miniAlwaysOnTop !== undefined) miniWin.setAlwaysOnTop(config.miniAlwaysOnTop, 'floating');
   broadcast('config', config);
@@ -359,6 +367,8 @@ const overviewWatchers = new Set<number>();
 
 function registerIpc() {
   ipcMain.handle('usage:get', () => usage);
+  ipcMain.handle('local:get', () => localMonitor.view());
+  ipcMain.handle('local:refresh', () => localMonitor.refreshNow());
   ipcMain.handle('claude:model', () => {
     try {
       const m = JSON.parse(fs.readFileSync(settingsPath(), 'utf8'))?.model;
@@ -447,6 +457,10 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform === 'win32') app.setAppUserModelId('com.fatty8me2.claudevisualized');
     config = loadConfig();
     if (process.env.CLAUDE_VIS_PORT) config.port = Number(process.env.CLAUDE_VIS_PORT);
+    // test hooks: CLAUDE_VIS_OLLAMA_URL / CLAUDE_VIS_LMSTUDIO_URL ("off" disables that server)
+    config.localModels = applyUrlOverrides(config.localModels, process.env);
+    localMonitor = new LocalMonitor(config.localModels);
+    localMonitor.on('view', (v) => broadcast('local', v));
     manager.followActive = config.followActive;
     manager.notifyAttention = config.notifyAttention;
     manager.notifyAgentDone = config.notifyAgentDone;
@@ -479,6 +493,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     registerStartupHotkey();
     manager.start();
+    localMonitor.start();
     if (!process.env.CLAUDE_VIS_NO_HOOK_SERVER) hookServer.start(config.port);
     if (!process.env.CLAUDE_VIS_NO_TRAY) createTray();
     const openedAtLogin = process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin;
@@ -490,6 +505,7 @@ if (!app.requestSingleInstanceLock()) {
     quitting = true;
     globalShortcut.unregisterAll();
     manager.stop();
+    localMonitor?.stop();
     hookServer.stop();
   });
   app.on('window-all-closed', () => {

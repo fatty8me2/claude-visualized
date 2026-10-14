@@ -5,6 +5,7 @@ import { GoalBadge } from './GoalBadge';
 import { useLiveState, useNow } from '../hooks';
 import { CtxChip } from './ContextMeter';
 import { UsageMeters } from './UsageMeters';
+import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
 import { agentName, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
 
 export function MiniView() {
@@ -33,11 +34,13 @@ export function MiniView() {
       </div>
       <div className="mini-usage">
         <UsageMeters compact />
+        <LocalChip onOpen={() => window.api.showMain()} />
       </div>
       {view && main && (
         <div className="mini-body">
           <div className={`mini-main ${famClass(main.model)}`}>
             <b style={{ color: 'var(--fam)' }}>{modelLabel(main.model)}</b>
+            {isLocalModel(main.model) && <LocalTag />}
             <span className={`status ${st}`}>{STATUS_GLYPH[st]}</span>
             <CtxChip agent={main} />
             <GoalBadge goal={agentGoal(main, plan)} glyphOnly />
@@ -51,13 +54,13 @@ export function MiniView() {
                 const ins = agentInsight(view.agents, a, now);
                 return (
                   <span key={a.id} className={`mini-chip ${famClass(a.model)}`} title={`${a.description}\n${ins.goal.because}`}>
-                    <GoalBadge goal={ins.goal} glyphOnly /> {agentName(a)} · {ins.activity.line}
+                    <GoalBadge goal={ins.goal} glyphOnly /> {isLocalModel(a.model) && <LocalTag title="local model" />} {agentName(a)} · {ins.activity.line}
                   </span>
                 );
               })}
               {recentDone.map((a) => (
                 <span key={a.id} className={`mini-chip done ${famClass(a.model)}`} title={a.description}>
-                  <GoalBadge goal={agentGoal(a)} glyphOnly /> ✓ {agentName(a)}
+                  <GoalBadge goal={agentGoal(a)} glyphOnly /> {isLocalModel(a.model) && <LocalTag title="local model" />} ✓ {agentName(a)}
                   {a.description ? ` · ${a.description}` : ''}
                 </span>
               ))}

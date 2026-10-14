@@ -6,7 +6,10 @@ import { DEFAULT_LAYOUT, layoutAgents } from '@core/layout';
 import { MAIN, type AgentNode, type SessionView } from '@core/state';
 import { formatDuration, formatTokens, modeLabel, modelLabel } from '@core/summarize';
 import { CtxChip } from './ContextMeter';
+import { isLocalModel, LocalLinkLine } from './LocalBits';
 import { agentName, displayStatus, famClass, STATUS_GLYPH, type DisplayStatus } from '../util';
+
+const LOCAL_ROWS_H = 30;
 
 function Spark({ activity, now }: { activity: number[]; now: number }) {
   const buckets = 24;
@@ -81,6 +84,7 @@ function NodeCard({ a, view, now, x, y, w, h, selected, hl, onSelect }: { a: Age
           <span className={`status ${st}`}>{STATUS_GLYPH[st]}</span>
         </div>
       )}
+      {isLocalModel(a.model) && <LocalLinkLine agent={a} />}
       <Bar status={st} />
       {!isMain && <div className="desc">{a.description || a.lastText || ''}</div>}
       <div className={`now ${act.kind}`} title={act.line} data-testid="now">
@@ -148,7 +152,9 @@ export function AgentGraph({
   // reset per-session UI state
   useEffect(() => setExpanded(new Set()), [view.id]);
 
-  const layout = layoutAgents(view.agents, { ...DEFAULT_LAYOUT, showFinished, expanded });
+  // local-model cards carry two extra rows (model id, where it is loaded)
+  const extra = Object.values(view.agents).some((a) => isLocalModel(a.model)) ? LOCAL_ROWS_H : 0;
+  const layout = layoutAgents(view.agents, { ...DEFAULT_LAYOUT, nodeH: DEFAULT_LAYOUT.nodeH + extra, mainH: DEFAULT_LAYOUT.mainH + extra, showFinished, expanded });
   const pad = compact ? 14 : 36;
   const scale = compact
     ? Math.max(0.28, Math.min(1, (wrapW - pad * 2) / Math.max(1, layout.width), (wrapH - pad * 2) / Math.max(1, layout.height)))

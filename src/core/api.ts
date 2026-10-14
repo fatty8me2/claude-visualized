@@ -3,6 +3,7 @@ import type { AgentEvent } from './events';
 import type { HookInstallState, StatusLineState } from './hooksConfig';
 import type { UsageView } from './usage';
 import type { SessionSummary, SessionView } from './state';
+import type { LocalModelsConfig, LocalModelsView } from './localModels';
 
 export interface AppConfigView {
   port: number;
@@ -15,6 +16,7 @@ export interface AppConfigView {
   miniHotkey: string;
   onboardingDone?: boolean;
   onboardingVersion?: number;
+  localModels: LocalModelsConfig;
 }
 
 export interface SystemInfoView {
@@ -100,4 +102,9 @@ export interface VisApi {
   setupStatus(): Promise<SetupStatusView>;
   /** the tray menu asks the window to show the welcome screen */
   onShowOnboarding(cb: () => void): () => void;
+  /** local model servers (Ollama, LM Studio, OpenAI-compatible), polled by the main process */
+  getLocalModels(): Promise<LocalModelsView>;
+  onLocalModels(cb: (v: LocalModelsView) => void): () => void;
+  /** "check again": poll every enabled server now */
+  refreshLocalModels(): Promise<void>;
 }

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ONBOARDING_VERSION, shouldShowOnboarding } from '@core/onboarding';
 import { modelFamily, modelLabel } from '@core/summarize';
+import { LocalChip, LocalTag } from './components/LocalBits';
+import { LocalModelsPage } from './components/LocalModelsPage';
 import type { SessionView } from '@core/state';
 import { AgentDrawer } from './components/AgentDrawer';
 import { AgentGraph } from './components/AgentGraph';
@@ -18,23 +20,29 @@ import { useReplay } from './replay';
 import { LayoutToolbar, PanelGrid, SidebarResizeHandle, usePanelLayout } from './layout';
 import { clock } from './util';
 
-const FAMILY_ROLE: Record<string, string> = { opus: 'plan / main', sonnet: 'build', haiku: 'search', fable: 'agents', other: 'other' };
+const FAMILY_ROLE: Record<string, string> = { opus: 'plan / main', sonnet: 'build', haiku: 'search', fable: 'agents', local: 'local model', other: 'other' };
 
 function Legend({ view }: { view: SessionView }) {
-  const models = new Map<string, string>();
-  for (const a of Object.values(view.agents)) if (a.model) models.set(modelFamily(a.model), a.model);
-  if (models.size === 0) return <div className="legend">waiting for the first model response…</div>;
+  // one entry per Claude family, but one per model for local models (qwen and llama are different things)
+  const groups = new Map<string, { fam: string; model: string; count: number }>();
+  for (const a of Object.values(view.agents)) {
+    if (!a.model) continue;
+    const fam = modelFamily(a.model);
+    const key = fam === 'local' ? `local:${a.model}` : fam;
+    const g = groups.get(key);
+    if (g) g.count++;
+    else groups.set(key, { fam, model: a.model, count: 1 });
+  }
+  if (groups.size === 0) return <div className="legend">waiting for the first model response…</div>;
   return (
     <div className="legend">
-      {[...models.entries()].map(([fam, model]) => {
-        const count = Object.values(view.agents).filter((a) => a.model && modelFamily(a.model) === fam).length;
-        return (
-          <span key={fam} className={`fam-${fam}`}>
-            <span className="sw" />
-            {modelLabel(model).toLowerCase()} · {count > 1 ? `${count} agents` : FAMILY_ROLE[fam]}
-          </span>
-        );
-      })}
+      {[...groups.entries()].map(([key, g]) => (
+        <span key={key} className={`fam-${g.fam}`} data-testid="legend-item">
+          <span className="sw" />
+          {modelLabel(g.model).toLowerCase()} · {g.count > 1 ? `${g.count} agents` : FAMILY_ROLE[g.fam]}
+          {g.fam === 'local' && <> <LocalTag /></>}
+        </span>
+      ))}
     </div>
   );
 }
@@ -62,7 +70,8 @@ export function App() {
   const [editingLayout, setEditingLayout] = useState(false);
   const [page, setPageState] = useState<Page>(() => {
     try {
-      return localStorage.getItem('cvis.page') === 'overview' ? 'overview' : 'session';
+      const p = localStorage.getItem('cvis.page');
+      return p === 'overview' || p === 'local' ? p : 'session';
     } catch {
       return 'session';
     }
@@ -138,8 +147,10 @@ export function App() {
       />
       {!collapsed && <SidebarResizeHandle api={layoutApi} />}
       </div>
-      {page === 'overview' ? (
-        <Overview onOpen={openSession} />
+      {page === 'local' ? (
+        <LocalModelsPage onOpenSession={openSession} onSettings={() => setShowSettings(true)} />
+      ) : page === 'overview' ? (
+        <Overview onOpen={openSession} onLocal={() => setPage('local')} />
       ) : view ? (
         <div className="view">
           <div className="topbar">
@@ -147,6 +158,7 @@ export function App() {
               {view.title ?? 'untitled session'} <span className="proj">· {summary?.project ?? view.cwd?.split(/[\\/]/).pop() ?? ''}</span>
             </div>
             <UsageMeters />
+            <LocalChip onOpen={() => setPage('local')} />
             <div className="actions">
               <button data-tour="open-in-claude" onClick={() => void window.api.openInClaude(view.id)} title="Open this session in the Claude desktop app">
                 ↗ open in Claude

@@ -1,3 +1,5 @@
+import { classifyModel } from './models';
+
 // Context-window sizing. Transcripts do not record the window size (no "[1m]" in model ids or
 // requestedModel, no context keys), so it is inferred.
 
@@ -38,9 +40,12 @@ export type ContextLevel = 'ok' | 'warn' | 'hot';
 
 export interface ContextInfo {
   tokens: number;
+  /** 0 when the window is unknown (a non-Claude model no running server has reported on) */
   size: number;
   estimated: boolean;
-  /** 0..1+ */
+  /** false: show the token count only, no percentage */
+  windowKnown: boolean;
+  /** 0..1+ (0 when unknown) */
   fraction: number;
   pct: number;
   level: ContextLevel;
@@ -50,10 +55,32 @@ export function contextLevel(fraction: number): ContextLevel {
   return fraction >= 0.9 ? 'hot' : fraction >= 0.7 ? 'warn' : 'ok';
 }
 
-/** null when no usage has been seen for the agent yet. */
-export function contextInfo(a: { model: string | null; contextTokens: number; contextPeak: number }, settingsModel?: string | null): ContextInfo | null {
+/** A context length a running local server reported for a model. */
+export interface LocalWindow {
+  size: number;
+  /** true when it is the model's maximum rather than the loaded (runtime) context */
+  estimated: boolean;
+}
+
+/**
+ * null when no usage has been seen for the agent yet. Claude models use the inferred 200k/1M window;
+ * local and other non-Claude models only get a percentage when `localWindow` (reported by a running
+ * server) is given, otherwise just the token count.
+ */
+export function contextInfo(
+  a: { model: string | null; contextTokens: number; contextPeak: number },
+  settingsModel?: string | null,
+  localWindow?: LocalWindow | null,
+): ContextInfo | null {
   if (!a.contextTokens) return null;
+  if (a.model && classifyModel(a.model).provider !== 'anthropic') {
+    if (!localWindow || !localWindow.size) {
+      return { tokens: a.contextTokens, size: 0, estimated: false, windowKnown: false, fraction: 0, pct: 0, level: 'ok' };
+    }
+    const fraction = a.contextTokens / localWindow.size;
+    return { tokens: a.contextTokens, size: localWindow.size, estimated: localWindow.estimated, windowKnown: true, fraction, pct: Math.round(fraction * 100), level: contextLevel(fraction) };
+  }
   const w = contextWindow(a.model, Math.max(a.contextPeak, a.contextTokens), settingsModel);
   const fraction = a.contextTokens / w.size;
-  return { tokens: a.contextTokens, size: w.size, estimated: w.estimated, fraction, pct: Math.round(fraction * 100), level: contextLevel(fraction) };
+  return { tokens: a.contextTokens, size: w.size, estimated: w.estimated, windowKnown: true, fraction, pct: Math.round(fraction * 100), level: contextLevel(fraction) };
 }

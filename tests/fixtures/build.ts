@@ -120,3 +120,40 @@ export function writeFixture(home: string, opts: { truncatedTail?: boolean } = {
   fs.writeFileSync(path.join(wf, 'journal.jsonl'), ['{"type":"launched"}', '{"type":"started","agentId":"w1"}', '{"type":"started","agentId":"w2"}', '{"type":"result","agentId":"w1"}'].join('\n') + '\n');
   return { mainFile: path.join(pdir, `${SID}.jsonl`), sessionDir: sdir };
 }
+
+// ---- a session running on local models (Claude Code pointed at a gateway/proxy) ----
+export const LOCAL_SID = '33333333-3333-4333-8333-333333333333';
+export const LOCAL_PROJECT = 'C--local-llm';
+export const LOCAL_MAIN_MODEL = 'qwen2.5-coder:32b';
+export const LOCAL_SUB_MODEL = 'llama3.1:8b';
+
+export function writeLocalFixture(home: string) {
+  const pdir = path.join(home, 'projects', LOCAL_PROJECT);
+  const sub = path.join(pdir, LOCAL_SID, 'subagents');
+  fs.mkdirSync(sub, { recursive: true });
+  const b = (s: number) => ({ sessionId: LOCAL_SID, cwd: 'C:\\demo\\local', version: '2.1.295', entrypoint: 'cli', gitBranch: 'main', timestamp: at(s), userType: 'external' });
+  const u = (i: number, o: number) => ({ input_tokens: i, output_tokens: o, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 });
+  const am = (s: number, id: string, model: string, block: unknown, stop: string | null = null, side?: string) => ({
+    type: 'assistant',
+    isSidechain: !!side,
+    ...(side ? { agentId: side } : {}),
+    requestedModel: model,
+    message: { id, model, role: 'assistant', content: [block], stop_reason: stop, usage: u(14_000 + s, 120) },
+    ...b(s),
+  });
+  const lines = [
+    { type: 'user', isSidechain: false, permissionMode: 'default', message: { role: 'user', content: 'Summarize the repo layout' }, ...b(0) },
+    am(1, 'lm_1', LOCAL_MAIN_MODEL, toolUse('toolu_L1', 'Agent', { description: 'list source files', subagent_type: 'Explore', prompt: 'list the files in src' })),
+    { type: 'user', isSidechain: false, message: { role: 'user', content: [toolResult('toolu_L1')] }, toolUseResult: { status: 'async_launched', agentId: 'l1', description: 'list source files', resolvedModel: LOCAL_SUB_MODEL }, ...b(2) },
+    am(3, 'lm_2', LOCAL_MAIN_MODEL, toolUse('toolu_L2', 'Read', { file_path: 'C:\\demo\\local\\README.md' })),
+    { type: 'custom-title', customTitle: 'Local qwen session', sessionId: LOCAL_SID },
+  ];
+  fs.writeFileSync(path.join(pdir, `${LOCAL_SID}.jsonl`), lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  fs.writeFileSync(path.join(sub, 'agent-l1.meta.json'), JSON.stringify({ agentType: 'Explore', description: 'list source files', toolUseId: 'toolu_L1', spawnDepth: 1, requestShape: 'background' }));
+  const sideLines = [
+    { type: 'user', isSidechain: true, agentId: 'l1', message: { role: 'user', content: 'list the files in src' }, ...b(4) },
+    am(5, 'lm_s1', LOCAL_SUB_MODEL, toolUse('toolu_L3', 'Glob', { pattern: 'src/**/*.ts' }), null, 'l1'),
+  ];
+  fs.writeFileSync(path.join(sub, 'agent-l1.jsonl'), sideLines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  return { mainFile: path.join(pdir, `${LOCAL_SID}.jsonl`) };
+}

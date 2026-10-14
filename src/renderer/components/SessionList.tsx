@@ -32,7 +32,7 @@ function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: 
   );
 }
 
-export type Page = 'session' | 'overview';
+export type Page = 'session' | 'overview' | 'local';
 
 export function SessionList({ sessions, selected, now, follow, onSelect, onFollow, collapsed, onCollapse, page, onPage, onHelp }: { sessions: SessionSummary[]; selected: string | null; now: number; follow: boolean; onSelect: (id: string) => void; onFollow: (on: boolean) => void; collapsed: boolean; onCollapse: () => void; page: Page; onPage: (p: Page) => void; onHelp: () => void }) {
   const [q, setQ] = useState('');
@@ -53,6 +53,9 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
           </button>
           <button className={page === 'session' ? 'on' : ''} onClick={() => onPage('session')} title="One session">
             ◉
+          </button>
+          <button className={page === 'local' ? 'on' : ''} onClick={() => onPage('local')} title="Local models (Ollama, LM Studio, ...)">
+            ⌂
           </button>
         </div>
       </div>
@@ -86,6 +89,9 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
             ◉ one session
           </button>
         </div>
+        <button className={`local-nav ${page === 'local' ? 'on' : ''}`} data-testid="nav-local" onClick={() => onPage('local')} title="Ollama, LM Studio and other local model servers">
+          ⌂ local models
+        </button>
         <input placeholder="search sessions…" value={q} onChange={(e) => setQ(e.target.value)} />
         <label className="follow" data-tour="follow">
           <input type="checkbox" checked={follow} onChange={(e) => onFollow(e.target.checked)} />

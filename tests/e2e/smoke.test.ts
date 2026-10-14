@@ -2,11 +2,13 @@
 // through the transcript files and the hook receiver. Run `npm run build` first.
 // SHOT_REAL=1 additionally screenshots the app against the real ~/.claude (read-only).
 import fs from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { SID, writeFixture } from '../fixtures/build';
+import { LOCAL_MAIN_MODEL, LOCAL_PROJECT, LOCAL_SID, SID, writeFixture, writeLocalFixture } from '../fixtures/build';
 
 const ROOT = path.resolve(__dirname, '../..');
 const ART = path.join(ROOT, 'tests/e2e/artifacts');
@@ -311,6 +313,186 @@ describe('app smoke (fixture data)', () => {
     const restored = JSON.parse(fs.readFileSync(path.join(home, 'settings.json'), 'utf8'));
     expect(restored.hooks.Stop).toHaveLength(1);
     expect(restored.statusLine).toBeUndefined();
+  });
+});
+
+/** A tiny fake Ollama: just /api/version, /api/ps, /api/tags and /api/show. */
+function startFakeOllama(): Promise<{ server: http.Server; url: string }> {
+  const GB = 1024 ** 3;
+  const size = Math.round(18.2 * GB);
+  const routes: Record<string, unknown> = {
+    '/api/version': { version: '0.12.3' },
+    '/api/ps': {
+      models: [
+        {
+          name: LOCAL_MAIN_MODEL,
+          model: LOCAL_MAIN_MODEL,
+          size,
+          size_vram: size,
+          digest: 'a'.repeat(64),
+          details: { parent_model: '', format: 'gguf', family: 'qwen2', families: ['qwen2'], parameter_size: '32.8B', quantization_level: 'Q4_K_M' },
+          expires_at: new Date(Date.now() + 4 * 60_000 + 12_000).toISOString(),
+          context_length: 32768,
+        },
+      ],
+    },
+    '/api/tags': {
+      models: [
+        { name: LOCAL_MAIN_MODEL, model: LOCAL_MAIN_MODEL, size, details: { family: 'qwen2', parameter_size: '32.8B', quantization_level: 'Q4_K_M' } },
+        { name: 'llama3.2:latest', model: 'llama3.2:latest', size: 2_019_393_189, details: { family: 'llama', parameter_size: '3.2B', quantization_level: 'Q4_K_M' } },
+      ],
+    },
+    '/api/show': { model_info: { 'qwen2.context_length': 32768 }, capabilities: ['completion', 'tools'] },
+  };
+  const server = http.createServer((req, res) => {
+    const body = routes[req.url ?? ''];
+    if (body === undefined) {
+      res.writeHead(404).end('{}');
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+  });
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, url: `http://127.0.0.1:${(server.address() as AddressInfo).port}` })));
+}
+
+describe('local models (fake Ollama, qwen + llama fixture session)', () => {
+  let home: string;
+  let userData: string;
+  let app: ElectronApplication;
+  let page: Page;
+  let fake: { server: http.Server; url: string };
+
+  beforeAll(async () => {
+    fs.mkdirSync(ART, { recursive: true });
+    fake = await startFakeOllama();
+    home = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-home-'));
+    writeLocalFixture(home);
+    fs.appendFileSync(path.join(home, 'projects', LOCAL_PROJECT, `${LOCAL_SID}.jsonl`), freshLine(LOCAL_SID));
+    ({ app, page, userData } = await launch({ CLAUDE_VIS_HOME: home, CLAUDE_VIS_OLLAMA_URL: fake.url, CLAUDE_VIS_LMSTUDIO_URL: 'off' }));
+  });
+
+  afterAll(async () => {
+    await app?.close();
+    fake?.server.closeAllConnections();
+    fake?.server.close();
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(userData, { recursive: true, force: true });
+  });
+
+  it('tags the qwen and llama agents as local and links the loaded model', async () => {
+    await page.getByText('Local qwen session').first().waitFor({ timeout: 20_000 });
+    const main = page.locator('[data-agent="main"]');
+    const sub = page.locator('[data-agent="l1"]');
+    await sub.waitFor({ timeout: 10_000 });
+    expect(await main.getByTestId('local-tag').count()).toBe(1);
+    expect(await sub.getByTestId('local-tag').count()).toBe(1);
+    expect(await main.innerText()).toContain('Qwen2.5 Coder 32B');
+    expect(await sub.innerText()).toContain('Llama 3.1 8B');
+    // the link needs the first poll to have landed
+    await page.waitForFunction(() => document.querySelector('[data-agent="main"] [data-testid="local-link"]')?.textContent?.includes('loaded in Ollama'), null, { timeout: 15_000 });
+    expect(await main.getByTestId('local-link').innerText()).toContain('qwen2.5-coder:32b');
+    expect(await main.getByTestId('local-link').innerText()).toContain('loaded in Ollama · 18.2 GB VRAM');
+    expect(await sub.getByTestId('local-link').innerText()).toContain('not loaded right now');
+    // context: the server reported 32768 for qwen; llama has no known window, so tokens only
+    expect(await main.locator('.ctx').innerText()).toMatch(/ctx \d+%/);
+    expect(await sub.locator('.ctx').innerText()).toMatch(/^ctx [\d.]+k$/);
+    // legend: one entry per local model, both tagged
+    expect(await page.getByTestId('legend-item').count()).toBe(2);
+    expect(await page.locator('.legend .local-tag').count()).toBe(2);
+    // mode panel: local tokens apart from Claude's
+    expect((await page.getByTestId('local-tokens').innerText()).toLowerCase()).toContain('local tokens');
+    // top-bar chip
+    expect((await page.getByTestId('local-chip').innerText()).trim()).toBe('⌂ 1 model loaded');
+    await page.waitForTimeout(500);
+    await main.screenshot({ path: path.join(ART, 'local-agent-card.png') });
+    await page.screenshot({ path: path.join(ART, 'local-session.png') });
+  });
+
+  it('lists the loaded model with its VRAM on the local models page', async () => {
+    await page.getByTestId('nav-local').click();
+    await page.getByTestId('local-page').waitFor();
+    const server = page.getByTestId('local-server');
+    await server.waitFor({ timeout: 10_000 });
+    expect(await server.innerText()).toContain('Ollama');
+    expect(await server.innerText()).toContain('v0.12.3');
+    const model = page.getByTestId('loaded-model');
+    expect(await model.getAttribute('data-model')).toBe('qwen2.5-coder:32b');
+    expect(await model.innerText()).toContain('Qwen2.5 Coder 32B');
+    expect(await page.getByTestId('mem-text').innerText()).toContain('18.2 GB VRAM');
+    expect(await page.getByTestId('mem-text').innerText()).toContain('100% GPU');
+    expect(await page.getByTestId('model-ctx').innerText()).toContain('context 32.8k');
+    expect(await page.getByTestId('model-unload').innerText()).toMatch(/unloads in (3m \d\d|4m \d\d)s/);
+    // the agent using it
+    await page.getByTestId('used-by').waitFor({ timeout: 10_000 });
+    expect(await page.getByTestId('used-by').innerText()).toContain('Local qwen session / main');
+    // honest about what Ollama does not report
+    expect(await server.innerText()).toContain('no live tokens/sec');
+    // installed models are collapsed until asked for
+    expect(await page.getByTestId('installed-list').count()).toBe(0);
+    await page.getByTestId('installed-toggle').click();
+    expect(await page.getByTestId('installed-list').locator('.n').allInnerTexts()).toEqual(['qwen2.5-coder:32b', 'llama3.2:latest']);
+    await page.getByTestId('installed-toggle').click();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(ART, 'local-models.png') });
+  });
+
+  it('has local model settings with the polling options', async () => {
+    await page.getByRole('button', { name: '⚙ settings' }).click();
+    const s = page.getByTestId('local-settings');
+    await s.waitFor();
+    expect(await page.getByLabel('Ollama URL').inputValue()).toBe(fake.url);
+    expect(await page.getByLabel('Poll interval seconds').inputValue()).toBe('5');
+    await page.getByLabel('Endpoint name').fill('llama.cpp');
+    await page.getByLabel('Endpoint URL').fill('127.0.0.1:1');
+    await page.getByRole('button', { name: 'Add endpoint' }).click();
+    await s.getByText('llama.cpp').first().waitFor();
+    const saved = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8'));
+    expect(saved.localModels.extra).toEqual([{ id: 'openai:http://127.0.0.1:1', name: 'llama.cpp', url: 'http://127.0.0.1:1', enabled: true }]);
+    await s.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(ART, 'local-settings.png') });
+    await s.getByRole('button', { name: 'Remove', exact: true }).click();
+    await page.getByRole('button', { name: '×' }).click();
+  });
+
+  it('shows a friendly empty state and hides the chip once the server is gone', async () => {
+    fake.server.closeAllConnections();
+    await new Promise((r) => fake.server.close(r));
+    await page.getByTestId('local-empty').waitFor({ timeout: 25_000 });
+    expect(await page.getByTestId('local-empty').innerText()).toContain('No local model servers found on this computer');
+    expect(await page.getByTestId('local-empty').innerText()).toContain('ollama pull');
+    expect(await page.getByTestId('local-chip').count()).toBe(0);
+    expect(await page.getByTestId('local-check').count()).toBe(1);
+    await page.getByTestId('local-check').click();
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: path.join(ART, 'local-empty.png') });
+    // back on the session: cards fall back to "no local server detected"
+    await page.getByRole('button', { name: /one session/ }).click();
+    await page.locator('[data-agent="main"] [data-testid="local-link"]').waitFor();
+    expect(await page.locator('[data-agent="main"] [data-testid="local-link"]').innerText()).toContain('no local server detected');
+    expect(await page.getByTestId('local-chip').count()).toBe(0);
+  });
+});
+
+describe('local models: nothing running', () => {
+  it('starts with no servers, no chip, and a friendly empty page', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-home-'));
+    writeFixture(home);
+    fs.appendFileSync(path.join(home, 'projects', 'C--demo-app', `${SID}.jsonl`), freshLine(SID));
+    const { app, page, userData } = await launch({ CLAUDE_VIS_HOME: home, CLAUDE_VIS_OLLAMA_URL: 'http://127.0.0.1:1', CLAUDE_VIS_LMSTUDIO_URL: 'off' });
+    try {
+      await page.getByText('Retry + docs').first().waitFor({ timeout: 20_000 });
+      await page.waitForTimeout(1500);
+      expect(await page.getByTestId('local-chip').count()).toBe(0);
+      // a normal Claude session shows no local tags
+      expect(await page.getByTestId('local-tag').count()).toBe(0);
+      await page.getByTestId('nav-local').click();
+      await page.getByTestId('local-empty').waitFor();
+      expect(await page.getByTestId('local-empty').innerText()).toContain('No local model servers found on this computer');
+    } finally {
+      await app.close();
+      fs.rmSync(home, { recursive: true, force: true });
+      fs.rmSync(userData, { recursive: true, force: true });
+    }
   });
 });
 

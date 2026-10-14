@@ -5,6 +5,7 @@ import type { AgentNode, SessionView } from '@core/state';
 import { formatDuration, formatTokens, modelLabel, toolLabel } from '@core/summarize';
 import { agentName, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
 import { GoalBadge } from './GoalBadge';
+import { isLocalModel, LocalLinkLine } from './LocalBits';
 
 const TOOL_ICON: Record<ToolCategory, string> = {
   search: '⌕',
@@ -89,6 +90,12 @@ export function AgentDrawer({ view, id, now, onClose, onFilterLog }: { view: Ses
         <span className={`v status ${st}`}>{STATUS_GLYPH[st]}</span>
         <span className="k">model</span>
         <span className="v">{modelLabel(a.model)}</span>
+        {isLocalModel(a.model) && (
+          <>
+            <span className="k">runs on</span>
+            <span className="v"><LocalLinkLine agent={a} /></span>
+          </>
+        )}
         {a.kind !== 'main' && (
           <>
             <span className="k">id</span>

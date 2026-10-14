@@ -16,6 +16,21 @@ A desktop app (Windows + macOS) that shows what your Claude Code sessions are do
 
 It works with both the Claude desktop app's Code tab and the `claude` CLI, because both write the same transcripts.
 
+## Local models
+
+Claude Code can run against local models through a gateway or proxy (LiteLLM, Ollama's Anthropic-compatible endpoint, claude-code-router, LM Studio, ...) via `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL`. The transcripts then carry non-Claude model ids such as `qwen2.5-coder:32b` or `ollama/llama3.1:70b`.
+
+- **Recognition** (`src/core/models.ts`): model ids are classified as `anthropic`, `local` (qwen, llama, mistral/mixtral/codestral/devstral, deepseek, gemma, phi, gpt-oss, granite, starcoder, codellama, command-r, glm, kimi, or any `ollama/`, `lmstudio-community/`, `hf.co/` id) or `other` (hosted gateways such as `openrouter/...`, `gpt-4o`). Labels are prettified (`qwen2.5-coder:32b` becomes "Qwen2.5 Coder 32B"). Local agents get a teal colour (`--local`), a "⌂ local" tag on cards, legend, overview panels and the mini view, and their tokens are shown as "local tokens", separate from Claude's. They are never attributed to the 5-hour / weekly meters.
+- **Context**: a local agent shows a context percentage only when a running server reported the model's context length (Ollama `/api/ps` `context_length`, `/api/show` `num_ctx` or `model_info.*.context_length`, LM Studio `loaded_context_length` / `max_context_length`, llama.cpp `n_ctx`). Otherwise just the token count.
+- **Local models view** (sidebar, "⌂ local models"; top-bar chip "⌂ N models loaded", hidden when no server is up): the main process polls, read-only and only the URLs in settings (loopback by default; remote hosts only if you add them):
+  - **Ollama** `127.0.0.1:11434`: `GET /api/version`, `/api/ps` (loaded models: `size`, `size_vram`, `expires_at`, `details`, `context_length` if present), `/api/tags` (installed), `POST /api/show` (context, capabilities; cached).
+  - **LM Studio** `127.0.0.1:1234`: `GET /api/v0/models` (`state`, `max_context_length`, `quantization`, `arch`), falling back to `/api/v1/models` and then OpenAI-compatible `/v1/models`.
+  - **OpenAI-compatible endpoints** you add (llama.cpp server, vLLM, LocalAI, Jan, ...): `GET /v1/models`, plus llama.cpp's `/health`, `/props`, `/slots` and `/metrics` when they answer.
+  - Ollama and LM Studio do not expose live tokens/sec or request counts, so the view does not show any for them; llama.cpp's `/slots` and `/metrics` give requests in flight and server-reported average tokens/sec, labelled as such.
+  - Interval defaults to 5 s and backs off to 60 s while a server is down. With nothing running the view says so and offers "check again".
+  - An agent whose model a server has loaded shows "loaded in Ollama · 18.2 GB VRAM" on its card, and the view lists "used by: session / agent".
+  - Test hooks: `CLAUDE_VIS_OLLAMA_URL`, `CLAUDE_VIS_LMSTUDIO_URL` (`off` disables).
+
 ## First run
 
 On first launch the app shows a welcome screen with a live setup checklist:

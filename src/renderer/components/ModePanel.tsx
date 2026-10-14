@@ -2,6 +2,8 @@ import { MAIN, type SessionView } from '@core/state';
 import { CtxBar } from './ContextMeter';
 import { formatDuration, formatTokens, modeLabel, modelLabel } from '@core/summarize';
 import type { HookServerStatusView } from '@core/api';
+import { tokensByProvider } from '@core/localModels';
+import { isLocalModel, LocalTag } from './LocalBits';
 
 const TODO_GLYPH: Record<string, string> = { completed: '✓', in_progress: '▸', pending: '○' };
 
@@ -10,7 +12,10 @@ export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: numb
   const plan = m.short === 'PLAN';
   const main = view.agents[MAIN];
   const done = view.todos.filter((t) => t.status === 'completed').length;
-  const t = view.totals;
+  const split = tokensByProvider(view.agents, view.totals);
+  const t = split.claude;
+  const lt = split.local;
+  const allLocal = split.localAgents > 0 && t.in + t.out + t.cacheRead + t.cacheWrite === 0;
   const hookFresh = view.lastHookAt && now - view.lastHookAt < 10 * 60_000;
   return (
     <div className="modepanel" data-tour="mode">
@@ -57,7 +62,9 @@ export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: numb
         <CtxBar agent={main} />
         <div className="kv">
           <span className="k">model</span>
-          <span className="v">{modelLabel(main?.model)}</span>
+          <span className="v">
+            {modelLabel(main?.model)} {isLocalModel(main?.model) && <LocalTag />}
+          </span>
           <span className="k">effort</span>
           <span className="v">{main?.effort ?? '—'}</span>
           <span className="k">tools used</span>
@@ -68,7 +75,7 @@ export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: numb
       </div>
 
       <div className="section">
-        <h4>tokens (all agents)</h4>
+        <h4>{split.localAgents > 0 ? 'tokens (Claude agents)' : 'tokens (all agents)'}</h4>
         <div className="kv">
           <span className="k">input</span>
           <span className="v">{formatTokens(t.in)}</span>
@@ -80,10 +87,33 @@ export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: numb
           <span className="v">{formatTokens(t.cacheWrite)}</span>
           <span className="k">cost</span>
           <span className="v" title="As reported by Claude Code in the transcript (cost-state); only written at certain points">
-            {view.costUSD != null ? `$${view.costUSD.toFixed(2)}` : '—'}
+            {allLocal ? 'n/a' : view.costUSD != null ? `$${view.costUSD.toFixed(2)}` : '—'}
           </span>
         </div>
       </div>
+
+      {split.localAgents > 0 && (
+        <div className="section" data-testid="local-tokens">
+          <h4>
+            <span>local tokens</span>
+            <LocalTag title="Served by a local model: not counted against the 5-hour or weekly limits, no Anthropic cost" />
+          </h4>
+          <div className="kv">
+            <span className="k">input</span>
+            <span className="v">{formatTokens(lt.in)}</span>
+            <span className="k">output</span>
+            <span className="v">{formatTokens(lt.out)}</span>
+            {lt.cacheRead + lt.cacheWrite > 0 && (
+              <>
+                <span className="k">cache</span>
+                <span className="v">{formatTokens(lt.cacheRead + lt.cacheWrite)}</span>
+              </>
+            )}
+            <span className="k">agents</span>
+            <span className="v">{split.localAgents}</span>
+          </div>
+        </div>
+      )}
 
       <div className="section">
         <h4>session</h4>
