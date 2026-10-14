@@ -50,7 +50,7 @@ export function isWorkHeading(title: string): boolean {
 /** a list item that is just a file path or path list ("src/main/{a,b}.ts"), not a piece of work */
 function isPathItem(raw: string): boolean {
   const t = stripMd(raw).replace(/[:,;]\s*$/, '');
-  return !/\s/.test(t) && /[\/]|\.[a-z]{1,5}$/i.test(t);
+  return !/\s/.test(t) && /[/]|\.[a-z]{1,5}$/i.test(t);
 }
 
 export function isInfoHeading(title: string): boolean {

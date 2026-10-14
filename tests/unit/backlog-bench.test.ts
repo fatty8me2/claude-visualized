@@ -34,7 +34,8 @@ const loader: BacklogLoader = (sessionId, mainFile, wantEvents) =>
     const w = new Worker(workerFile!, { workerData: { sessionId, mainFile, wantEvents } });
     w.once('message', (m) => {
       void w.terminate();
-      m.ok ? resolve(m.snapshot) : reject(new Error(m.error));
+      if (m.ok) resolve(m.snapshot);
+      else reject(new Error(m.error));
     });
     w.once('error', reject);
   });

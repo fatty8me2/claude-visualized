@@ -130,7 +130,7 @@ export function classifyModel(model: string | null | undefined): ModelClass {
   const famIdx = LOCAL_FAMILIES.findIndex(([, re]) => re.test(lowName));
   const famKey = famIdx >= 0 ? LOCAL_FAMILIES[famIdx][0] : null;
   // an Ollama-style "name:tag" id is a strong hint when the family is unknown
-  const isLocal = prefixLocal || (!prefixCloud && famKey !== null) || (!prefixCloud && /^[\w.\-]+:[\w.\-]+$/.test(name) && !/^(gpt|o\d|gemini|grok)/i.test(name));
+  const isLocal = prefixLocal || (!prefixCloud && famKey !== null) || (!prefixCloud && /^[\w.-]+:[\w.-]+$/.test(name) && !/^(gpt|o\d|gemini|grok)/i.test(name));
   const label = prettyLocalLabel(name, famIdx);
   if (isLocal) return { provider: 'local', family: famKey ?? 'local', label: label || raw };
   return { provider: 'other', family: 'other', label: famKey ? label : name || raw };
