@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { HookServerStatusView } from '@core/api';
 import { modelFamily, modelLabel } from '@core/summarize';
 import type { SessionSummary, SessionView as CoreSessionView } from '@core/state';
@@ -13,6 +13,7 @@ import { LayoutToolbar, PanelGrid, type LayoutApi } from '../layout';
 import type { useReplay } from '../replay';
 import type { SessionUi } from '../state/sessionUi';
 import { clock } from '../util';
+import { eventIndexAt } from '@core/timeline';
 import { GRAPH_VIEWS } from './graphViews';
 
 const FAMILY_ROLE: Record<string, string> = { opus: 'plan / main', sonnet: 'build', haiku: 'search', fable: 'agents', local: 'local model', other: 'other' };
@@ -82,6 +83,7 @@ export function SessionView({
   const planPrefs = usePlanRailPrefs();
   const plan = usePlanModel(view);
   const [graphViewId, setGraphViewId] = useState(GRAPH_VIEWS[0].id);
+  const eventTimes = useMemo(() => replay?.events.map((e) => e.ts), [replay?.events]);
   const graphView = GRAPH_VIEWS.find((g) => g.id === graphViewId) ?? GRAPH_VIEWS[0];
 
   return (
@@ -167,6 +169,8 @@ export function SessionView({
                   onToggleFinished: () => onActiveOnly(!activeOnly),
                   highlight: hlAgents,
                   onHoverAgent: plan ? setHoverAgent : undefined,
+                  replaying: !!replay,
+                  onSeekTime: eventTimes ? (ts) => goto(eventIndexAt(eventTimes, ts)) : undefined,
                   extraTools: plan ? <PlanToggle plan={plan} prefs={planPrefs} /> : undefined,
                 })}
                 {agentSel && <AgentDrawer view={view} id={agentSel} now={now} onClose={() => setAgentSel(null)} onFilterLog={setLogAgent} />}
