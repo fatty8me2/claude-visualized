@@ -1,26 +1,32 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { describeActivity, firstLine } from '@core/activity';
 import { agentGoal } from '@core/insight';
 import { GoalBadge } from './GoalBadge';
-import { DEFAULT_LAYOUT, layoutAgents } from '@core/layout';
+import { DEFAULT_LAYOUT, layoutAgents, type Layout } from '@core/layout';
 import { MAIN, type AgentNode, type SessionView } from '@core/state';
 import { formatDuration, formatTokens, modeLabel, modelLabel } from '@core/summarize';
 import { CtxChip } from './ContextMeter';
 import { isLocalModel, LocalLinkLine } from './LocalBits';
+import { createClock, useClockKey, type Clock } from '../clockStore';
 import { agentName, displayStatus, famClass, STATUS_GLYPH, type DisplayStatus } from '../util';
 
 const LOCAL_ROWS_H = 30;
 
-function Spark({ activity, now }: { activity: number[]; now: number }) {
-  const buckets = 24;
-  const span = 12 * 60_000;
-  const size = span / buckets;
-  const counts = new Array(buckets).fill(0);
+const SPARK_BUCKETS = 24;
+const SPARK_SPAN = 12 * 60_000;
+
+function sparkCounts(activity: number[], now: number): number[] {
+  const size = SPARK_SPAN / SPARK_BUCKETS;
+  const counts = new Array<number>(SPARK_BUCKETS).fill(0);
   for (const t of activity) {
     const age = now - t;
-    if (age < 0 || age >= span) continue;
-    counts[buckets - 1 - Math.floor(age / size)]++;
+    if (age < 0 || age >= SPARK_SPAN) continue;
+    counts[SPARK_BUCKETS - 1 - Math.floor(age / size)]++;
   }
+  return counts;
+}
+
+function Spark({ counts }: { counts: number[] }) {
   const max = Math.max(1, ...counts);
   return (
     <svg className="spark" width={40} height={14} viewBox="0 0 96 14" preserveAspectRatio="none" aria-hidden>
@@ -56,10 +62,32 @@ function totalTokens(a: AgentNode) {
   return a.tokens.in + a.tokens.out + a.tokens.cacheRead + a.tokens.cacheWrite;
 }
 
-function NodeCard({
+interface KidStats {
+  total: number;
+  running: number;
+}
+
+/** everything on a card that depends on the clock */
+function cardTime(a: AgentNode, now: number, kids: KidStats) {
+  const st = displayStatus(a, now);
+  const elapsed = (a.endedAt ?? (st === 'running' || st === 'waiting' ? now : a.lastActivity)) - a.startedAt;
+  const elapsedText = formatDuration(elapsed);
+  const act = describeActivity(a, { now, runningChildren: kids.running, totalChildren: kids.total });
+  const dur = act.since != null && now - act.since >= 1000 ? formatDuration(now - act.since) : '';
+  const spark = sparkCounts(a.activity, now);
+  return { st, elapsedText, act, dur, spark, key: `${st}|${elapsedText}|${act.kind}|${act.line}|${dur}|${spark.join(',')}` };
+}
+
+/**
+ * One agent card. Memoized: it re-renders when its agent object (replaced only when that agent changed), its geometry or its
+ * selection changes, or when the text it shows because of time changes (see useClockKey), not on every clock tick.
+ */
+const NodeCard = memo(function NodeCard({
   a,
-  view,
-  now,
+  mode,
+  kidsTotal,
+  kidsRunning,
+  clock,
   x,
   y,
   w,
@@ -69,8 +97,10 @@ function NodeCard({
   onSelect,
 }: {
   a: AgentNode;
-  view: SessionView;
-  now: number;
+  mode: string;
+  kidsTotal: number;
+  kidsRunning: number;
+  clock: Clock;
   x: number;
   y: number;
   w: number;
@@ -79,15 +109,13 @@ function NodeCard({
   hl?: boolean;
   onSelect: (id: string) => void;
 }) {
-  const st = displayStatus(a, now);
-  const elapsed = (a.endedAt ?? (st === 'running' || st === 'waiting' ? now : a.lastActivity)) - a.startedAt;
+  const kids = { total: kidsTotal, running: kidsRunning };
+  const now = useClockKey(clock, (n) => cardTime(a, n, kids).key);
+  const { st, elapsedText, act, dur, spark } = cardTime(a, now, kids);
   const isMain = a.kind === 'main';
   const model = a.model ? modelLabel(a.model) : a.kind === 'workflow' ? 'workflow' : '—';
-  const children = Object.values(view.agents).filter((c) => c.parentId === a.id && c.id !== a.id);
-  const plan = view.mode === 'plan';
+  const plan = mode === 'plan';
   const goal = useMemo(() => agentGoal(a, plan), [a.toolCount, a.description, a.prompt, a.phase, a.agentType, a.kind, plan]); // eslint-disable-line react-hooks/exhaustive-deps
-  const runningKids = children.filter((c) => c.status === 'running').length;
-  const act = describeActivity(a, { now, runningChildren: runningKids, totalChildren: children.length });
   // a finished card already says what it ended with; otherwise show the agent's own last sentence
   const says = act.kind === 'finished' || act.kind === 'idle' ? '' : firstLine(a.lastText, 120);
   return (
@@ -103,7 +131,7 @@ function NodeCard({
       </div>
       {isMain ? (
         <>
-          <div className="model">{modeLabel(view.mode).short === 'PLAN' ? 'plan mode · reads, designs' : `building · ${modeLabel(view.mode).detail}`}</div>
+          <div className="model">{modeLabel(mode).short === 'PLAN' ? 'plan mode · reads, designs' : `building · ${modeLabel(mode).detail}`}</div>
           <div className={`status ${st}`}>
             {STATUS_GLYPH[st]}
             {a.effort ? ` · effort ${a.effort}` : ''}
@@ -124,7 +152,7 @@ function NodeCard({
       {!isMain && <div className="desc">{a.description || a.lastText || ''}</div>}
       <div className={`now ${act.kind}`} title={act.line} data-testid="now">
         <span className="lbl">now:</span> {act.phrase}
-        {act.since != null && now - act.since >= 1000 && <span className="dur"> · {formatDuration(now - act.since)}</span>}
+        {dur && <span className="dur"> · {dur}</span>}
       </div>
       {!isMain && (
         <div className="says" title={a.lastText ?? ''}>
@@ -133,14 +161,37 @@ function NodeCard({
       )}
       <div className="meta">
         <span>
-          {a.toolCount} tools · {formatDuration(elapsed)} · {formatTokens(totalTokens(a))} tok
+          {a.toolCount} tools · {elapsedText} · {formatTokens(totalTokens(a))} tok
         </span>
         <CtxChip agent={a} />
-        <Spark activity={a.activity} now={now} />
+        <Spark counts={spark} />
       </div>
     </div>
   );
-}
+});
+
+/** The edges layer only changes with the layout, not with every card update. */
+const MANY_ACTIVE_EDGES = 16;
+
+const Edges = memo(function Edges({ layout }: { layout: Layout }) {
+  // the dash and dot animations repaint continuously: with many running agents, step the dashes and only travel dots on the first few edges
+  const active = layout.edges.reduce((n, e) => n + (e.active ? 1 : 0), 0);
+  let dots = 0;
+  return (
+    <svg className={`edges${active > MANY_ACTIVE_EDGES ? ' calm' : ''}`} width={layout.width} height={layout.height}>
+      {layout.edges.map((e) => (
+        <g key={`${e.from}>${e.to}`}>
+          <path className={`edge ${e.active ? 'active' : ''}`} d={e.d} id={`p-${e.to}`} />
+          {e.active && dots++ < MANY_ACTIVE_EDGES && (
+            <circle r={3.2} className="edge-dot">
+              <animateMotion dur="1.8s" repeatCount="indefinite" path={e.d} />
+            </circle>
+          )}
+        </g>
+      ))}
+    </svg>
+  );
+});
 
 export function AgentGraph({
   view,
@@ -192,14 +243,43 @@ export function AgentGraph({
   useEffect(() => setExpanded(new Set()), [view.id]);
 
   // local-model cards carry two extra rows (model id, where it is loaded)
-  const extra = Object.values(view.agents).some((a) => isLocalModel(a.model)) ? LOCAL_ROWS_H : 0;
-  const layout = layoutAgents(view.agents, {
-    ...DEFAULT_LAYOUT,
-    nodeH: DEFAULT_LAYOUT.nodeH + extra,
-    mainH: DEFAULT_LAYOUT.mainH + extra,
-    showFinished,
-    expanded,
-  });
+  const extra = useMemo(() => (Object.values(view.agents).some((a) => isLocalModel(a.model)) ? LOCAL_ROWS_H : 0), [view.agents]);
+  // the layout depends only on the tree's structure: recompute it when that changes, not on every push
+  const structureKey = useMemo(() => {
+    let k = '';
+    for (const a of Object.values(view.agents)) k += `${a.id}|${a.parentId}|${a.status}|${a.startedAt}\n`;
+    return k;
+  }, [view.agents]);
+  const layout = useMemo(
+    () =>
+      layoutAgents(view.agents, {
+        ...DEFAULT_LAYOUT,
+        nodeH: DEFAULT_LAYOUT.nodeH + extra,
+        mainH: DEFAULT_LAYOUT.mainH + extra,
+        showFinished,
+        expanded,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [structureKey, extra, showFinished, expanded],
+  );
+  const kidStats = useMemo(() => {
+    const m = new Map<string, KidStats>();
+    for (const c of Object.values(view.agents)) {
+      if (!c.parentId || c.parentId === c.id) continue;
+      const k = m.get(c.parentId) ?? { total: 0, running: 0 };
+      k.total++;
+      if (c.status === 'running') k.running++;
+      m.set(c.parentId, k);
+    }
+    return m;
+  }, [view.agents]);
+  // the clock is pushed to the cards through a store so a per-second tick does not re-render every card
+  const [clock] = useState(() => createClock(now));
+  useLayoutEffect(() => {
+    clock.set(now);
+    clock.notify();
+  }, [clock, now]);
+
   const pad = compact ? 14 : 36;
   const scale = compact
     ? Math.max(0.28, Math.min(1, (wrapW - pad * 2) / Math.max(1, layout.width), (wrapH - pad * 2) / Math.max(1, layout.height)))
@@ -242,18 +322,7 @@ export function AgentGraph({
             transformOrigin: 'top left',
           }}
         >
-          <svg className="edges" width={layout.width} height={layout.height}>
-            {layout.edges.map((e) => (
-              <g key={`${e.from}>${e.to}`}>
-                <path className={`edge ${e.active ? 'active' : ''}`} d={e.d} id={`p-${e.to}`} />
-                {e.active && (
-                  <circle r={3.2} className="edge-dot">
-                    <animateMotion dur="1.8s" repeatCount="indefinite" path={e.d} />
-                  </circle>
-                )}
-              </g>
-            ))}
-          </svg>
+          <Edges layout={layout} />
           {layout.nodes.map((n) => {
             if (n.collapsed) {
               return (
@@ -276,8 +345,10 @@ export function AgentGraph({
               <NodeCard
                 key={n.id}
                 a={a}
-                view={view}
-                now={now}
+                mode={view.mode}
+                kidsTotal={kidStats.get(a.id)?.total ?? 0}
+                kidsRunning={kidStats.get(a.id)?.running ?? 0}
+                clock={clock}
                 x={n.x}
                 y={n.y}
                 w={n.w}

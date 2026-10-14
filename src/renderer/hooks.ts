@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AppConfigView, HookServerStatusView } from '@core/api';
 import type { InboxSnapshot } from '@core/inbox';
 import type { SessionSummary, SessionView } from '@core/state';
+import { OverviewDecoder, ViewDecoder } from '@core/sync';
 import type { UsageView } from '@core/usage';
 
 export function useNow(intervalMs = 1000): number {
@@ -25,8 +26,31 @@ export function useSessions(): SessionSummary[] {
 export function useLiveState(): SessionView | null {
   const [s, set] = useState<SessionView | null>(null);
   useEffect(() => {
-    void window.api.getState().then(set);
-    return window.api.onState(set);
+    // pushes are deltas: rebuild the view locally; fetch a snapshot first, and again whenever a push does not fit
+    const dec = new ViewDecoder();
+    let fetching = false;
+    let alive = true;
+    const resync = () => {
+      if (fetching) return;
+      fetching = true;
+      void window.api.getState().then((v) => {
+        fetching = false;
+        if (!alive) return;
+        dec.adopt(v);
+        set(v);
+      });
+    };
+    const off = window.api.onState((m) => {
+      if (fetching) return;
+      const v = dec.apply(m);
+      if (v === undefined) resync();
+      else set(v);
+    });
+    resync();
+    return () => {
+      alive = false;
+      off();
+    };
   }, []);
   return s;
 }
@@ -44,10 +68,29 @@ export function useSelected(): string | null {
 export function useOverview(): SessionView[] | null {
   const [v, set] = useState<SessionView[] | null>(null);
   useEffect(() => {
-    void window.api.getOverview().then(set);
+    const dec = new OverviewDecoder();
+    let fetching = false;
+    let alive = true;
+    const resync = () => {
+      if (fetching) return;
+      fetching = true;
+      void window.api.getOverview().then((vs) => {
+        fetching = false;
+        if (!alive) return;
+        dec.adopt(vs);
+        set(vs);
+      });
+    };
+    resync();
     void window.api.watchOverview(true);
-    const off = window.api.onOverview(set);
+    const off = window.api.onOverview((m) => {
+      if (fetching) return;
+      const vs = dec.apply(m);
+      if (vs === undefined) resync();
+      else set(vs);
+    });
     return () => {
+      alive = false;
       off();
       void window.api.watchOverview(false);
     };

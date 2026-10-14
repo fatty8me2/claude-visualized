@@ -154,7 +154,18 @@ const hookServer = new HookServer(
   (status) => broadcast('hookserver', status),
 );
 
+/** CLAUDE_VIS_PERF=1: count the pushes and JSON bytes per channel, read by the perf e2e (tests/e2e/perf.test.ts). */
+const perfStats: Record<string, { n: number; bytes: number; max: number }> = {};
+(globalThis as { __perf?: unknown }).__perf = perfStats;
+
 function broadcast(channel: string, payload: unknown) {
+  if (process.env.CLAUDE_VIS_PERF) {
+    const b = JSON.stringify(payload ?? null).length;
+    const st = (perfStats[channel] ??= { n: 0, bytes: 0, max: 0 });
+    st.n++;
+    st.bytes += b;
+    st.max = Math.max(st.max, b);
+  }
   for (const w of [mainWin, miniWin]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 }
 

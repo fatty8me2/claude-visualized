@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AgentEvent } from '@core/events';
 import { apply } from '@core/reducer';
 import { newSession, toView, type SessionState, type SessionView } from '@core/state';
+import { LocalViewStream } from '@core/sync';
 
 export interface Replay {
   sessionId: string;
@@ -19,6 +20,8 @@ const MAX_GAP_MS = 4000;
 export function useReplay() {
   const [replay, setReplay] = useState<Replay | null>(null);
   const stateRef = useRef<{ s: SessionState; idx: number } | null>(null);
+  // replay views go through the same incremental codec as live ones, so unchanged agents keep their identity (React.memo) and later reducer mutations can't leak into old views
+  const streamRef = useRef(new LocalViewStream());
 
   const seek = useCallback((events: AgentEvent[], sessionId: string, idx: number) => {
     let cur = stateRef.current;
@@ -26,7 +29,7 @@ export function useReplay() {
     for (let i = cur.idx; i < idx; i++) apply(cur.s, events[i]);
     cur.idx = idx;
     stateRef.current = cur;
-    return toView(cur.s);
+    return streamRef.current.next(toView(cur.s));
   }, []);
 
   const start = useCallback(

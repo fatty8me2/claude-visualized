@@ -2,7 +2,7 @@
 // (cheap for 10k+ event transcripts) and returns it; callers that need a new identity copy it.
 
 import type { AgentEvent, UsageNumbers } from './events';
-import { ACTIVITY_CAP, LOG_CAP, MAIN, newAgent, newSession, type AgentNode, type AttentionKind, type LogEntry, type LogKind, type SessionState } from './state';
+import { ACTIVITY_CAP, LOG_CAP, MAIN, SEEN_TOOLS_CAP, USAGE_MSGS_CAP, newAgent, newSession, type AgentNode, type AttentionKind, type LogEntry, type LogKind, type SessionState } from './state';
 import { summarizeTool, toolLabel } from './summarize';
 import { toolCategory } from './goal';
 import { COMMANDS_CAP, FILES_CAP, PROMPT_CAP, RECENT_CAP } from './state';
@@ -62,6 +62,25 @@ function ensureWorkflow(s: SessionState, runId: string, ts: number): AgentNode {
     s.agents[key] = w;
   }
   return w;
+}
+
+/**
+ * seenTools only has to dedupe near-simultaneous copies of a call (hook + transcript) and resolve a spawned agent's parent;
+ * once it grows past the cap, drop the oldest entries that nothing refers to any more.
+ */
+function pruneSeenTools(s: SessionState) {
+  const i = s.internal;
+  const keep = new Set<string>([...Object.keys(i.pending), ...Object.keys(i.agentByToolUse), ...Object.values(i.workflowToolUse)]);
+  for (const a of Object.values(s.agents)) if (a.parentToolUseId) keep.add(a.parentToolUseId);
+  if (s.plan?.exitToolUseId) keep.add(s.plan.exitToolUseId);
+  let drop = Object.keys(i.seenTools).length - Math.floor(SEEN_TOOLS_CAP * 0.75);
+  for (const id of Object.keys(i.seenTools)) {
+    if (drop <= 0) break;
+    if (keep.has(id)) continue;
+    delete i.seenTools[id];
+    drop--;
+  }
+  i.seenCount = Object.keys(i.seenTools).length;
 }
 
 function log(s: SessionState, ts: number, agentId: string, kind: LogKind, text: string, attn?: AttentionKind) {
@@ -201,6 +220,8 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       const known = s.internal.seenTools[e.toolUseId];
       if (!known) {
         s.internal.seenTools[e.toolUseId] = a.id;
+        s.internal.seenCount ??= Object.keys(s.internal.seenTools).length;
+        if (++s.internal.seenCount > SEEN_TOOLS_CAP) pruneSeenTools(s);
         a.toolCount++;
         a.activity.push(ts);
         if (a.activity.length > ACTIVITY_CAP) a.activity.splice(0, a.activity.length - ACTIVITY_CAP);
@@ -259,6 +280,16 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       if (prev) {
         addUsage(a.tokens, prev, -1);
         addUsage(s.totals, prev, -1);
+      }
+      if (!prev) {
+        const counts = (s.internal.usageCount ??= {});
+        counts[a.id] ??= Object.keys(book).length;
+        if (++counts[a.id] > USAGE_MSGS_CAP * 1.5) {
+          // message ids are only repeated close together: forget the oldest
+          const old = Object.keys(book).slice(0, counts[a.id] - USAGE_MSGS_CAP);
+          for (const k of old) delete book[k];
+          counts[a.id] = Object.keys(book).length + 1;
+        }
       }
       book[e.msgId] = e.usage;
       addUsage(a.tokens, e.usage, 1);
