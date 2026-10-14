@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { DEFAULT_LAYOUT, layoutAgents } from '@core/layout';
 import { MAIN, type AgentNode, type SessionView } from '@core/state';
 import { formatDuration, formatTokens, modeLabel, modelLabel, toolLabel } from '@core/summarize';
+import { CtxChip } from './ContextMeter';
 import { agentName, displayStatus, famClass, STATUS_GLYPH, type DisplayStatus } from '../util';
 
 function Spark({ activity, now }: { activity: number[]; now: number }) {
@@ -89,6 +90,7 @@ function NodeCard({ a, view, now, x, y, w, h, selected, onSelect }: { a: AgentNo
         <span>
           {a.toolCount} tools · {formatDuration(elapsed)} · {formatTokens(totalTokens(a))} tok
         </span>
+        <CtxChip agent={a} />
         <Spark activity={a.activity} now={now} />
       </div>
     </div>

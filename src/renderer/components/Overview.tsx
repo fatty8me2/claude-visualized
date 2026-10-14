@@ -1,4 +1,5 @@
 import { MAIN, type SessionView } from '@core/state';
+import { CtxChip } from './ContextMeter';
 import { formatTokens, modelLabel, toolLabel } from '@core/summarize';
 import { useNow, useOverview } from '../hooks';
 import { agentName, ago, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
@@ -40,6 +41,8 @@ function Panel({ v, index, now, onOpen }: { v: SessionView; index: number; now: 
             <b style={{ color: 'var(--fam)' }}>{modelLabel(main?.model)}</b> {STATUS_GLYPH[st]}
           </span>
           <span className="ov-sub">
+            <CtxChip agent={main} />
+            {main && main.contextTokens > 0 ? ' · ' : ''}
             agents {running}/{subs.length} · {formatTokens(tokens)} tok{v.costUSD != null ? ` · $${v.costUSD.toFixed(2)}` : ''}
           </span>
         </div>

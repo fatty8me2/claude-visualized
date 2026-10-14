@@ -1,6 +1,7 @@
 import { MAIN } from '@core/state';
 import { modelLabel, toolLabel } from '@core/summarize';
 import { useLiveState, useNow } from '../hooks';
+import { CtxChip } from './ContextMeter';
 import { UsageMeters } from './UsageMeters';
 import { agentName, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
 
@@ -36,6 +37,7 @@ export function MiniView() {
           <div className={`mini-main ${famClass(main.model)}`}>
             <b style={{ color: 'var(--fam)' }}>{modelLabel(main.model)}</b>
             <span className={`status ${st}`}>{STATUS_GLYPH[st]}</span>
+            <CtxChip agent={main} />
             {main.currentTool && (
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 ⚙ {toolLabel(main.currentTool.name)} {main.currentTool.summary}

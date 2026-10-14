@@ -1,4 +1,5 @@
 import { MAIN, type SessionView } from '@core/state';
+import { CtxBar } from './ContextMeter';
 import { formatDuration, formatTokens, modeLabel, modelLabel } from '@core/summarize';
 import type { HookServerStatusView } from '@core/api';
 
@@ -53,6 +54,7 @@ export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: numb
 
       <div className="section">
         <h4>main agent</h4>
+        <CtxBar agent={main} />
         <div className="kv">
           <span className="k">model</span>
           <span className="v">{modelLabel(main?.model)}</span>

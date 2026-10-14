@@ -20,6 +20,11 @@ export interface AgentNode {
   effort: string | null;
   status: AgentStatus;
   tokens: UsageNumbers;
+  /** input side of the latest API message (not a sum): how full the context window is; 0 = unknown */
+  contextTokens: number;
+  contextAt: number;
+  /** highest contextTokens ever seen (survives compaction); evidence of a 1M window */
+  contextPeak: number;
   currentTool: CurrentTool | null;
   toolCount: number;
   errorCount: number;
@@ -122,6 +127,9 @@ export function newAgent(id: string, kind: AgentNode['kind'], ts: number, parent
     effort: null,
     status: kind === 'main' ? 'idle' : 'running',
     tokens: zeroUsage(),
+    contextTokens: 0,
+    contextAt: 0,
+    contextPeak: 0,
     currentTool: null,
     toolCount: 0,
     errorCount: 0,

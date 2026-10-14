@@ -238,6 +238,12 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       book[e.msgId] = e.usage;
       addUsage(a.tokens, e.usage, 1);
       addUsage(s.totals, e.usage, 1);
+      const ctx = e.usage.in + e.usage.cacheRead + e.usage.cacheWrite;
+      if (ctx > 0 && ts >= a.contextAt) {
+        a.contextTokens = ctx;
+        a.contextAt = ts;
+        if (ctx > a.contextPeak) a.contextPeak = ctx;
+      }
       break;
     }
     case 'agent.spawn': {
