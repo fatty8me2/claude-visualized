@@ -3,11 +3,13 @@ import type { HookServer } from '../hookServer';
 import type { LocalMonitor } from '../localMonitor';
 import type { SessionManager } from '../manager';
 import type { SystemInfoView } from '@core/api';
+import type { Updater } from '../updater';
 import type { UsageView } from '@core/usage';
 import { registerConfigIpc } from './config';
 import { registerLocalIpc } from './local';
 import { registerSessionsIpc } from './sessions';
 import { registerSystemIpc } from './system';
+import { registerUpdatesIpc } from './updates';
 import { registerUsageIpc } from './usage';
 
 /**
@@ -28,6 +30,7 @@ export interface IpcContext {
   showMain: () => void;
   /** true once if the tray asked for the settings dialog while the window was still loading */
   takePendingOpenSettings: () => boolean;
+  updater: Updater;
 }
 
 /** One module per area, each exporting a function that registers that area's `ipcMain.handle` channels. */
@@ -38,7 +41,14 @@ export type IpcRegistrar = (ctx: IpcContext) => void;
  * (`export const registerInboxIpc: IpcRegistrar = (ctx) => { ipcMain.handle('inbox:get', ...) }`), then add ONE line to this array.
  * Channel names are `<area>:<verb>`; the renderer-facing method goes in src/core/api.ts (VisApi) and src/preload/index.ts.
  */
-export const IPC_AREAS: readonly IpcRegistrar[] = [registerSessionsIpc, registerUsageIpc, registerConfigIpc, registerSystemIpc, registerLocalIpc];
+export const IPC_AREAS: readonly IpcRegistrar[] = [
+  registerSessionsIpc,
+  registerUsageIpc,
+  registerConfigIpc,
+  registerSystemIpc,
+  registerLocalIpc,
+  registerUpdatesIpc,
+];
 
 export function registerAllIpc(ctx: IpcContext): void {
   for (const register of IPC_AREAS) register(ctx);

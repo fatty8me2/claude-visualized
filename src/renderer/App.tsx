@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Tour, Welcome } from './components/Onboarding';
 import { SessionList } from './components/SessionList';
 import { SettingsDialog } from './components/SettingsDialog';
+import { UpdatePill, useUpdates } from './components/UpdatesSettings';
 import { useConfig, useHookServer, useLiveState, useNow, useSelected, useSessions } from './hooks';
 import { SidebarResizeHandle, usePanelLayout } from './layout';
 import { useReplay } from './replay';
@@ -19,6 +20,7 @@ export function App() {
   const live = useLiveState();
   const config = useConfig();
   const hookSrv = useHookServer();
+  const updates = useUpdates();
   const wallNow = useNow(1000);
   const replayApi = useReplay();
   const { replay, stop } = replayApi;
@@ -97,6 +99,7 @@ export function App() {
             }
           : null,
       })}
+      <UpdatePill updates={updates} />
       {showSettings && config && (
         <SettingsDialog
           config={config}

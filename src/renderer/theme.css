@@ -893,6 +893,33 @@ select:focus {
   color: var(--err);
   border-color: #6d2a33;
 }
+.update-pill {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 20;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid #2f5d3d;
+  background: var(--bg-2);
+  color: var(--ok);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.update-pill:hover {
+  border-color: var(--ok);
+}
+.update-notes {
+  max-height: 120px;
+  overflow: auto;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+}
 
 /* agent detail drawer */
 .drawer {

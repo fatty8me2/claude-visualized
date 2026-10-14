@@ -13,6 +13,8 @@ import { writeStatusLineScript } from './statusline';
 import { SessionManager, type NotifyRequest } from './manager';
 import { LocalMonitor } from './localMonitor';
 import { applyUrlOverrides, normalizeLocalConfig } from '@core/localModels';
+import { Updater } from './updater';
+import { RELEASES_URL } from '@core/updates';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 
@@ -99,6 +101,7 @@ function applyHotkey(raw: string): { ok: boolean; error?: string; accelerator?: 
 
 const manager = new SessionManager();
 let localMonitor: LocalMonitor;
+let updater: Updater;
 // ---- 5-hour / weekly usage limits, persisted so they show right after a restart ----
 const usageFile = () => path.join(app.getPath('userData'), 'usage.json');
 let usage: UsageView = emptyUsage();
@@ -278,6 +281,17 @@ ${u}`
   );
 }
 
+/** Tray entry for updates: restart when ready, the release page on unsigned macOS, otherwise a manual check. Nothing when disabled. */
+function updateTrayItems(): Electron.MenuItemConstructorOptions[] {
+  const u = updater?.state;
+  if (!u || u.status === 'disabled') return [];
+  if (u.status === 'downloaded') return [{ type: 'separator' }, { label: `Restart to update to v${u.version}`, click: () => updater.install() }];
+  if (u.status === 'available' && u.mode === 'manual')
+    return [{ type: 'separator' }, { label: `Download v${u.version}…`, click: () => void shell.openExternal(u.releaseUrl ?? RELEASES_URL) }];
+  if (u.status === 'downloading') return [{ type: 'separator' }, { label: `Downloading update… ${u.percent ?? 0}%`, enabled: false }];
+  return [{ type: 'separator' }, { label: 'Check for updates', enabled: u.status !== 'checking', click: () => void updater.check() }];
+}
+
 function rebuildTrayMenu() {
   if (!tray) return;
   updateTrayTooltip();
@@ -293,6 +307,9 @@ function rebuildTrayMenu() {
     config.launchAtLogin,
     config.miniHotkey,
     registeredHotkey,
+    updater?.state.status,
+    updater?.state.version,
+    updater?.state.mode,
   ]);
   if (sig === traySignature) return;
   traySignature = sig;
@@ -325,6 +342,7 @@ function rebuildTrayMenu() {
       checked: config.launchAtLogin,
       click: (mi) => updateConfig({ launchAtLogin: mi.checked }),
     },
+    ...updateTrayItems(),
     { type: 'separator' },
     {
       label: 'Quit',
@@ -392,6 +410,7 @@ function registerIpc() {
     applyHotkey,
     toggleMini,
     showMain,
+    updater,
     takePendingOpenSettings: () => {
       const p = pendingOpenSettings;
       pendingOpenSettings = false;
@@ -415,6 +434,16 @@ if (!app.requestSingleInstanceLock()) {
     config.localModels = applyUrlOverrides(config.localModels, process.env);
     localMonitor = new LocalMonitor(config.localModels);
     localMonitor.on('view', (v) => broadcast('local', v));
+    updater = new Updater({
+      autoDownload: () => config.autoDownloadUpdates,
+      onChange: (v) => {
+        broadcast('updates', v);
+        rebuildTrayMenu();
+      },
+      beforeInstall: () => {
+        quitting = true;
+      },
+    });
     manager.followActive = config.followActive;
     manager.notifyAttention = config.notifyAttention;
     manager.notifyAgentDone = config.notifyAgentDone;
@@ -448,6 +477,7 @@ if (!app.requestSingleInstanceLock()) {
     registerStartupHotkey();
     manager.start();
     localMonitor.start();
+    updater.start();
     if (!process.env.CLAUDE_VIS_NO_HOOK_SERVER) hookServer.start(config.port);
     if (!process.env.CLAUDE_VIS_NO_TRAY) createTray();
     const openedAtLogin = process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin;
@@ -460,6 +490,7 @@ if (!app.requestSingleInstanceLock()) {
     globalShortcut.unregisterAll();
     manager.stop();
     localMonitor?.stop();
+    updater?.stop();
     hookServer.stop();
   });
   app.on('window-all-closed', () => {

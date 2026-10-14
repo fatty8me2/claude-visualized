@@ -29,6 +29,7 @@ async function launch(env: Record<string, string>, existingUserData?: string) {
       CLAUDE_VIS_NO_SYSTEM_INTEGRATION: '1',
       CLAUDE_VIS_NO_USAGE_API: '1',
       CLAUDE_VIS_SKIP_ONBOARDING: '1',
+      CLAUDE_VIS_NO_UPDATES: '1',
       CLAUDE_VIS_DESKTOP_DIR: path.join(userData, 'no-desktop'),
       ...env,
     } as Record<string, string>,

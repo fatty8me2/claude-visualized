@@ -48,6 +48,11 @@ const api: VisApi = {
   getLocalModels: () => ipcRenderer.invoke('local:get'),
   onLocalModels: (cb) => on('local', cb),
   refreshLocalModels: () => ipcRenderer.invoke('local:refresh'),
+  getUpdates: () => ipcRenderer.invoke('updates:state'),
+  checkForUpdates: () => ipcRenderer.invoke('updates:check'),
+  downloadUpdate: () => ipcRenderer.invoke('updates:download'),
+  installUpdate: () => ipcRenderer.invoke('updates:install'),
+  onUpdates: (cb) => on('updates', cb),
 };
 
 contextBridge.exposeInMainWorld('api', api);
