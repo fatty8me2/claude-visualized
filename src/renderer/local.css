@@ -1,0 +1,291 @@
+/* local models: family colour, "⌂ local" tag, agent-card link rows, top-bar chip and the Local models page */
+:root {
+  --local: #4fd1c5;
+}
+.fam-local {
+  --fam: var(--local);
+}
+
+.local-tag {
+  display: inline-block;
+  color: var(--local);
+  border: 1px solid color-mix(in srgb, var(--local) 55%, transparent);
+  background: color-mix(in srgb, var(--local) 12%, transparent);
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: nowrap;
+  font-weight: 400;
+  flex-shrink: 0;
+}
+.local-num {
+  color: var(--local);
+}
+
+/* agent card: two extra rows */
+.node .local-link {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+  font-size: 10.5px;
+}
+.node .local-link .ll-top {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.node .local-link .ll-id {
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.node .local-link .ll-sub {
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.node .local-link.linked .ll-sub {
+  color: var(--local);
+}
+.node.main .local-link {
+  align-items: center;
+}
+.drawer .local-link {
+  font-size: 11px;
+}
+.drawer .local-link .ll-id {
+  overflow: visible;
+  white-space: normal;
+  word-break: break-all;
+}
+.drawer .local-link .ll-sub {
+  white-space: normal;
+}
+
+/* tags inside the legend, mini view and overview rows */
+.legend .local-tag,
+.mini .local-tag,
+.ov-stats .local-tag,
+.modepanel .local-tag {
+  margin-left: 4px;
+}
+.modepanel h4 .local-tag {
+  margin-left: 0;
+}
+
+/* top-bar chip */
+.local-chip {
+  color: var(--local);
+  border-color: color-mix(in srgb, var(--local) 45%, var(--line-2));
+  font-size: 11px;
+  white-space: nowrap;
+}
+.local-chip.active {
+  background: color-mix(in srgb, var(--local) 12%, transparent);
+}
+.local-chip:hover {
+  border-color: var(--local);
+}
+.mini .local-chip {
+  margin: 0 8px 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+}
+
+/* sidebar entry */
+.local-nav {
+  width: 100%;
+  color: var(--local);
+}
+.local-nav.on {
+  border-color: var(--local);
+  background: color-mix(in srgb, var(--local) 12%, transparent);
+}
+
+/* page */
+.localpage .lm-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lm-server {
+  border: 1px solid color-mix(in srgb, var(--local) 40%, var(--line));
+  border-radius: 4px;
+  background: var(--panel);
+  padding: 10px 14px 12px;
+}
+.lm-server > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.lm-server h5 {
+  margin: 12px 0 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.lm-server h5.lm-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.lm-server h5.lm-toggle:hover {
+  color: var(--text-2);
+}
+.lm-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+  flex-shrink: 0;
+}
+.lm-dot.up {
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
+}
+.lm-url {
+  color: var(--muted);
+}
+.lm-faint {
+  color: var(--muted);
+}
+.lm-pill {
+  color: var(--text-2);
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.lm-pill.dim {
+  color: var(--muted);
+  border-color: var(--line);
+}
+.lm-stats {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.lm-stats b {
+  color: var(--text);
+}
+.lm-model {
+  border-top: 1px dashed var(--line);
+  padding: 8px 0;
+}
+.lm-model:first-of-type {
+  border-top: 0;
+}
+.lm-model-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.lm-model-head b {
+  color: var(--local);
+}
+.lm-label {
+  color: var(--text-2);
+}
+.lm-model-body {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  color: var(--text-2);
+}
+.lm-mem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.lm-bar {
+  display: inline-block;
+  width: 140px;
+  height: 8px;
+  background: color-mix(in srgb, var(--warn) 55%, var(--line));
+  border-radius: 2px;
+  overflow: hidden;
+}
+.lm-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--local);
+}
+.lm-unload {
+  color: var(--muted);
+}
+.lm-used {
+  margin-top: 4px;
+  color: var(--text-2);
+}
+.lm-installed > div {
+  display: flex;
+  gap: 12px;
+  padding: 1px 0;
+  align-items: baseline;
+}
+.lm-installed .n {
+  min-width: 230px;
+  color: var(--text-2);
+}
+.lm-installed .loaded .n {
+  color: var(--local);
+}
+.lm-notes {
+  margin: 10px 0 0;
+  padding-left: 16px;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+.lm-others {
+  padding: 2px 2px;
+}
+.lm-empty {
+  margin: 40px auto;
+  max-width: 640px;
+  text-align: left;
+  color: var(--text-2);
+}
+.lm-empty-title {
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.lm-hints {
+  padding-left: 18px;
+  line-height: 1.8;
+}
+.lm-hints a {
+  color: var(--local);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.lm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.lm-checked {
+  margin-top: 14px;
+  font-size: 10.5px;
+}

@@ -7,6 +7,7 @@ import { GoalBadge } from './GoalBadge';
 import { useNow, useOverview } from '../hooks';
 import { agentName, ago, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
 import { AgentGraph } from './AgentGraph';
+import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
 import { UsageMeters } from './UsageMeters';
 
 /** columns that keep panels roughly landscape on a typical monitor */
@@ -23,6 +24,7 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
   const subs = Object.values(v.agents).filter((a) => a.kind === 'agent');
   const running = subs.filter((a) => a.status === 'running').length;
   const plan = v.mode === 'plan';
+  const localAgents = Object.values(v.agents).filter((a) => isLocalModel(a.model)).length;
   const tokens = v.totals.in + v.totals.out + v.totals.cacheRead + v.totals.cacheWrite;
   const recent = v.log.filter((l) => l.kind !== 'text').slice(-2);
   const project = v.cwd?.split(/[\\/]/).filter(Boolean).pop() ?? '';
@@ -41,12 +43,12 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
         </div>
         <div className="ov-stats">
           <span className={`status ${st} ${famClass(main?.model)}`}>
-            <b style={{ color: 'var(--fam)' }}>{modelLabel(main?.model)}</b> {STATUS_GLYPH[st]}
+            <b style={{ color: 'var(--fam)' }}>{modelLabel(main?.model)}</b> {isLocalModel(main?.model) && <LocalTag />} {STATUS_GLYPH[st]}
           </span>
           <span className="ov-sub">
             <CtxChip agent={main} />
             {main && main.contextTokens > 0 ? ' · ' : ''}
-            agents {running}/{subs.length} · {formatTokens(tokens)} tok{v.costUSD != null ? ` · $${v.costUSD.toFixed(2)}` : ''}
+            agents {running}/{subs.length}{localAgents > 0 && !isLocalModel(main?.model) ? ` · ⌂ ${localAgents} local` : ''} · {formatTokens(tokens)} tok{v.costUSD != null ? ` · $${v.costUSD.toFixed(2)}` : ''}
           </span>
         </div>
         <button
@@ -95,7 +97,7 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
   );
 }
 
-export function Overview({ onOpen, activeOnly = false }: { onOpen: (id: string) => void; activeOnly?: boolean }) {
+export function Overview({ onOpen, onLocal, activeOnly = false }: { onOpen: (id: string) => void; onLocal: () => void; activeOnly?: boolean }) {
   const views = useOverview();
   const now = useNow(1000);
   if (!views) return <div className="empty">loading sessions…</div>;
@@ -110,6 +112,7 @@ export function Overview({ onOpen, activeOnly = false }: { onOpen: (id: string) 
           ALL SESSIONS <span className="proj">· {n} live · {running} subagents running · click a panel to open it</span>
         </div>
         <UsageMeters />
+        <LocalChip onOpen={onLocal} />
       </div>
       {n === 0 ? (
         <div className="empty">

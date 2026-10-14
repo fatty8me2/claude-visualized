@@ -2,13 +2,16 @@ import { MAIN, type SessionView } from '@core/state';
 import { formatTokens, modelLabel, toolLabel } from '@core/summarize';
 import type { HookServerStatusView } from '@core/api';
 import { displayStatus } from '../util';
+import { tokensByProvider } from '@core/localModels';
 
 export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView; now: number; hookSrv: HookServerStatusView | null; replaying: boolean }) {
   const main = view.agents[MAIN];
   const subs = Object.values(view.agents).filter((a) => a.kind === 'agent');
   const running = subs.filter((a) => a.status === 'running').length;
   const st = main ? displayStatus(main, now) : 'idle';
-  const t = view.totals;
+  const split = tokensByProvider(view.agents, view.totals);
+  const t = split.claude;
+  const lt = split.local;
   const hooksLive = view.lastHookAt && now - view.lastHookAt < 10 * 60_000;
   return (
     <div className="statusbar">
@@ -24,6 +27,11 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
       <span>
         tokens <b>{formatTokens(t.in + t.out + t.cacheRead + t.cacheWrite)}</b>
       </span>
+      {split.localAgents > 0 && (
+        <span title="Tokens served by local models: not counted against Anthropic limits">
+          local tokens <b className="local-num">{formatTokens(lt.in + lt.out + lt.cacheRead + lt.cacheWrite)}</b>
+        </span>
+      )}
       {view.costUSD != null && (
         <span>
           cost <b>${view.costUSD.toFixed(2)}</b>

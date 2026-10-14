@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { LocalModelsSettings } from './LocalModelsSettings';
 import type { AppConfigView, HookPreviewView, HookServerStatusView, HookStateView, SystemInfoView } from '@core/api';
 
 const STATE_TEXT: Record<string, [string, string]> = {
@@ -199,6 +200,8 @@ export function SettingsDialog({ config, hookSrv, onClose, onWelcome }: { config
           </button>
           <span className="note">after changing the port, reinstall hooks</span>
         </div>
+
+        <LocalModelsSettings config={config.localModels} />
       </div>
     </div>
   );
