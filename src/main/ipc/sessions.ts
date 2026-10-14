@@ -17,7 +17,7 @@ export const registerSessionsIpc: IpcRegistrar = ({ manager, updateConfig }) => 
       return { ok: false, url, error: (err as Error).message };
     }
   });
-  ipcMain.handle('overview:get', () => manager.overview());
+  ipcMain.handle('overview:get', () => manager.snapshotOverview());
   ipcMain.handle('overview:watch', (e, on: boolean) => {
     const id = e.sender.id;
     if (on) {
@@ -31,7 +31,7 @@ export const registerSessionsIpc: IpcRegistrar = ({ manager, updateConfig }) => 
     manager.overviewViewers = overviewWatchers.size;
   });
   ipcMain.handle('sessions:get', () => manager.getSummaries());
-  ipcMain.handle('state:get', () => manager.currentView());
+  ipcMain.handle('state:get', () => manager.snapshotState());
   ipcMain.handle('selected:get', () => manager.selected);
   ipcMain.handle('session:select', (_e, id: string | null) => {
     manager.select(id);

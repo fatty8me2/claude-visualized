@@ -3,6 +3,7 @@ import type { AgentEvent } from './events';
 import type { HookInstallState, StatusLineState } from './hooksConfig';
 import type { UsageView } from './usage';
 import type { SessionSummary, SessionView } from './state';
+import type { OverviewMsg, ViewMsg } from './sync';
 import type { LocalModelsConfig, LocalModelsView } from './localModels';
 
 export interface AppConfigView {
@@ -67,13 +68,14 @@ export interface VisApi {
   select(id: string | null): Promise<void>;
   setFollow(on: boolean): Promise<void>;
   onSessions(cb: (s: SessionSummary[]) => void): () => void;
-  onState(cb: (s: SessionView | null) => void): () => void;
+  /** pushes are incremental (see core/sync.ts): decode them with a ViewDecoder, and call getState() to resync */
+  onState(cb: (m: ViewMsg) => void): () => void;
   onSelected(cb: (id: string | null) => void): () => void;
   replayEvents(id: string): Promise<AgentEvent[]>;
   getOverview(): Promise<SessionView[]>;
   /** start/stop receiving 'overview' pushes for this window */
   watchOverview(on: boolean): Promise<void>;
-  onOverview(cb: (views: SessionView[]) => void): () => void;
+  onOverview(cb: (m: OverviewMsg) => void): () => void;
   getConfig(): Promise<AppConfigView>;
   setConfig(patch: Partial<AppConfigView>): Promise<AppConfigView>;
   onConfig(cb: (c: AppConfigView) => void): () => void;

@@ -475,6 +475,10 @@ select:focus {
 .edge-dot {
   fill: var(--run);
 }
+/* many running agents: the marching dashes repaint the whole edge layer every frame, so step them (8 fps) instead */
+.edges.calm .edge.active {
+  animation-timing-function: steps(8, end);
+}
 
 .node {
   position: absolute;
@@ -653,10 +657,12 @@ select:focus {
 }
 .bar.indet > i {
   position: absolute;
-  inset: 0;
+  /* starts one tile to the left and slides right by one tile: same look as animating background-position, but on the compositor */
+  inset: 0 0 0 -34px;
   background: repeating-linear-gradient(-45deg, var(--fam) 0 6px, color-mix(in srgb, var(--fam) 35%, transparent) 6px 12px);
   background-size: 34px 34px;
   animation: stripes 0.9s linear infinite;
+  will-change: transform;
   opacity: 0.85;
 }
 .bar.quiet > i {
@@ -665,7 +671,7 @@ select:focus {
 }
 @keyframes stripes {
   to {
-    background-position: 34px 0;
+    transform: translateX(34px);
   }
 }
 .spark {
@@ -726,6 +732,10 @@ select:focus {
   gap: 10px;
   padding: 1px 14px;
   white-space: nowrap;
+  /* fixed height: the log renders only the rows in view (LogPanel ROW_H) */
+  height: 20px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 .log-row:hover {
   background: var(--panel);

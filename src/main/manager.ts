@@ -3,6 +3,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { normalizeHook } from '@core/normalize';
 import { MAIN, toView, type AgentStatus, type SessionSummary, type SessionView } from '@core/state';
+import { OverviewEncoder, ViewEncoder, type OverviewMsg, type ViewMsg } from '@core/sync';
 import { SessionIndexer, LIVE_MS } from './indexer';
 import { SessionWatcher } from './watcher';
 import { loadBacklogInWorker } from './workerLoader';
@@ -26,14 +27,16 @@ export interface NotifyRequest {
  * Owns the session index and one SessionWatcher per followed session (the selected one plus
  * recently live ones, so the tray can show what's running everywhere).
  *
- * Events: 'sessions' (SessionSummary[]), 'state' (SessionView | null), 'notify' (NotifyRequest),
- * 'overview' (SessionView[] of every live session, only while an overview is open)
+ * Events: 'sessions' (SessionSummary[]), 'state' (ViewMsg: a full SessionView or a delta, see core/sync.ts), 'notify' (NotifyRequest),
+ * 'overview' (OverviewMsg for every live session, only while an overview is open)
  */
 export class SessionManager extends EventEmitter {
   private indexer = new SessionIndexer();
   private watchers = new Map<string, SessionWatcher>();
   private summaries: SessionSummary[] = [];
   private selectedId: string | null = null;
+  private stateEnc = new ViewEncoder();
+  private overviewEnc = new OverviewEncoder();
   private dirty = false;
   private overviewDirty = false;
   /** number of windows currently showing the all-sessions overview */
@@ -52,7 +55,7 @@ export class SessionManager extends EventEmitter {
       setInterval(() => {
         if (this.dirty) {
           this.dirty = false;
-          this.emit('state', this.currentView());
+          this.emit('state', this.stateEnc.encode(this.currentView()) satisfies ViewMsg);
         }
       }, PUSH_MS),
     );
@@ -60,7 +63,7 @@ export class SessionManager extends EventEmitter {
       setInterval(() => {
         if (this.overviewDirty && this.overviewViewers > 0) {
           this.overviewDirty = false;
-          this.emit('overview', this.overview());
+          this.emit('overview', this.overviewEnc.encode(this.overview()) satisfies OverviewMsg);
         }
       }, OVERVIEW_MS),
     );
@@ -78,6 +81,17 @@ export class SessionManager extends EventEmitter {
       out.push(v);
     }
     return out;
+  }
+
+  /** Full view for a window that (re)loaded; the next push is a full view too, so every window resyncs. */
+  snapshotState(): SessionView | null {
+    this.stateEnc.reset();
+    return this.currentView();
+  }
+
+  snapshotOverview(): SessionView[] {
+    this.overviewEnc.reset();
+    return this.overview();
   }
 
   markOverviewDirty() {
