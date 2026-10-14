@@ -68,6 +68,12 @@ Settings (the **⚙ hooks** dialog, section **App**) and the tray menu expose:
 A second launch of the app focuses the running window; a second launch with `--hidden` (what the login item uses) does not.
 Set `CLAUDE_VIS_NO_SYSTEM_INTEGRATION=1` to skip login-item and global-hotkey registration (the e2e tests do).
 
+## Launching
+
+- **Installed app:** run `release/<version>/Claude Visualized Setup <version>.exe` once. It installs per user (no admin), adds **Claude Visualized** to the Start menu, so you can just search for it, and puts a shortcut on the desktop.
+- **From this folder:** double-click **`Launch Claude Visualized.cmd`**. It starts the installed app, or the latest local build in `release/` if it is not installed.
+- **Tray / login:** the app keeps running in the tray when you close the window. Turn on "Start with Windows" in the settings (⚙ hooks → App) to have it start with your computer.
+
 ## Develop
 
 ```bash
