@@ -95,6 +95,61 @@ describe('app smoke (fixture data)', () => {
     expect(await card.locator('.status').innerText()).toContain('running');
   });
 
+  it('shows the plan beside the graph with evidence-based statuses and hover linking', async () => {
+    const rail = page.getByTestId('plan-rail');
+    await rail.waitFor({ timeout: 10_000 });
+    expect(await page.getByTestId('plan-origin').innerText()).toContain('approved plan');
+    const steps = page.locator('[data-testid="plan-step"]');
+    expect(await steps.count()).toBe(5);
+    const status = async (i: number) => steps.nth(i).getAttribute('data-status');
+    // todo 'Map the repo' is completed, agents a1 'search repo' and a2 'run tests' are done, a9 'design the docs update' is running
+    expect([await status(0), await status(1), await status(2), await status(3), await status(4)]).toEqual(['done', 'done', 'done', 'pending', 'in_progress']);
+    expect((await page.getByTestId('plan-count').innerText()).trim()).toBe('3/5 steps');
+    expect(await steps.nth(1).locator('.pr-chip').first().innerText()).toBe('Explore · done');
+    expect(await steps.nth(4).locator('.pr-chip').first().innerText()).toContain('running');
+
+    // hovering a step lights up its agent card; hovering a card lights up its step
+    await steps.nth(4).hover();
+    await page.locator('[data-agent="a9"].hl').waitFor({ timeout: 3000 });
+    expect(await page.locator('.node.hl').count()).toBe(1);
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(150);
+    expect(await page.locator('.node.hl').count()).toBe(0);
+    await page.locator('[data-agent="a2"]').hover();
+    await steps.nth(2).and(page.locator('.hl')).waitFor({ timeout: 3000 });
+    expect(await page.locator('.pr-step.hl').count()).toBe(1);
+
+    // clicking a step selects its agent
+    await steps.nth(1).click();
+    await page.locator('.drawer').waitFor();
+    expect(await page.locator('.drawer .hd b').innerText()).toBe('Explore');
+    await page.locator('.drawer .hd button').click();
+
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: path.join(ART, 'plan-rail.png') });
+
+    // toggle, side and width are remembered
+    const w0 = (await rail.boundingBox())!;
+    const edge = (await page.getByTestId('plan-resize').boundingBox())!;
+    await page.mouse.move(edge.x + edge.width / 2, edge.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(edge.x + edge.width / 2 + 60, edge.y + 200, { steps: 5 });
+    await page.mouse.up();
+    expect((await rail.boundingBox())!.width).toBeGreaterThan(w0.width + 40);
+    await rail.getByTitle('Move the plan to the other side').click();
+    const graph = (await page.locator('.graph-main').boundingBox())!;
+    expect((await rail.boundingBox())!.x).toBeGreaterThan(graph.x);
+    const saved = JSON.parse(await page.evaluate(() => localStorage.getItem('cvis.plan.v1') ?? 'null'));
+    expect(saved).toMatchObject({ open: true, side: 'right' });
+    await page.getByTestId('plan-toggle').click();
+    expect(await rail.count()).toBe(0);
+    await page.getByTestId('plan-toggle').click();
+    await rail.waitFor();
+    await rail.getByTitle('Move the plan to the other side').click();
+    await page.evaluate(() => localStorage.removeItem('cvis.plan.v1'));
+  });
+
   it('applies hook events instantly', async () => {
     const post = (body: object) => fetch(`http://127.0.0.1:${PORT}/hook?src=claude-visualized`, { method: 'POST', body: JSON.stringify(body) });
     const health = await fetch(`http://127.0.0.1:${PORT}/health`).then((r) => r.json());

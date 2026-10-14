@@ -6,6 +6,7 @@ A desktop app (Windows + macOS) that shows what your Claude Code sessions are do
   workflow agents), each with its model, status, current tool, elapsed time, token use and an activity sparkline.
 - **Mode panel**: PLAN vs BUILD (and the exact permission mode), the session's task checklist, token totals and the
   cost Claude Code reports.
+- **Plan rail**: when the session has a plan (plan mode's plan file or the approved `ExitPlanMode` plan, else its todo list) it is drawn as a metro line beside the agent graph: sections are stations, steps are nodes (done / in progress / pending) and the agents doing each step hang under it as chips. A step counts as done or in progress only on evidence: a ticked `[x]`, a matching todo, or a matching agent (keyword overlap with the agent's description). Hover a step to light up its agents in the graph, hover an agent to light up its step. Toggle it with **plan** in the graph toolbar, drag its edge to resize, and flip it to the other side with the arrows button.
 - **Session log**: timestamped prompts, tool calls, spawns, completions, mode changes and replies, filterable by agent and kind.
 - **Session picker**: every session under `~/.claude/projects`, live ones first, with an option to follow
   whichever session is active right now.

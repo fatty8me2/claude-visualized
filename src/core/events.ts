@@ -51,6 +51,11 @@ export type AgentEvent = Base &
     | { k: 'agent.stop'; childId: string; status: 'done' | 'error'; detail?: string; /** event time is only a file mtime: end at the agent's last activity instead */ atLastActivity?: boolean }
     | { k: 'task.notification'; taskId: string; status: string; summary?: string }
     | { k: 'todos.replace'; items: TodoInput[] }
+    /**
+     * Plan text and/or the plan file's path. source: 'exit' = ExitPlanMode input, 'file' = read from the plan file,
+     * 'reference' = plan_file_reference attachment, 'path' = only the path is known (plan_mode attachments).
+     */
+    | { k: 'plan'; text?: string; path?: string; source: 'exit' | 'file' | 'reference' | 'path'; toolUseId?: string }
     | { k: 'text'; role: 'assistant'; preview: string; endTurn: boolean }
     | { k: 'turn.end' }
     | { k: 'cost'; totalCostUSD: number; byModel: Record<string, number> }

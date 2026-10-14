@@ -248,8 +248,9 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
         if (a.currentTool?.id === e.toolUseId) refreshCurrentTool(s, a);
         touch(s, a, ts);
       }
+      if (name === 'ExitPlanMode' && s.plan?.exitToolUseId === e.toolUseId) s.plan.approved = e.ok;
       const r = (e.result ?? null) as Json | null;
-      if (r && typeof r === 'object') onToolResult(s, a, name, e.toolUseId, r, e.ok, ts);
+      if (r && typeof r === 'object') onToolResult(s, a, name, e.toolUseId, r, e.ok, ts, p?.input);
       // a subagent handing its report back is its last act
       if (p && name === 'SubagentHandback' && a.kind === 'agent' && a.status === 'running') {
         finish(a, 'done', ts);
@@ -344,6 +345,31 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       s.todos = e.items.map((t) => ({ id: t.id, text: t.text, status: t.status, owner }));
       break;
     }
+    case 'plan': {
+      if (e.ref.agentId !== null) break;
+      const p = (s.plan ??= { text: null, path: null, source: null, at: 0, since: 0, exitToolUseId: null, approved: null });
+      if (e.source === 'path' && e.path && p.path && p.path !== e.path) {
+        // a new plan file: the old text belongs to the previous plan
+        p.text = null;
+        p.source = null;
+        p.approved = null;
+        p.exitToolUseId = null;
+        p.at = 0;
+        p.since = 0;
+      }
+      if (e.path) p.path = e.path;
+      if (e.text !== undefined && e.source !== 'path' && ts >= p.at) {
+        p.text = e.text;
+        p.source = e.source;
+        p.at = ts;
+        if (e.source === 'exit' || !p.since) p.since = ts;
+        if (e.source === 'exit') {
+          p.exitToolUseId = e.toolUseId ?? null;
+          p.approved = null;
+        }
+      }
+      break;
+    }
     case 'text': {
       const a = ensureAgent(s, e.ref.agentId, ts);
       touch(s, a, ts);
@@ -397,7 +423,7 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
   return s;
 }
 
-function onToolResult(s: SessionState, a: AgentNode, name: string, toolUseId: string, r: Json, ok: boolean, ts: number) {
+function onToolResult(s: SessionState, a: AgentNode, name: string, toolUseId: string, r: Json, ok: boolean, ts: number, input?: unknown) {
   switch (name) {
     case 'TaskCreate': {
       const t = r.task as Json | undefined;
@@ -426,6 +452,8 @@ function onToolResult(s: SessionState, a: AgentNode, name: string, toolUseId: st
       if (typeof r.resolvedModel === 'string' && !c.model) c.model = r.resolvedModel;
       if (typeof r.description === 'string' && !c.description) c.description = r.description;
       if (r.isAsync) c.background = true;
+      const given = (input as Json | undefined)?.prompt;
+      if (typeof given === 'string' && !c.prompt) c.prompt = given.slice(0, 300);
       const st = typeof r.status === 'string' ? r.status : '';
       if (st === 'completed' || (!r.isAsync && st && st !== 'async_launched' && ok)) {
         if (c.status !== 'done') {

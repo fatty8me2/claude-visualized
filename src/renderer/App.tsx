@@ -7,6 +7,7 @@ import { AgentGraph } from './components/AgentGraph';
 import { Tour, Welcome } from './components/Onboarding';
 import { LogPanel } from './components/LogPanel';
 import { ModePanel } from './components/ModePanel';
+import { PlanRail, PlanToggle, usePlanModel, usePlanRailPrefs } from './components/PlanRail';
 import { Overview } from './components/Overview';
 import { SessionList, type Page } from './components/SessionList';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -53,6 +54,9 @@ export function App() {
   const [agentSel, setAgentSel] = useState<string | null>(null);
   const [logAgent, setLogAgent] = useState<string | null>(null);
   const [showFinished, setShowFinished] = useState(true);
+  const [hlAgents, setHlAgents] = useState<Set<string> | undefined>(undefined);
+  const [hoverAgent, setHoverAgent] = useState<string | null>(null);
+  const planPrefs = usePlanRailPrefs();
   const layoutApi = usePanelLayout();
   const { layout } = layoutApi;
   const [editingLayout, setEditingLayout] = useState(false);
@@ -107,11 +111,14 @@ export function App() {
     if (replay && replay.sessionId !== selected) stop();
     setAgentSel(null);
     setLogAgent(null);
+    setHlAgents(undefined);
+    setHoverAgent(null);
   }, [selected]);
 
   const view = replay ? replay.view : live && live.id === selected ? live : null;
   const now = replay ? replay.now : wallNow;
   const summary = sessions.find((s) => s.id === selected);
+  const plan = usePlanModel(view);
 
   return (
     <div className={`app sidebar-${layout.sidebar.side}`}>
@@ -186,9 +193,24 @@ export function App() {
             panels={{
               mode: <ModePanel view={view} now={now} hookSrv={hookSrv} />,
               graph: (
-                <div className="graph-host">
-                  <AgentGraph view={view} now={now} selectedAgent={agentSel} onSelect={setAgentSel} showFinished={showFinished} onToggleFinished={() => setShowFinished(!showFinished)} />
-                  {agentSel && <AgentDrawer view={view} id={agentSel} now={now} onClose={() => setAgentSel(null)} onFilterLog={setLogAgent} />}
+                <div className={`graph-host ${plan && planPrefs.prefs.open ? `plan-${planPrefs.prefs.side}` : ''}`}>
+                  <div className="graph-main">
+                    <AgentGraph
+                      view={view}
+                      now={now}
+                      selectedAgent={agentSel}
+                      onSelect={setAgentSel}
+                      showFinished={showFinished}
+                      onToggleFinished={() => setShowFinished(!showFinished)}
+                      highlight={hlAgents}
+                      onHoverAgent={plan ? setHoverAgent : undefined}
+                      extraTools={plan ? <PlanToggle plan={plan} prefs={planPrefs} /> : undefined}
+                    />
+                    {agentSel && <AgentDrawer view={view} id={agentSel} now={now} onClose={() => setAgentSel(null)} onFilterLog={setLogAgent} />}
+                  </div>
+                  {plan && planPrefs.prefs.open && (
+                    <PlanRail view={view} plan={plan} prefs={planPrefs} hoverAgent={hoverAgent} onHighlight={setHlAgents} onSelect={setAgentSel} onFilterLog={setLogAgent} />
+                  )}
                 </div>
               ),
               log: <LogPanel view={view} agentFilter={logAgent} onAgentFilter={setLogAgent} />,

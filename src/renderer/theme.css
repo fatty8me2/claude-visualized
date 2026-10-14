@@ -1780,3 +1780,304 @@ body.resizing .rz-right {
     animation: none;
   }
 }
+
+/* ---------- plan rail: a metro line of the session's plan, beside the agent graph ---------- */
+.graph-host {
+  display: flex;
+}
+.graph-main {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+}
+.plan-rail {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--bg-2) 100%);
+  z-index: 4;
+}
+.graph-host.plan-left .plan-rail {
+  order: -1;
+  border-right: 1px solid var(--line);
+}
+.graph-host.plan-right .plan-rail {
+  border-left: 1px solid var(--line);
+}
+.pr-head {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pr-h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pr-h1 b {
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  color: var(--opus);
+}
+.pr-count {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.pr-spacer {
+  flex: 1;
+}
+.pr-h1 button {
+  padding: 0 6px;
+  line-height: 18px;
+  font-size: 11px;
+}
+.pr-meter {
+  position: relative;
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.pr-meter i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--ok);
+  transition: width 0.5s ease;
+}
+.pr-meter i.act {
+  background: repeating-linear-gradient(90deg, var(--run) 0 6px, color-mix(in srgb, var(--run) 35%, transparent) 6px 12px);
+  background-size: 24px 100%;
+  animation: pr-stripes 0.9s linear infinite;
+  transition: left 0.5s ease, width 0.5s ease;
+}
+@keyframes pr-stripes {
+  to {
+    background-position: 24px 0;
+  }
+}
+.pr-src {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pr-body-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 8px 14px 0;
+}
+
+/* stations (sections) and steps share one vertical line at x = 14px */
+.pr-station,
+.pr-step {
+  position: relative;
+  padding-left: 32px;
+}
+.pr-station {
+  padding-top: 11px;
+  padding-bottom: 4px;
+  min-height: 30px;
+  display: flex;
+  align-items: flex-end;
+}
+.pr-station::before,
+.pr-step::before,
+.pr-step::after {
+  content: '';
+  position: absolute;
+  left: 13px;
+  width: 2px;
+  background: var(--line-2);
+}
+.pr-station::before {
+  top: 0;
+  bottom: 0;
+}
+.pr-station.up-on::before,
+.pr-step.up-on::before {
+  background: var(--ok);
+}
+.pr-sdot {
+  position: absolute;
+  left: 6px;
+  bottom: 5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid var(--line-2);
+  background: var(--bg);
+}
+.pr-station.up-on .pr-sdot {
+  border-color: var(--ok);
+}
+.pr-stitle {
+  color: var(--text-2);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.pr-step {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-right: 4px;
+  cursor: default;
+  border-radius: 0 4px 4px 0;
+  transition: background 0.15s;
+}
+.pr-step.linked {
+  cursor: pointer;
+}
+.pr-step::before {
+  top: 0;
+  height: 14px;
+}
+.pr-step::after {
+  top: 14px;
+  bottom: 0;
+}
+.pr-step.last::after {
+  display: none;
+}
+.pr-step.st-done::after {
+  background: var(--ok);
+}
+.pr-step.st-in_progress::after {
+  background: repeating-linear-gradient(180deg, var(--fam, var(--run)) 0 5px, transparent 5px 10px);
+  background-size: 2px 20px;
+  animation: pr-flow 0.8s linear infinite;
+}
+@keyframes pr-flow {
+  to {
+    background-position: 0 20px;
+  }
+}
+.pr-step:hover,
+.pr-step.hl {
+  background: color-mix(in srgb, var(--fam, var(--opus)) 10%, transparent);
+}
+.pr-step.hl {
+  box-shadow: inset 2px 0 0 var(--fam, var(--opus));
+}
+.pr-node {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  line-height: 1;
+  border: 2px solid var(--line-2);
+  color: var(--faint);
+  background: var(--bg);
+  z-index: 1;
+}
+.pr-step.st-done .pr-node {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: var(--bg);
+  font-weight: 700;
+}
+.pr-step.st-in_progress .pr-node {
+  border-color: var(--fam, var(--run));
+  color: var(--fam, var(--run));
+  animation: pr-pulse 1.6s ease-out infinite;
+}
+@keyframes pr-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--fam, var(--run)) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+.pr-body {
+  min-width: 0;
+}
+.pr-title {
+  color: var(--text-2);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.pr-step.depth-1 .pr-body {
+  padding-left: 10px;
+}
+.pr-step.depth-2 .pr-body,
+.pr-step.depth-3 .pr-body {
+  padding-left: 20px;
+}
+.pr-step.st-pending .pr-title {
+  color: var(--muted);
+}
+.pr-step.st-done .pr-title {
+  color: var(--text-2);
+}
+.pr-step.st-in_progress .pr-title {
+  color: var(--text);
+}
+.pr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.pr-chip {
+  font-size: 10.5px;
+  line-height: 1.5;
+  padding: 0 6px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--fam, var(--line-2)) 60%, transparent);
+  background: color-mix(in srgb, var(--fam, var(--line-2)) 10%, transparent);
+  color: var(--fam, var(--text-2));
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pr-chip.ds-running {
+  box-shadow: 0 0 8px -3px var(--fam);
+}
+.pr-chip.ds-done {
+  opacity: 0.7;
+}
+.pr-chip.ds-error {
+  border-color: var(--err);
+  color: var(--err);
+}
+.pr-more {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+.plan-rail.finished .pr-count {
+  color: var(--ok);
+}
+
+/* agent card lit by hovering a plan step */
+.node.hl {
+  box-shadow: 0 0 0 2px var(--fam, var(--opus)), 0 0 22px -2px var(--fam, var(--opus));
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-meter i,
+  .pr-meter i.act,
+  .pr-step,
+  .pr-step.st-in_progress .pr-node,
+  .pr-step.st-in_progress::after {
+    animation: none;
+    transition: none;
+  }
+}

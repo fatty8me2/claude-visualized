@@ -50,11 +50,13 @@ const IGNORED_ATTACHMENTS = new Set([
   'thinking_stripped',
   'file',
   'compact_file_reference',
-  'plan_file_reference',
   'command_permissions',
   'hook_success',
   'hook_additional_context',
 ]);
+
+/** plan text is kept whole (unlike other tool inputs) but capped */
+export const PLAN_CAP = 40_000;
 
 export function parseTs(v: unknown, fallback: number): number {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -166,8 +168,15 @@ export function normalizeLine(line: string, ctx: LineContext, fallbackTs = 0): A
       const a = o.attachment as Json | undefined;
       const at = str(a?.type) ?? '';
       if (!at || IGNORED_ATTACHMENTS.has(at)) return out;
-      if (at === 'plan_mode' && !a?.isSubAgent) ev({ k: 'mode', mode: 'plan' });
-      else if (at === 'plan_mode_exit') ev({ k: 'mode', mode: 'default' });
+      if (at === 'plan_mode' && !a?.isSubAgent) {
+        ev({ k: 'mode', mode: 'plan' });
+        if (str(a?.planFilePath)) ev({ k: 'plan', path: a!.planFilePath, source: 'path' });
+      } else if (at === 'plan_mode_exit') {
+        ev({ k: 'mode', mode: 'default' });
+        if (str(a?.planFilePath)) ev({ k: 'plan', path: a!.planFilePath, source: 'path' });
+      } else if (at === 'plan_file_reference') {
+        if (str(a?.planFilePath)) ev({ k: 'plan', path: a!.planFilePath, text: str(a?.planContent)?.slice(0, PLAN_CAP), source: 'reference' });
+      }
       else if (at === 'auto_mode') ev({ k: 'mode', mode: 'auto' });
       else if (at === 'auto_mode_exit') ev({ k: 'mode', mode: 'default' });
       else if (at === 'model' && str(a?.identity?.modelId)) ev({ k: 'model', model: a!.identity.modelId });
@@ -234,6 +243,10 @@ export function normalizeLine(line: string, ctx: LineContext, fallbackTs = 0): A
     for (const b of content as Json[]) {
       if (b?.type === 'tool_use' && str(b.id) && str(b.name)) {
         ev({ k: 'tool.start', toolUseId: b.id, name: b.name, input: compactInput(b.input) });
+        if (b.name === 'ExitPlanMode') {
+          const text = str(b.input?.plan);
+          if (text || str(b.input?.planFilePath)) ev({ k: 'plan', text: text?.slice(0, PLAN_CAP), path: str(b.input?.planFilePath), source: 'exit', toolUseId: b.id });
+        }
         if (b.name === 'TodoWrite') {
           const items = todoWriteItems(b.input);
           if (items) ev({ k: 'todos.replace', items });
@@ -324,7 +337,12 @@ export function normalizeHook(p: Json, now: number): AgentEvent[] {
       if (str(p.prompt)) ev({ k: 'prompt', text: cleanPrompt(p.prompt) });
       break;
     case 'PreToolUse':
-      if (str(p.tool_use_id) && str(p.tool_name)) ev({ k: 'tool.start', toolUseId: p.tool_use_id, name: p.tool_name, input: compactInput(p.tool_input) });
+      if (str(p.tool_use_id) && str(p.tool_name)) {
+        ev({ k: 'tool.start', toolUseId: p.tool_use_id, name: p.tool_name, input: compactInput(p.tool_input) });
+        if (p.tool_name === 'ExitPlanMode' && !agentId && str(p.tool_input?.plan)) {
+          ev({ k: 'plan', text: p.tool_input.plan.slice(0, PLAN_CAP), path: str(p.tool_input.planFilePath), source: 'exit', toolUseId: p.tool_use_id });
+        }
+      }
       break;
     case 'PostToolUse':
       if (str(p.tool_use_id)) ev({ k: 'tool.end', toolUseId: p.tool_use_id, ok: true, durationMs: num(p.duration_ms) || undefined, name: str(p.tool_name) });

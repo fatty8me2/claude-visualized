@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { describeActivity, firstLine } from '@core/activity';
 import { agentGoal } from '@core/insight';
 import { GoalBadge } from './GoalBadge';
@@ -38,7 +38,7 @@ function totalTokens(a: AgentNode) {
   return a.tokens.in + a.tokens.out + a.tokens.cacheRead + a.tokens.cacheWrite;
 }
 
-function NodeCard({ a, view, now, x, y, w, h, selected, onSelect }: { a: AgentNode; view: SessionView; now: number; x: number; y: number; w: number; h: number; selected: boolean; onSelect: (id: string) => void }) {
+function NodeCard({ a, view, now, x, y, w, h, selected, hl, onSelect }: { a: AgentNode; view: SessionView; now: number; x: number; y: number; w: number; h: number; selected: boolean; hl?: boolean; onSelect: (id: string) => void }) {
   const st = displayStatus(a, now);
   const elapsed = (a.endedAt ?? (st === 'running' || st === 'waiting' ? now : a.lastActivity)) - a.startedAt;
   const isMain = a.kind === 'main';
@@ -52,7 +52,7 @@ function NodeCard({ a, view, now, x, y, w, h, selected, onSelect }: { a: AgentNo
   const says = act.kind === 'finished' || act.kind === 'idle' ? '' : firstLine(a.lastText, 120);
   return (
     <div
-      className={`node ${famClass(a.model)} ${st === 'idle' && !isMain ? 'idle-agent' : st} ${isMain ? 'main' : ''} ${selected ? 'sel' : ''}`}
+      className={`node ${famClass(a.model)} ${st === 'idle' && !isMain ? 'idle-agent' : st} ${isMain ? 'main' : ''} ${selected ? 'sel' : ''}${hl ? ' hl' : ''}`}
       style={{ left: x, top: y, width: w, height: h }}
       onClick={() => onSelect(a.id)}
       data-agent={a.id}
@@ -106,6 +106,9 @@ export function AgentGraph({
   onSelect,
   showFinished,
   onToggleFinished,
+  highlight,
+  onHoverAgent,
+  extraTools,
   compact = false,
 }: {
   view: SessionView;
@@ -114,6 +117,12 @@ export function AgentGraph({
   onSelect: (id: string | null) => void;
   showFinished: boolean;
   onToggleFinished: () => void;
+  /** agents to light up (hovering a plan step) */
+  highlight?: Set<string>;
+  /** pointer entered/left an agent card (null = left) */
+  onHoverAgent?: (id: string | null) => void;
+  /** extra buttons for the toolbar */
+  extraTools?: ReactNode;
   /** overview panels: no toolbar, scale to fit both width and height */
   compact?: boolean;
 }) {
@@ -162,9 +171,14 @@ export function AgentGraph({
         <span className="badge" style={{ alignSelf: 'center' }}>
           subagents {running}/{total}
         </span>
+        {extraTools}
       </div>
       )}
-      <div className="graph-canvas" style={{ width: layout.width * scale + pad * 2, height: layout.height * scale + pad * 2 }}>
+      <div
+        className="graph-canvas"
+        onMouseOver={onHoverAgent ? (e) => onHoverAgent((e.target as HTMLElement).closest<HTMLElement>('[data-agent]')?.dataset.agent ?? null) : undefined}
+        onMouseLeave={onHoverAgent ? () => onHoverAgent(null) : undefined}
+        style={{ width: layout.width * scale + pad * 2, height: layout.height * scale + pad * 2 }}>
         <div style={{ position: 'absolute', left: pad, top: pad, width: layout.width, height: layout.height, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
           <svg className="edges" width={layout.width} height={layout.height}>
             {layout.edges.map((e) => (
@@ -196,7 +210,7 @@ export function AgentGraph({
             }
             const a = view.agents[n.id];
             if (!a) return null;
-            return <NodeCard key={n.id} a={a} view={view} now={now} x={n.x} y={n.y} w={n.w} h={n.h} selected={selectedAgent === n.id} onSelect={onSelect} />;
+            return <NodeCard key={n.id} a={a} view={view} now={now} x={n.x} y={n.y} w={n.w} h={n.h} selected={selectedAgent === n.id} hl={highlight?.has(n.id)} onSelect={onSelect} />;
           })}
         </div>
       </div>

@@ -76,6 +76,20 @@ export interface TodoItem {
   owner: string;
 }
 
+export interface PlanInfo {
+  /** markdown; null while only the file path is known */
+  text: string | null;
+  path: string | null;
+  source: 'exit' | 'file' | 'reference' | null;
+  /** event time of the newest text (file mtime for 'file') */
+  at: number;
+  /** when the plan was submitted (latest ExitPlanMode, else first sighting): agents that started earlier were planning, not building */
+  since: number;
+  /** ExitPlanMode tool_use id and whether the user approved it (null = unanswered / unknown) */
+  exitToolUseId: string | null;
+  approved: boolean | null;
+}
+
 export type LogKind = 'prompt' | 'tool' | 'tool-error' | 'agent' | 'done' | 'mode' | 'model' | 'text' | 'notice' | 'attention';
 
 export interface LogEntry {
@@ -98,6 +112,7 @@ export interface SessionState {
   modeSource: 'transcript' | 'hook' | null;
   agents: Record<string, AgentNode>;
   todos: TodoItem[];
+  plan: PlanInfo | null;
   log: LogEntry[];
   totals: UsageNumbers;
   costUSD: number | null;
@@ -192,6 +207,7 @@ export function newSession(id: string): SessionState {
     modeSource: null,
     agents: { [MAIN]: newAgent(MAIN, 'main', 0, null) },
     todos: [],
+    plan: null,
     log: [],
     totals: zeroUsage(),
     costUSD: null,

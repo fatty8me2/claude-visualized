@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { AgentEvent } from '@core/events';
-import { normalizeJournalLine, normalizeLine, normalizeMeta } from '@core/normalize';
+import { normalizeJournalLine, normalizeLine, normalizeMeta, PLAN_CAP } from '@core/normalize';
 import { apply } from '@core/reducer';
 import { newSession, type SessionState } from '@core/state';
 import { FileTail, type TailSnapshot } from './tail';
@@ -21,6 +21,8 @@ export interface BacklogSnapshot {
   agents: { file: string; agentId: string; workflowRunId?: string; spawned: boolean; firstSeen: number; tail: TailSnapshot }[];
   journals: { runId: string; file: string; tail: TailSnapshot }[];
   titleMtime: number;
+  /** path:mtime of the plan file last read */
+  planKey?: string;
   /** the sorted backlog, only when requested (replay) */
   events?: AgentEvent[];
 }
@@ -40,6 +42,7 @@ export class SessionWatcher {
   private agents = new Map<string, AgentFile>();
   private journals = new Map<string, FileTail>();
   private titleMtime = 0;
+  private planKey = '';
   private busy = false;
   private lastDirScan = 0;
   /** events applied since the last drain, for listeners (notifications) */
@@ -111,6 +114,7 @@ export class SessionWatcher {
     this.agents.clear();
     this.journals.clear();
     this.titleMtime = 0;
+    this.planKey = '';
   }
 
   /** Snapshot of the folded state and tail positions, for handing over to another thread. */
@@ -121,6 +125,7 @@ export class SessionWatcher {
       agents: [...this.agents.values()].map((a) => ({ file: a.tail.file, agentId: a.agentId, workflowRunId: a.workflowRunId, spawned: a.spawned, firstSeen: a.firstSeen, tail: a.tail.snapshot() })),
       journals: [...this.journals.entries()].map(([runId, t]) => ({ runId, file: t.file, tail: t.snapshot() })),
       titleMtime: this.titleMtime,
+      planKey: this.planKey,
       events,
     };
   }
@@ -141,6 +146,7 @@ export class SessionWatcher {
       this.journals.set(j.runId, tail);
     }
     this.titleMtime = s.titleMtime;
+    this.planKey = s.planKey ?? '';
     // files created while the worker ran are picked up by the next directory scan
     this.lastDirScan = 0;
   }
@@ -201,12 +207,30 @@ export class SessionWatcher {
         this.backlogSink?.(all);
         this.ingest(all);
       }
+      await this.pollPlanFile();
       const changed = this.state.eventCount !== before;
       this.primed = true;
       return changed;
     } finally {
       this.buffer = null;
       this.busy = false;
+    }
+  }
+
+  /** The plan file is where Claude edits the plan, so it is newer than any ExitPlanMode copy. Read it when its mtime changes. */
+  private async pollPlanFile() {
+    const file = this.state.plan?.path;
+    if (!file || !/\.md$/i.test(file)) return;
+    try {
+      const st = await fs.stat(file);
+      if (!st.isFile() || st.size > 2_000_000) return;
+      const key = `${file}:${st.mtimeMs}`;
+      if (key === this.planKey) return;
+      const text = (await fs.readFile(file, 'utf8')).slice(0, PLAN_CAP);
+      this.planKey = key;
+      this.ingest([{ ts: st.mtimeMs, src: 'transcript', ref: { sessionId: this.sessionId, agentId: null }, k: 'plan', text, path: file, source: 'file' }]);
+    } catch {
+      /* plan file missing or unreadable: keep what the transcript gave us */
     }
   }
 
