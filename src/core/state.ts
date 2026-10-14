@@ -1,0 +1,197 @@
+import type { UsageNumbers } from './events';
+
+export type AgentStatus = 'running' | 'waiting' | 'idle' | 'done' | 'error';
+
+export interface CurrentTool {
+  id: string;
+  name: string;
+  summary: string;
+  since: number;
+}
+
+export interface AgentNode {
+  /** 'main' for the session's main agent, 'wf:<runId>' for a workflow group, else the subagent id */
+  id: string;
+  parentId: string | null;
+  kind: 'main' | 'agent' | 'workflow';
+  agentType: string;
+  description: string;
+  model: string | null;
+  effort: string | null;
+  status: AgentStatus;
+  tokens: UsageNumbers;
+  currentTool: CurrentTool | null;
+  toolCount: number;
+  errorCount: number;
+  startedAt: number;
+  endedAt: number | null;
+  lastActivity: number;
+  /** timestamps of recent tool starts, for the activity sparkline */
+  activity: number[];
+  background: boolean;
+  depth: number;
+  phase: string | null;
+  /** tool_use id of the spawning Agent call, used to resolve the parent lazily */
+  parentToolUseId: string | null;
+  lastText: string | null;
+}
+
+export interface TodoItem {
+  id: string;
+  text: string;
+  status: string;
+  owner: string;
+}
+
+export type LogKind = 'prompt' | 'tool' | 'tool-error' | 'agent' | 'done' | 'mode' | 'model' | 'text' | 'notice' | 'attention';
+
+export interface LogEntry {
+  seq: number;
+  ts: number;
+  agentId: string;
+  kind: LogKind;
+  text: string;
+}
+
+export interface SessionState {
+  id: string;
+  cwd: string | null;
+  title: string | null;
+  titleKind: 'custom' | 'ai' | 'prompt' | null;
+  version: string | null;
+  entrypoint: string | null;
+  gitBranch: string | null;
+  mode: string;
+  modeSource: 'transcript' | 'hook' | null;
+  agents: Record<string, AgentNode>;
+  todos: TodoItem[];
+  log: LogEntry[];
+  totals: UsageNumbers;
+  costUSD: number | null;
+  costByModel: Record<string, number>;
+  startedAt: number | null;
+  lastActivity: number | null;
+  ended: boolean;
+  lastHookAt: number | null;
+  warnings: number;
+  eventCount: number;
+  /** bookkeeping, not rendered */
+  internal: SessionInternal;
+}
+
+export interface PendingTool {
+  agentId: string;
+  name: string;
+  input: unknown;
+  start: number;
+}
+
+export interface SessionInternal {
+  pending: Record<string, PendingTool>;
+  /** tool_use ids already counted, so hook + transcript copies of one call count once */
+  seenTools: Record<string, string>;
+  /** per agent: msgId -> usage, so repeated per-block usage lines are counted once */
+  usage: Record<string, Record<string, UsageNumbers>>;
+  /** Agent tool_use id -> spawned agent id (from tool_result) */
+  agentByToolUse: Record<string, string>;
+  /** workflow runId -> tool_use id of the Workflow call */
+  workflowToolUse: Record<string, string>;
+  /** workflow task id (from task-notification) -> runId */
+  workflowByTask: Record<string, string>;
+  /** task id -> last notified status; notifications arrive via queue, attachment and user line */
+  notified: Record<string, string>;
+  logSeq: number;
+}
+
+export const LOG_CAP = 1500;
+export const ACTIVITY_CAP = 120;
+export const MAIN = 'main';
+
+export const zeroUsage = (): UsageNumbers => ({ in: 0, out: 0, cacheRead: 0, cacheWrite: 0 });
+
+export function newAgent(id: string, kind: AgentNode['kind'], ts: number, parentId: string | null): AgentNode {
+  return {
+    id,
+    parentId,
+    kind,
+    agentType: kind === 'main' ? 'main' : kind === 'workflow' ? 'workflow' : 'agent',
+    description: '',
+    model: null,
+    effort: null,
+    status: kind === 'main' ? 'idle' : 'running',
+    tokens: zeroUsage(),
+    currentTool: null,
+    toolCount: 0,
+    errorCount: 0,
+    startedAt: ts,
+    endedAt: null,
+    lastActivity: ts,
+    activity: [],
+    background: false,
+    depth: kind === 'main' ? 0 : 1,
+    phase: null,
+    parentToolUseId: null,
+    lastText: null,
+  };
+}
+
+export function newSession(id: string): SessionState {
+  return {
+    id,
+    cwd: null,
+    title: null,
+    titleKind: null,
+    version: null,
+    entrypoint: null,
+    gitBranch: null,
+    mode: 'default',
+    modeSource: null,
+    agents: { [MAIN]: newAgent(MAIN, 'main', 0, null) },
+    todos: [],
+    log: [],
+    totals: zeroUsage(),
+    costUSD: null,
+    costByModel: {},
+    startedAt: null,
+    lastActivity: null,
+    ended: false,
+    lastHookAt: null,
+    warnings: 0,
+    eventCount: 0,
+    internal: {
+      pending: {},
+      seenTools: {},
+      usage: {},
+      agentByToolUse: {},
+      workflowToolUse: {},
+      workflowByTask: {},
+      notified: {},
+      logSeq: 0,
+    },
+  };
+}
+
+/** The renderer-facing snapshot: everything except bookkeeping. */
+export type SessionView = Omit<SessionState, 'internal'>;
+
+export function toView(s: SessionState): SessionView {
+  const { internal: _internal, ...view } = s;
+  return view;
+}
+
+/** Lightweight row for the session picker / tray. */
+export interface SessionSummary {
+  id: string;
+  file: string;
+  projectDir: string;
+  project: string;
+  cwd: string | null;
+  title: string | null;
+  mtime: number;
+  size: number;
+  live: boolean;
+  entrypoint: string | null;
+  running?: number;
+  mode?: string;
+  waiting?: boolean;
+}

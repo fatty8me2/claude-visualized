@@ -1,0 +1,109 @@
+import { MAIN, type SessionView } from '@core/state';
+import { formatDuration, formatTokens, modeLabel, modelLabel } from '@core/summarize';
+import type { HookServerStatusView } from '@core/api';
+
+const TODO_GLYPH: Record<string, string> = { completed: '✓', in_progress: '▸', pending: '○' };
+
+export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: number; hookSrv: HookServerStatusView | null }) {
+  const m = modeLabel(view.mode);
+  const plan = m.short === 'PLAN';
+  const main = view.agents[MAIN];
+  const done = view.todos.filter((t) => t.status === 'completed').length;
+  const t = view.totals;
+  const hookFresh = view.lastHookAt && now - view.lastHookAt < 10 * 60_000;
+  return (
+    <div className="modepanel">
+      <div className={`modebox ${plan ? 'plan' : 'build'}`}>
+        <div className="big">{plan ? 'PLAN MODE' : 'BUILD MODE'}</div>
+        <div className="detail">{m.detail}</div>
+        <div className="flip">
+          <span className={plan ? 'cur' : ''}>{plan ? '◆' : '◇'} plan</span>
+          <span className={plan ? '' : 'cur'}>{plan ? '◇' : '◆'} build</span>
+        </div>
+        <div className="detail" style={{ color: 'var(--faint)', marginTop: 4 }}>
+          shift+tab to flip
+        </div>
+      </div>
+
+      <div className="section">
+        <h4>
+          <span>checklist</span>
+          {view.todos.length > 0 && (
+            <span>
+              {done}/{view.todos.length}
+            </span>
+          )}
+        </h4>
+        {view.todos.length === 0 ? (
+          <div className="empty-note">no tasks tracked yet</div>
+        ) : (
+          <>
+            <div className="progress">
+              <i style={{ width: `${(done / view.todos.length) * 100}%` }} />
+            </div>
+            {view.todos.map((td) => (
+              <div key={td.id} className={`todo ${td.status}`}>
+                <span>{TODO_GLYPH[td.status] ?? '·'}</span>
+                <span className="tx">{td.text}</span>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
+      <div className="section">
+        <h4>main agent</h4>
+        <div className="kv">
+          <span className="k">model</span>
+          <span className="v">{modelLabel(main?.model)}</span>
+          <span className="k">effort</span>
+          <span className="v">{main?.effort ?? '—'}</span>
+          <span className="k">tools used</span>
+          <span className="v">{main?.toolCount ?? 0}</span>
+          <span className="k">errors</span>
+          <span className="v">{main?.errorCount ?? 0}</span>
+        </div>
+      </div>
+
+      <div className="section">
+        <h4>tokens (all agents)</h4>
+        <div className="kv">
+          <span className="k">input</span>
+          <span className="v">{formatTokens(t.in)}</span>
+          <span className="k">output</span>
+          <span className="v">{formatTokens(t.out)}</span>
+          <span className="k">cache read</span>
+          <span className="v">{formatTokens(t.cacheRead)}</span>
+          <span className="k">cache write</span>
+          <span className="v">{formatTokens(t.cacheWrite)}</span>
+          <span className="k">cost</span>
+          <span className="v" title="As reported by Claude Code in the transcript (cost-state); only written at certain points">
+            {view.costUSD != null ? `$${view.costUSD.toFixed(2)}` : '—'}
+          </span>
+        </div>
+      </div>
+
+      <div className="section">
+        <h4>session</h4>
+        <div className="kv">
+          <span className="k">duration</span>
+          <span className="v">{view.startedAt ? formatDuration((view.lastActivity ?? now) - view.startedAt) : '—'}</span>
+          <span className="k">project</span>
+          <span className="v" title={view.cwd ?? ''}>
+            {view.cwd?.split(/[\\/]/).filter(Boolean).pop() ?? '—'}
+          </span>
+          <span className="k">branch</span>
+          <span className="v">{view.gitBranch || '—'}</span>
+          <span className="k">client</span>
+          <span className="v">{view.entrypoint ?? '—'}</span>
+          <span className="k">version</span>
+          <span className="v">{view.version ?? '—'}</span>
+          <span className="k">hooks</span>
+          <span className="v" style={{ color: hookFresh ? 'var(--ok)' : 'var(--muted)' }}>
+            {hookFresh ? 'live' : hookSrv?.listening ? 'transcript only' : 'off'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
