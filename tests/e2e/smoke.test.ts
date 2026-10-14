@@ -175,6 +175,83 @@ describe('app smoke (fixture data)', () => {
     await page.evaluate(() => localStorage.removeItem('cvis.plan.v1'));
   });
 
+  it('shows the session as a timeline: tree-ordered lanes, a time axis, bars that open the drawer, replay seeking', async () => {
+    const tabs = page.locator('.graph-views button');
+    expect(await tabs.allInnerTexts()).toEqual(['graph', 'timeline']);
+    await tabs.filter({ hasText: 'timeline' }).click();
+    await page.getByTestId('timeline').waitFor();
+    const lanes = () => page.locator('[data-testid="tl-row"] [data-lane]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.lane!));
+    await page.locator('[data-lane="w2"]').waitFor();
+    const ids = await lanes();
+    const at = (id: string) => ids.indexOf(id);
+    expect(at('main')).toBe(0);
+    for (const id of ['a1', 'a2', 'a3', 'wf:wf_x', 'w1', 'w2']) expect(at(id), id).toBeGreaterThan(0);
+    expect(at('wf:wf_x')).toBeLessThan(at('w1'));
+    expect(at('w1')).toBeLessThan(at('w2'));
+    // the axis has wall-clock labels and the now line is drawn
+    const axis = page.getByTestId('tl-axis');
+    expect(await axis.locator('.tl-ax').count()).toBeGreaterThan(2);
+    expect(await axis.locator('.tl-ax').first().innerText()).toMatch(/^\d\d:\d\d(:\d\d)?$|^\d\d-\d\d$/);
+    expect(await page.locator('[data-bar]').count()).toBe(ids.length);
+    await page.screenshot({ path: path.join(ART, 'timeline.png') });
+
+    // collapsing the workflow hides its agents
+    await page.locator('[data-lane="wf:wf_x"]').getByTestId('tl-fold').click();
+    await page.locator('[data-lane="w1"]').waitFor({ state: 'detached' });
+    await page.locator('[data-lane="wf:wf_x"]').getByTestId('tl-fold').click();
+    await page.locator('[data-lane="w1"]').waitFor();
+
+    // hovering a bar shows a tooltip; clicking it opens the drawer
+    const main = page.locator('[data-bar="main"]');
+    const box = (await main.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.getByTestId('tl-tip').waitFor();
+    expect(await page.getByTestId('tl-tip').innerText()).toContain('tool call');
+    await main.click({ position: { x: box.width / 2, y: box.height / 2 } });
+    const drawer = page.getByTestId('drawer');
+    await drawer.waitFor();
+    await drawer.getByRole('button', { name: '×' }).click();
+    await drawer.waitFor({ state: 'detached' });
+
+    // zoom with ctrl+wheel changes the axis; fit restores it
+    const before = await axis.locator('.tl-ax').allInnerTexts();
+    const ab = (await axis.boundingBox())!;
+    // zoom deep into the first seconds of the (long-ago) fixture session, anchored at the start of the main bar
+    await page.keyboard.down('Control');
+    for (let i = 0; i < 8; i++) {
+      const mb = (await page.locator('[data-bar="main"]').boundingBox())!;
+      await page.mouse.move(Math.max(mb.x, ab.x) + 1, mb.y + 4);
+      await page.mouse.wheel(0, -600);
+      await page.waitForTimeout(60);
+    }
+    await page.keyboard.up('Control');
+    await page.waitForTimeout(300);
+    expect(await axis.locator('.tl-ax').allInnerTexts()).not.toEqual(before);
+    await page.screenshot({ path: path.join(ART, 'timeline-zoomed.png') });
+    expect(await axis.locator('.tl-ax').allInnerTexts()).not.toEqual(before);
+    await page.getByTestId('tl-fit').click();
+
+    // replay: the timeline follows the replay clock, and clicking empty space seeks
+    await page
+      .getByRole('button', { name: /replay/ })
+      .first()
+      .click();
+    await page.locator('.replaybar').waitFor();
+    await page.getByRole('button', { name: '❚❚' }).click();
+    await page.getByTestId('timeline').waitFor();
+    expect(await page.locator('.tl-nowtag').innerText()).toBe('replay');
+    const slider = page.locator('.replaybar input[type=range]');
+    await slider.fill((await slider.getAttribute('max')) ?? '0');
+    await page.getByTestId('tl-fit').click();
+    const idx0 = await page.locator('.replaybar .rt').innerText();
+    const ab2 = (await axis.boundingBox())!;
+    await page.mouse.click(ab2.x + ab2.width * 0.5, ab2.y + 12);
+    await page.waitForFunction((was) => document.querySelector('.replaybar .rt')?.textContent !== was, idx0, { timeout: 5000 });
+    await page.getByRole('button', { name: /back to live/ }).click();
+    await tabs.filter({ hasText: 'graph' }).click();
+    await page.locator('[data-agent="a1"]').waitFor();
+  });
+
   it('applies hook events instantly', async () => {
     const post = (body: object) => fetch(`http://127.0.0.1:${PORT}/hook?src=claude-visualized`, { method: 'POST', body: JSON.stringify(body) });
     const health = await fetch(`http://127.0.0.1:${PORT}/health`).then((r) => r.json());
@@ -627,6 +704,12 @@ describe.skipIf(!process.env.SHOT_REAL)('real data screenshot', () => {
       await page.locator('.node').first().waitFor({ timeout: 20_000 });
       await page.waitForTimeout(1500);
       await page.screenshot({ path: path.join(ART, 'real.png') });
+      await page.locator('.graph-views button', { hasText: 'timeline' }).click();
+      await page.locator('[data-testid="tl-bar"]').first().waitFor({ timeout: 10_000 });
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: path.join(ART, 'real-timeline.png') });
+      await page.locator('.graph-views button', { hasText: 'graph' }).click();
+      await page.locator('.node').first().waitFor({ timeout: 10_000 });
       const id = process.env.SHOT_SESSION;
       if (id) {
         const t = Date.now();

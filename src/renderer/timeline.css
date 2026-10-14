@@ -1,0 +1,303 @@
+/* Timeline (Gantt) view of a session: one lane per agent, shared time axis. */
+
+/* the graph/timeline tab switcher */
+.graph-main:has(> .graph-views) {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.graph-views {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.graph-views button {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+
+.tl {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-size: 11px;
+  user-select: none;
+}
+.tl.seekable .tl-body,
+.tl.seekable .tl-axis {
+  cursor: crosshair;
+}
+.tl:not(.seekable) .tl-body,
+.tl:not(.seekable) .tl-axis {
+  cursor: grab;
+}
+.tl.dragging,
+.tl.dragging * {
+  cursor: grabbing !important;
+}
+
+.tl-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.tl-tools button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.tl-hint {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-left: 6px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tl-head {
+  display: flex;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--line-2);
+  background: var(--bg-2);
+}
+.tl-corner {
+  flex: 0 0 210px;
+  padding: 5px 8px;
+  color: var(--faint);
+}
+.tl-axis {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 24px;
+  overflow: hidden;
+}
+.tl-ax {
+  position: absolute;
+  top: 5px;
+  padding-left: 4px;
+  border-left: 1px solid var(--line-2);
+  height: 20px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tl-ax.major {
+  color: var(--text-2);
+}
+.tl-nowtag {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  padding: 0 5px;
+  border-radius: 0 0 4px 4px;
+  background: var(--err);
+  color: #1a0d10;
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.tl-body {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.tl-content {
+  position: relative;
+}
+.tl-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.tl-grid,
+.tl-over {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+}
+.tl-grid line {
+  stroke: var(--line);
+  stroke-width: 1;
+  opacity: 0.45;
+}
+.tl-grid line.major {
+  opacity: 0.9;
+}
+.tl-spawn {
+  stroke: var(--text-2);
+  stroke-width: 1;
+  opacity: 0.45;
+  stroke-dasharray: 2 2;
+}
+.tl-now {
+  stroke: var(--err);
+  stroke-width: 1.5;
+}
+
+.tl-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-bottom: 1px solid rgba(46, 40, 59, 0.35);
+}
+.tl-row.sel {
+  background: rgba(180, 156, 255, 0.08);
+}
+.tl-row.hl {
+  background: rgba(122, 167, 255, 0.1);
+}
+.tl-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-sizing: border-box;
+  padding-right: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: pointer;
+  background: var(--bg);
+  border-right: 1px solid var(--line-2);
+  z-index: 1;
+}
+.tl-label:hover {
+  background: var(--panel);
+}
+.tl-row.sel .tl-label {
+  background: #1d1830;
+}
+.tl-name {
+  color: var(--text);
+}
+.tl-desc {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tl-conn {
+  flex: 0 0 8px;
+  height: 100%;
+  margin-left: -10px;
+  box-sizing: border-box;
+  border-left: 1px solid var(--line-2);
+}
+.tl-conn::after {
+  content: '';
+  display: block;
+  margin-top: 12px;
+  width: 8px;
+  border-top: 1px solid var(--line-2);
+}
+.tl-conn.last {
+  height: 13px;
+}
+.tl-fold {
+  padding: 0 4px;
+  line-height: 14px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.tl-label .goal {
+  flex: 0 0 auto;
+}
+
+.tl-lp {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+.tl-bar {
+  --fam: var(--other);
+  position: absolute;
+  top: 5px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--fam);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--fam) 28%, var(--bg));
+  display: flex;
+  align-items: center;
+  padding-left: 3px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.tl-bar:hover,
+.tl-row.sel .tl-bar {
+  background: color-mix(in srgb, var(--fam) 48%, var(--bg));
+}
+.tl-bar.live {
+  background: color-mix(in srgb, var(--fam) 40%, var(--bg));
+}
+.tl-bar.st-error {
+  border-color: var(--err);
+}
+.tl-bar .goal {
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1;
+}
+.tl-gap {
+  position: absolute;
+  top: 6px;
+  height: 14px;
+  pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgba(14, 12, 20, 0.75) 0 3px, rgba(14, 12, 20, 0.2) 3px 6px);
+}
+.tl-tick {
+  position: absolute;
+  top: 8px;
+  width: 2px;
+  height: 10px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+  opacity: 0.85;
+}
+.tl-tick.multi {
+  width: 3px;
+  top: 7px;
+  height: 12px;
+}
+.tl-tick.fail {
+  background: var(--err);
+  opacity: 1;
+}
+
+.tl-tip {
+  position: absolute;
+  z-index: 10;
+  max-width: 320px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  white-space: pre-line;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tl-bar,
+  .tl-row {
+    transition: background-color 0.15s;
+  }
+}
