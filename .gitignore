@@ -3,3 +3,4 @@ out/
 release/
 *.log
 tests/e2e/artifacts/
+.claude/worktrees/
