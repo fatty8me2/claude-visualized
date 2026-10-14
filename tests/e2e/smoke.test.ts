@@ -14,12 +14,12 @@ const PORT = Number(process.env.E2E_PORT ?? 47899);
 
 const freshLine = (sid: string) => JSON.stringify({ type: 'system', subtype: 'turn_duration', sessionId: sid, timestamp: new Date().toISOString() }) + '\n';
 
-async function launch(env: Record<string, string>) {
-  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-ud-'));
+async function launch(env: Record<string, string>, existingUserData?: string) {
+  const userData = existingUserData ?? fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-ud-'));
   const app = await electron.launch({
     args: [ROOT],
     cwd: ROOT,
-    env: { ...process.env, CLAUDE_VIS_USER_DATA: userData, CLAUDE_VIS_PORT: String(PORT), CLAUDE_VIS_NO_EXTERNAL: '1', CLAUDE_VIS_NO_USAGE_API: '1', CLAUDE_VIS_DESKTOP_DIR: path.join(userData, 'no-desktop'), ...env } as Record<string, string>,
+    env: { ...process.env, CLAUDE_VIS_USER_DATA: userData, CLAUDE_VIS_PORT: String(PORT), CLAUDE_VIS_NO_EXTERNAL: '1', CLAUDE_VIS_NO_USAGE_API: '1', CLAUDE_VIS_SKIP_ONBOARDING: '1', CLAUDE_VIS_DESKTOP_DIR: path.join(userData, 'no-desktop'), ...env } as Record<string, string>,
   });
   const page = await app.firstWindow();
   await page.setViewportSize({ width: 1440, height: 920 }).catch(() => {});
@@ -156,6 +156,74 @@ describe('app smoke (fixture data)', () => {
     const restored = JSON.parse(fs.readFileSync(path.join(home, 'settings.json'), 'utf8'));
     expect(restored.hooks.Stop).toHaveLength(1);
     expect(restored.statusLine).toBeUndefined();
+  });
+});
+
+describe('first-run welcome and tour', () => {
+  let home: string;
+  let userData: string;
+
+  beforeAll(() => {
+    fs.mkdirSync(ART, { recursive: true });
+    home = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-home-'));
+    writeFixture(home);
+    fs.appendFileSync(path.join(home, 'projects', 'C--demo-app', `${SID}.jsonl`), freshLine(SID));
+    userData = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-ud-'));
+  });
+
+  afterAll(() => {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(userData, { recursive: true, force: true });
+  });
+
+  const open = () => launch({ CLAUDE_VIS_HOME: home, CLAUDE_VIS_SKIP_ONBOARDING: '' }, userData);
+
+  it('shows the welcome checklist, walks the tour, and stays away after finishing', async () => {
+    const first = await open();
+    try {
+      const page = first.page;
+      await page.getByTestId('welcome').waitFor({ timeout: 20_000 });
+      await page.locator('[data-check="claude"].ok').waitFor({ timeout: 10_000 });
+      expect(await page.locator('[data-check="claude"]').innerText()).toMatch(/Found \d+ session/);
+      for (const id of ['usage', 'hooks', 'mini']) expect(await page.locator(`[data-check="${id}"]`).count(), id).toBe(1);
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: path.join(ART, 'welcome.png') });
+
+      await page.getByTestId('take-tour').click();
+      await page.getByTestId('tour').waitFor();
+      let n = 0;
+      for (;;) {
+        const label = await page.getByTestId('tour-count').textContent() ?? '';
+        n++;
+        const total = Number(/of (\d+)/.exec(label)![1]);
+        expect(label).toContain(`step ${n} of`);
+        if (n === 4) {
+          await page.locator('.tour-spot').waitFor();
+          await page.waitForTimeout(500);
+          await page.screenshot({ path: path.join(ART, 'tour-step.png') });
+        }
+        if (n === total) break;
+        await page.getByTestId('tour-next').click();
+      }
+      expect(n).toBeGreaterThanOrEqual(6);
+      await page.getByTestId('tour-next').click();
+      await page.getByTestId('tour').waitFor({ state: 'detached' });
+      expect(await page.getByTestId('welcome').count()).toBe(0);
+    } finally {
+      await first.app.close();
+    }
+
+    const second = await open();
+    try {
+      const page = second.page;
+      await page.locator('.session-row').first().waitFor({ timeout: 20_000 });
+      await page.waitForTimeout(1500);
+      expect(await page.getByTestId('welcome').count()).toBe(0);
+      await page.getByRole('button', { name: /help/ }).click();
+      await page.getByTestId('welcome').waitFor();
+    } finally {
+      await second.app.close();
+    }
   });
 });
 

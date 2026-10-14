@@ -146,7 +146,7 @@ export function AgentGraph({
   const total = Object.keys(view.agents).length - 1;
 
   return (
-    <div className={`graph-wrap ${compact ? 'compact' : ''}`} ref={wrapRef} onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
+    <div className={`graph-wrap ${compact ? 'compact' : ''}`} data-tour="graph" ref={wrapRef} onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
       {!compact && (
       <div className="graph-tools">
         <button className={fit ? 'on' : ''} onClick={() => setFit(!fit)} title="Fit graph to width">

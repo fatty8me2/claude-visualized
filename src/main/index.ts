@@ -7,6 +7,7 @@ import { applyQuota, applyStatusline, applyUsageApi, emptyUsage, settleUsage, ty
 import { fetchUsage } from './usageApi';
 import { applyHooks, getHookState, previewHooks } from './installer';
 import { writeStatusLineScript } from './statusline';
+import { projectsDir } from './paths';
 import { SessionManager, type NotifyRequest } from './manager';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
@@ -130,6 +131,14 @@ function showMain() {
   }
 }
 
+function showWelcome() {
+  showMain();
+  // a freshly created window needs a moment to load before it can listen
+  const send = () => mainWin?.webContents.send('onboarding:show');
+  if (mainWin?.webContents.isLoading()) mainWin.webContents.once('did-finish-load', () => setTimeout(send, 300));
+  else send();
+}
+
 function toggleMini() {
   if (miniWin) {
     miniWin.close();
@@ -192,6 +201,7 @@ function rebuildTrayMenu() {
     })),
     { type: 'separator' },
     { label: 'Show window', click: showMain },
+    { label: 'Show welcome & tour', click: showWelcome },
     { label: miniWin ? 'Close mini view' : 'Mini view (always on top)', click: toggleMini },
     {
       label: 'Follow active session',
@@ -302,6 +312,12 @@ function registerIpc() {
   });
   ipcMain.handle('mini:toggle', () => toggleMini());
   ipcMain.handle('main:show', () => showMain());
+  ipcMain.handle('setup:status', () => ({
+    projectsDir: projectsDir(),
+    projectsDirExists: fs.existsSync(projectsDir()),
+    sessionCount: manager.getSummaries().length,
+    skipOnboarding: !!process.env.CLAUDE_VIS_SKIP_ONBOARDING,
+  }));
   ipcMain.handle('path:open', (_e, p: string) => {
     shell.showItemInFolder(p);
   });

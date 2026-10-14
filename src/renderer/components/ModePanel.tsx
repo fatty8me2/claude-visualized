@@ -12,7 +12,7 @@ export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: numb
   const t = view.totals;
   const hookFresh = view.lastHookAt && now - view.lastHookAt < 10 * 60_000;
   return (
-    <div className="modepanel">
+    <div className="modepanel" data-tour="mode">
       <div className={`modebox ${plan ? 'plan' : 'build'}`}>
         <div className="big">{plan ? 'PLAN MODE' : 'BUILD MODE'}</div>
         <div className="detail">{m.detail}</div>

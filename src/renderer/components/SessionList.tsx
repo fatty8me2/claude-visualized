@@ -34,7 +34,7 @@ function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: 
 
 export type Page = 'session' | 'overview';
 
-export function SessionList({ sessions, selected, now, follow, onSelect, onFollow, collapsed, onCollapse, page, onPage }: { sessions: SessionSummary[]; selected: string | null; now: number; follow: boolean; onSelect: (id: string) => void; onFollow: (on: boolean) => void; collapsed: boolean; onCollapse: () => void; page: Page; onPage: (p: Page) => void }) {
+export function SessionList({ sessions, selected, now, follow, onSelect, onFollow, collapsed, onCollapse, page, onPage, onHelp }: { sessions: SessionSummary[]; selected: string | null; now: number; follow: boolean; onSelect: (id: string) => void; onFollow: (on: boolean) => void; collapsed: boolean; onCollapse: () => void; page: Page; onPage: (p: Page) => void; onHelp: () => void }) {
   const [q, setQ] = useState('');
   if (collapsed) {
     return (
@@ -45,6 +45,9 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
           </button>
         </div>
         <div className="sidebar-head" style={{ flexDirection: 'column' }}>
+          <button onClick={onHelp} title="Welcome guide and tour">
+            ?
+          </button>
           <button className={page === 'overview' ? 'on' : ''} onClick={() => onPage('overview')} title="All sessions">
             ▦
           </button>
@@ -60,17 +63,22 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
   const live = sessions.filter((s) => s.live && match(s));
   const recent = sessions.filter((s) => !s.live && match(s)).slice(0, 120);
   return (
-    <div className="sidebar">
+    <div className="sidebar" data-tour="sessions">
       <div className="sidebar-head">
         <span className="brand">
           <b>◆</b> CLAUDE VISUALIZED
         </span>
-        <button onClick={onCollapse} title="Collapse">
-          «
-        </button>
+        <span style={{ display: 'flex', gap: 4 }}>
+          <button data-tour="help" onClick={onHelp} title="Welcome guide and tour">
+            ? help
+          </button>
+          <button onClick={onCollapse} title="Collapse">
+            «
+          </button>
+        </span>
       </div>
       <div className="sidebar-tools">
-        <div className="page-switch">
+        <div className="page-switch" data-tour="overview">
           <button className={page === 'overview' ? 'on' : ''} onClick={() => onPage('overview')} title="Every live session side by side">
             ▦ all sessions
           </button>
@@ -79,7 +87,7 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
           </button>
         </div>
         <input placeholder="search sessions…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <label className="follow">
+        <label className="follow" data-tour="follow">
           <input type="checkbox" checked={follow} onChange={(e) => onFollow(e.target.checked)} />
           follow the active session
         </label>

@@ -37,6 +37,8 @@ const api: VisApi = {
   toggleMini: () => ipcRenderer.invoke('mini:toggle'),
   showMain: () => ipcRenderer.invoke('main:show'),
   openPath: (p) => ipcRenderer.invoke('path:open', p),
+  setupStatus: () => ipcRenderer.invoke('setup:status'),
+  onShowOnboarding: (cb) => on<void>('onboarding:show', () => cb()),
 };
 
 contextBridge.exposeInMainWorld('api', api);

@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ONBOARDING_VERSION, shouldShowOnboarding } from '@core/onboarding';
 import { modelFamily, modelLabel } from '@core/summarize';
 import type { SessionView } from '@core/state';
 import { AgentDrawer } from './components/AgentDrawer';
 import { AgentGraph } from './components/AgentGraph';
+import { Tour, Welcome } from './components/Onboarding';
 import { LogPanel } from './components/LogPanel';
 import { ModePanel } from './components/ModePanel';
 import { Overview } from './components/Overview';
@@ -44,6 +46,8 @@ export function App() {
   const wallNow = useNow(1000);
   const { replay, start, stop, goto, setPlaying, setSpeed } = useReplay();
   const [showSettings, setShowSettings] = useState(false);
+  const [onboarding, setOnboarding] = useState<'none' | 'welcome' | 'tour'>('none');
+  const onboardingChecked = useRef(false);
   const [collapsed, setCollapsed] = useState(false);
   const [agentSel, setAgentSel] = useState<string | null>(null);
   const [logAgent, setLogAgent] = useState<string | null>(null);
@@ -66,6 +70,27 @@ export function App() {
   const openSession = (id: string) => {
     void window.api.select(id);
     setPage('session');
+  };
+
+  // first launch (or a newer tour version): show the welcome screen once per app start
+  useEffect(() => {
+    if (!config || onboardingChecked.current) return;
+    onboardingChecked.current = true;
+    void window.api.setupStatus().then((s) => {
+      if (shouldShowOnboarding(config, ONBOARDING_VERSION, s.skipOnboarding)) setOnboarding('welcome');
+    });
+  }, [config]);
+  // tray menu: "Show welcome & tour"
+  useEffect(() => window.api.onShowOnboarding(() => setOnboarding('welcome')), []);
+  const finishOnboarding = () => {
+    setOnboarding('none');
+    void window.api.setConfig({ onboardingDone: true, onboardingVersion: ONBOARDING_VERSION });
+  };
+  const startTour = () => {
+    // the tour points at the sidebar and the one-session page
+    setCollapsed(false);
+    setPage('session');
+    setOnboarding('tour');
   };
 
   // leaving the session ends replay and clears per-session selections
@@ -92,6 +117,7 @@ export function App() {
         onCollapse={() => setCollapsed(!collapsed)}
         page={page}
         onPage={setPage}
+        onHelp={() => setOnboarding('welcome')}
       />
       {page === 'overview' ? (
         <Overview onOpen={openSession} />
@@ -103,7 +129,7 @@ export function App() {
             </div>
             <UsageMeters />
             <div className="actions">
-              <button onClick={() => void window.api.openInClaude(view.id)} title="Open this session in the Claude desktop app">
+              <button data-tour="open-in-claude" onClick={() => void window.api.openInClaude(view.id)} title="Open this session in the Claude desktop app">
                 ↗ open in Claude
               </button>
               {replay ? (
@@ -115,10 +141,10 @@ export function App() {
                   ⟲ replay
                 </button>
               )}
-              <button onClick={() => void window.api.toggleMini()} title="Small always-on-top window">
+              <button data-tour="mini" onClick={() => void window.api.toggleMini()} title="Small always-on-top window">
                 ▣ mini
               </button>
-              <button onClick={() => setShowSettings(true)} title="Hooks and settings">
+              <button data-tour="hooks" onClick={() => setShowSettings(true)} title="Hooks and settings">
                 ⚙ hooks
               </button>
             </div>
@@ -153,14 +179,32 @@ export function App() {
           {selected ? (
             <div>loading session…</div>
           ) : (
-            <div>
-              <div style={{ fontSize: 15, color: 'var(--text)', marginBottom: 8 }}>No Claude Code sessions found yet</div>
-              <div>Start a session in the Claude desktop app or the CLI and it will appear here.</div>
+            <div className="getting-started" data-testid="empty-state">
+              <div className="gs-title">No Claude Code sessions found yet</div>
+              <ol>
+                <li>Install Claude Code: the <b>Code</b> tab in the Claude desktop app, or the <code>claude</code> command in a terminal.</li>
+                <li>Start a session and ask Claude something. It will show up here within a second or two, and this page fills in by itself.</li>
+                <li>Optional: run <code>claude /login</code> once so the usage meters work.</li>
+              </ol>
+              <button className="primary" onClick={() => setOnboarding('welcome')}>
+                open the welcome guide
+              </button>
             </div>
           )}
         </div>
       )}
-      {showSettings && config && <SettingsDialog config={config} hookSrv={hookSrv} onClose={() => setShowSettings(false)} />}
+      {showSettings && config && <SettingsDialog config={config} hookSrv={hookSrv} onClose={() => setShowSettings(false)} onWelcome={() => { setShowSettings(false); setOnboarding('welcome'); }} />}
+      {onboarding === 'welcome' && (
+        <Welcome
+          onTour={startTour}
+          onSkip={finishOnboarding}
+          onOpenSettings={() => {
+            setOnboarding('none');
+            setShowSettings(true);
+          }}
+        />
+      )}
+      {onboarding === 'tour' && <Tour onDone={finishOnboarding} />}
     </div>
   );
 }

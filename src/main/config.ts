@@ -9,6 +9,8 @@ export interface AppConfig {
   notifyAgentDone: boolean;
   closeToTray: boolean;
   miniAlwaysOnTop: boolean;
+  onboardingDone?: boolean;
+  onboardingVersion?: number;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {

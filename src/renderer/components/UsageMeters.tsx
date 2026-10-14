@@ -68,7 +68,7 @@ export function UsageMeters({ compact = false, usage: given }: { compact?: boole
   const problem = u?.api && u.api.state !== 'ok' ? u.api.message : null;
   const perModel = (u?.models ?? []).map((m) => `weekly ${m.label}: ${Math.round(m.window.pct)}%`);
   return (
-    <div className={`usage ${compact ? 'compact' : ''}`} onClick={() => void window.api.refreshUsage()} title="Click to refresh">
+    <div className={`usage ${compact ? 'compact' : ''}`} data-tour="usage" onClick={() => void window.api.refreshUsage()} title="Click to refresh">
       <Meter label={compact ? '5h' : '5-HOUR'} w={u?.fiveHour ?? null} span={WINDOW_MS.fiveHour} now={now} compact={compact} problem={problem} />
       <Meter label={compact ? 'wk' : 'WEEKLY'} w={u?.sevenDay ?? null} span={WINDOW_MS.sevenDay} now={now} compact={compact} problem={problem} extra={perModel} />
     </div>
