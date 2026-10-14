@@ -142,6 +142,58 @@ describe('app smoke (fixture data)', () => {
     await page.locator('.modebox').waitFor();
   });
 
+  it('rearranges, swaps, resizes and resets the panel layout', async () => {
+    const box = (sel: string) => page.locator(sel).boundingBox();
+    await page.getByTestId('layout-toggle').click();
+    await page.getByTestId('layout-bar').waitFor();
+
+    // preset: three columns puts the log to the right of the graph
+    await page.getByTestId('preset-columns').click();
+    await page.waitForTimeout(150);
+    await page.screenshot({ path: path.join(ART, 'layout-animating.png') });
+    await page.waitForTimeout(900);
+    const g = (await box('.lp-graph'))!;
+    const l = (await box('.lp-log'))!;
+    expect(l.x).toBeGreaterThan(g.x + g.width - 2);
+    await page.screenshot({ path: path.join(ART, 'layout-edit.png') });
+
+    // drag the mode panel onto the log panel: they swap places
+    const modeBefore = (await box('.lp-mode'))!;
+    const logBefore = (await box('.lp-log'))!;
+    await page.mouse.move(modeBefore.x + modeBefore.width / 2, modeBefore.y + modeBefore.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(logBefore.x + logBefore.width / 2, logBefore.y + logBefore.height / 2, { steps: 8 });
+    await page.locator('.lp-log.drop-target').waitFor();
+    await page.mouse.up();
+    await page.waitForTimeout(900);
+    expect(Math.abs((await box('.lp-mode'))!.x - logBefore.x)).toBeLessThan(4);
+
+    // done editing; resize the side slot by dragging its edge
+    await page.getByRole('button', { name: 'done' }).click();
+    const handle = page.locator('.lp-log .rz-right');
+    const hb = (await handle.boundingBox())!;
+    const before = (await box('.lp-log'))!.width;
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(hb.x + hb.width / 2 + 90, hb.y + 200, { steps: 6 });
+    await page.mouse.up();
+    expect((await box('.lp-log'))!.width).toBeGreaterThan(before + 60);
+
+    // hide the log from edit mode, then reset everything
+    await page.getByTestId('layout-toggle').click();
+    await page.getByRole('button', { name: '≡ log' }).click();
+    await page.waitForTimeout(700);
+    expect(await page.locator('.lp-log').count()).toBe(0);
+    await page.getByTestId('layout-reset').click();
+    await page.waitForTimeout(900);
+    const m = (await box('.lp-mode'))!;
+    const gr = (await box('.lp-graph'))!;
+    const lg = (await box('.lp-log'))!;
+    expect(m.x).toBeLessThan(gr.x);
+    expect(lg.y).toBeGreaterThan(gr.y + gr.height - 2);
+    await page.getByRole('button', { name: 'done' }).click();
+  });
+
   it('replays the session', async () => {
     await page.getByRole('button', { name: /replay/ }).click();
     await page.locator('.replaybar').waitFor();

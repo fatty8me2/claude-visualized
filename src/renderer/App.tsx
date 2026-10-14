@@ -14,6 +14,7 @@ import { StatusBar } from './components/StatusBar';
 import { UsageMeters } from './components/UsageMeters';
 import { useConfig, useHookServer, useLiveState, useNow, useSelected, useSessions } from './hooks';
 import { useReplay } from './replay';
+import { LayoutToolbar, PanelGrid, SidebarResizeHandle, usePanelLayout } from './layout';
 import { clock } from './util';
 
 const FAMILY_ROLE: Record<string, string> = { opus: 'plan / main', sonnet: 'build', haiku: 'search', fable: 'agents', other: 'other' };
@@ -52,6 +53,9 @@ export function App() {
   const [agentSel, setAgentSel] = useState<string | null>(null);
   const [logAgent, setLogAgent] = useState<string | null>(null);
   const [showFinished, setShowFinished] = useState(true);
+  const layoutApi = usePanelLayout();
+  const { layout } = layoutApi;
+  const [editingLayout, setEditingLayout] = useState(false);
   const [page, setPageState] = useState<Page>(() => {
     try {
       return localStorage.getItem('cvis.page') === 'overview' ? 'overview' : 'session';
@@ -110,7 +114,8 @@ export function App() {
   const summary = sessions.find((s) => s.id === selected);
 
   return (
-    <div className="app">
+    <div className={`app sidebar-${layout.sidebar.side}`}>
+      <div className="sidebar-wrap" data-flip="sidebar" style={collapsed ? undefined : { width: layout.sidebar.width }}>
       <SessionList
         sessions={sessions}
         selected={selected}
@@ -124,6 +129,8 @@ export function App() {
         onPage={setPage}
         onHelp={() => setOnboarding('welcome')}
       />
+      {!collapsed && <SidebarResizeHandle api={layoutApi} />}
+      </div>
       {page === 'overview' ? (
         <Overview onOpen={openSession} />
       ) : view ? (
@@ -152,16 +159,13 @@ export function App() {
               <button data-tour="hooks" onClick={() => setShowSettings(true)} title="Hooks and settings">
                 ⚙ hooks
               </button>
+              <button className={editingLayout ? 'on' : ''} onClick={() => setEditingLayout(!editingLayout)} title="Rearrange and resize the panels" data-testid="layout-toggle">
+                ⧉ layout
+              </button>
             </div>
           </div>
-          <Legend view={view} />
-          <div className="body">
-            <ModePanel view={view} now={now} hookSrv={hookSrv} />
-            <div style={{ position: 'relative', minWidth: 0, minHeight: 0, display: 'grid' }}>
-              <AgentGraph view={view} now={now} selectedAgent={agentSel} onSelect={setAgentSel} showFinished={showFinished} onToggleFinished={() => setShowFinished(!showFinished)} />
-              {agentSel && <AgentDrawer view={view} id={agentSel} now={now} onClose={() => setAgentSel(null)} onFilterLog={setLogAgent} />}
-            </div>
-          </div>
+          {editingLayout && <LayoutToolbar api={layoutApi} onDone={() => setEditingLayout(false)} />}
+          {!layout.hidden.legend && <div data-flip="legend"><Legend view={view} /></div>}
           {replay && (
             <div className="replaybar">
               <button onClick={() => setPlaying(!replay.playing)}>{replay.playing ? '❚❚' : '▶'}</button>
@@ -176,8 +180,21 @@ export function App() {
               </span>
             </div>
           )}
-          <LogPanel view={view} agentFilter={logAgent} onAgentFilter={setLogAgent} />
-          <StatusBar view={view} now={now} hookSrv={hookSrv} replaying={!!replay} />
+          <PanelGrid
+            api={layoutApi}
+            editing={editingLayout}
+            panels={{
+              mode: <ModePanel view={view} now={now} hookSrv={hookSrv} />,
+              graph: (
+                <div className="graph-host">
+                  <AgentGraph view={view} now={now} selectedAgent={agentSel} onSelect={setAgentSel} showFinished={showFinished} onToggleFinished={() => setShowFinished(!showFinished)} />
+                  {agentSel && <AgentDrawer view={view} id={agentSel} now={now} onClose={() => setAgentSel(null)} onFilterLog={setLogAgent} />}
+                </div>
+              ),
+              log: <LogPanel view={view} agentFilter={logAgent} onAgentFilter={setLogAgent} />,
+            }}
+          />
+          {!layout.hidden.status && <div data-flip="status"><StatusBar view={view} now={now} hookSrv={hookSrv} replaying={!!replay} /></div>}
         </div>
       ) : (
         <div className="empty">
