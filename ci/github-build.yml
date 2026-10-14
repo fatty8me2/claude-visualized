@@ -2,13 +2,13 @@ name: build
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
     tags: ['v*']
   pull_request:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,7 +17,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
+      - run: npx electron-vite build
+      # Playwright drives the built Electron app (_electron works on the Windows runner's desktop session)
+      - run: npx vitest run --config vitest.e2e.config.ts
+        env:
+          E2E_PORT: '47910'
 
   package:
     needs: test

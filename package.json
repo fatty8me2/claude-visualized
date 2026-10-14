@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "npm run build && node tests/e2e/smoke.mjs",
+    "test:e2e": "electron-vite build && vitest run --config vitest.e2e.config.ts",
     "icons": "node scripts/make-icons.mjs",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",

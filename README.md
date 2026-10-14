@@ -100,10 +100,28 @@ npm run dev
 | --- | --- |
 | `npm run dev` | run with hot reload |
 | `npm test` | unit tests (parser, reducer, tailer, installer merge, layout) |
+| `npm run typecheck` | `tsc --noEmit` over src and tests |
+| `npm run lint` | ESLint (flat config in `eslint.config.mjs`: typescript-eslint recommended + react-hooks) |
+| `npm run format` / `npm run format:check` | Prettier write / check over `src` and `tests` (config in `.prettierrc.json`) |
+| `npm run check` | typecheck + lint + unit tests: run this before committing |
+| `npm run test:e2e` | build, then run the Playwright e2e suite (set `E2E_PORT` to use another hook port) |
 | `REAL_DATA=1 npx vitest run tests/unit/real-data.test.ts` | fold every real session on this machine (read-only) |
 | `npm run build && npx vitest run --config vitest.e2e.config.ts` | launch the built app against fixture data with Playwright |
 | `npm run dist:win` / `npm run dist:mac` | installers in `release/<version>/` |
 | `npm run icons` | regenerate `build/icon.png` and the tray icons |
+
+Line endings are LF everywhere (`.gitattributes`, `.editorconfig`), except `Launch Claude Visualized.cmd` which stays CRLF.
+
+Where to add things:
+
+- **A page** (sidebar button + screen): one entry in `PAGES` in `src/renderer/views/pages.tsx`.
+- **A view in the session's graph panel** (e.g. a timeline): one entry in `GRAPH_VIEWS` in `src/renderer/views/graphViews.tsx`.
+- **IPC for a new area**: a module `src/main/ipc/<area>.ts` exporting a registrar, plus one line in `IPC_AREAS` in `src/main/ipc/registry.ts`.
+
+CI (`ci/github-build.yml`) runs typecheck, lint, unit tests, build and the e2e suite on `windows-latest`, then builds the Windows installer and the mac dmg.
+It lives in `ci/` because pushing to `.github/workflows/` needs a GitHub token with the `workflow` scope. To enable it, move the file
+(`git mv ci/github-build.yml .github/workflows/build.yml`) and push with such a token (or add the file in the GitHub web UI). Note its `push` trigger is for
+the `main` branch; change it if your default branch is named differently.
 
 Environment overrides (mainly for tests):
 
