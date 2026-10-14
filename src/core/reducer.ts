@@ -13,6 +13,32 @@ import {
   type SessionState,
 } from './state';
 import { summarizeTool, toolLabel } from './summarize';
+import { toolCategory } from './goal';
+import { COMMANDS_CAP, FILES_CAP, PROMPT_CAP, RECENT_CAP } from './state';
+
+const FILE_TOOLS = new Set(['Read', 'Edit', 'MultiEdit', 'Write', 'NotebookEdit']);
+
+/** per-agent bookkeeping for one tool call: mix, recent list, files, commands */
+function recordTool(a: AgentNode, id: string, name: string, input: unknown, summary: string, ts: number) {
+  const cat = toolCategory(name, input);
+  a.toolMix[cat] = (a.toolMix[cat] ?? 0) + 1;
+  a.recent.push({ id, name, summary, ts, ok: null });
+  if (a.recent.length > RECENT_CAP) a.recent.splice(0, a.recent.length - RECENT_CAP);
+  const i = (input && typeof input === 'object' ? input : {}) as Json;
+  if (FILE_TOOLS.has(name)) {
+    const p = typeof i.file_path === 'string' ? i.file_path : typeof i.notebook_path === 'string' ? i.notebook_path : '';
+    if (p) {
+      const at = a.files.indexOf(p);
+      if (at >= 0) a.files.splice(at, 1);
+      a.files.push(p);
+      if (a.files.length > FILES_CAP) a.files.splice(0, a.files.length - FILES_CAP);
+    }
+  } else if ((name === 'Bash' || name === 'PowerShell') && typeof i.command === 'string' && i.command.trim()) {
+    const cmd = i.command.trim();
+    if (a.commands[a.commands.length - 1] !== cmd) a.commands.push(cmd);
+    if (a.commands.length > COMMANDS_CAP) a.commands.splice(0, a.commands.length - COMMANDS_CAP);
+  }
+}
 
 type Json = Record<string, any>;
 
@@ -89,7 +115,7 @@ function refreshCurrentTool(s: SessionState, a: AgentNode) {
   for (const [id, p] of Object.entries(s.internal.pending)) {
     if (p.agentId === a.id && (!best || p.start > best.start)) best = { id, ...p };
   }
-  a.currentTool = best ? { id: best.id, name: best.name, summary: summarizeTool(best.name, best.input), since: best.start } : null;
+  a.currentTool = best ? { id: best.id, name: best.name, summary: summarizeTool(best.name, best.input), since: best.start, input: best.input } : null;
 }
 
 function setTodo(s: SessionState, id: string, patch: { text?: string; status?: string }, owner: string) {
@@ -172,6 +198,8 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
         s.titleKind = 'prompt';
       }
       if (a.kind === 'agent' && !a.description) a.description = text.slice(0, 120);
+      // the task: a subagent's first line, the main agent's latest prompt
+      if (a.kind === 'main' || (a.kind === 'agent' && !a.prompt)) a.prompt = e.text.trim().slice(0, PROMPT_CAP);
       break;
     }
     case 'tool.start': {
@@ -186,7 +214,8 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
         s.internal.pending[e.toolUseId] = { agentId: a.id, name: e.name, input: e.input, start: ts };
         const summary = summarizeTool(e.name, e.input);
         log(s, ts, a.id, 'tool', `${toolLabel(e.name)}${summary ? '  ' + summary : ''}`);
-        a.currentTool = { id: e.toolUseId, name: e.name, summary, since: ts };
+        a.currentTool = { id: e.toolUseId, name: e.name, summary, since: ts, input: e.input };
+        recordTool(a, e.toolUseId, e.name, e.input, summary, ts);
         // late parent resolution for children whose meta was read before this call
         if (e.name === 'Agent' || e.name === 'Task') {
           for (const c of Object.values(s.agents)) {
@@ -210,6 +239,8 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       const name = p?.name ?? e.name ?? '';
       if (p) {
         delete s.internal.pending[e.toolUseId];
+        const rec = a.recent.find((r) => r.id === e.toolUseId);
+        if (rec) rec.ok = e.ok;
         if (!e.ok) {
           a.errorCount++;
           log(s, ts, a.id, 'tool-error', `${toolLabel(name)} failed`);
@@ -317,6 +348,7 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       const a = ensureAgent(s, e.ref.agentId, ts);
       touch(s, a, ts);
       a.lastText = e.preview;
+      a.lastTextAt = ts;
       log(s, ts, a.id, 'text', e.preview.replace(/\s+/g, ' '));
       break;
     }

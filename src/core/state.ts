@@ -1,4 +1,5 @@
 import type { UsageNumbers } from './events';
+import type { ToolMix } from './goal';
 
 export type AgentStatus = 'running' | 'waiting' | 'idle' | 'done' | 'error';
 
@@ -7,7 +8,23 @@ export interface CurrentTool {
   name: string;
   summary: string;
   since: number;
+  /** compact tool input (strings clipped), for plain-English activity phrases */
+  input?: unknown;
 }
+
+export interface RecentTool {
+  id: string;
+  name: string;
+  summary: string;
+  ts: number;
+  /** null while the call is still running */
+  ok: boolean | null;
+}
+
+export const RECENT_CAP = 10;
+export const FILES_CAP = 30;
+export const COMMANDS_CAP = 10;
+export const PROMPT_CAP = 600;
 
 export interface AgentNode {
   /** 'main' for the session's main agent, 'wf:<runId>' for a workflow group, else the subagent id */
@@ -39,6 +56,17 @@ export interface AgentNode {
   /** tool_use id of the spawning Agent call, used to resolve the parent lazily */
   parentToolUseId: string | null;
   lastText: string | null;
+  lastTextAt: number;
+  /** tool calls by category, for the goal classifier and the drawer bars */
+  toolMix: ToolMix;
+  /** the task: first prompt of a subagent (~600 chars), latest prompt of the main agent */
+  prompt: string | null;
+  /** last ~10 tool calls, oldest first */
+  recent: RecentTool[];
+  /** files read or edited, most recent last, at most 30 */
+  files: string[];
+  /** shell commands run, most recent last, at most 10 */
+  commands: string[];
 }
 
 export interface TodoItem {
@@ -142,6 +170,12 @@ export function newAgent(id: string, kind: AgentNode['kind'], ts: number, parent
     phase: null,
     parentToolUseId: null,
     lastText: null,
+    lastTextAt: 0,
+    toolMix: {},
+    prompt: null,
+    recent: [],
+    files: [],
+    commands: [],
   };
 }
 

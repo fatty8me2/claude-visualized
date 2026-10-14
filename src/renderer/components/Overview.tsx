@@ -1,6 +1,9 @@
 import { MAIN, type SessionView } from '@core/state';
 import { CtxChip } from './ContextMeter';
-import { formatTokens, modelLabel, toolLabel } from '@core/summarize';
+import { GOAL_INFO } from '@core/goal';
+import { agentGoal, agentInsight } from '@core/insight';
+import { formatTokens, modelLabel } from '@core/summarize';
+import { GoalBadge } from './GoalBadge';
 import { useNow, useOverview } from '../hooks';
 import { agentName, ago, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
 import { AgentGraph } from './AgentGraph';
@@ -57,9 +60,20 @@ function Panel({ v, index, now, onOpen }: { v: SessionView; index: number; now: 
           ↗ Claude
         </button>
       </header>
-      {main?.currentTool && (
+      {main && (
         <div className={`ov-tool ${famClass(main.model)}`}>
-          ⚙ <span style={{ color: 'var(--fam)' }}>{toolLabel(main.currentTool.name)}</span> {main.currentTool.summary}
+          <GoalBadge goal={agentGoal(main, plan)} glyphOnly /> <span className="lbl">now:</span> {agentInsight(v.agents, main, now, plan).activity.line}
+          {running > 0 && (
+            <span className="ov-subs">
+              {' '}
+              ·{' '}
+              {subs
+                .filter((a) => a.status === 'running')
+                .slice(0, 3)
+                .map((a) => `${GOAL_INFO[agentGoal(a).goal].glyph} ${agentName(a)}: ${agentInsight(v.agents, a, now).activity.phrase}`)
+                .join('  ·  ')}
+            </span>
+          )}
         </div>
       )}
       <div className="ov-graph">

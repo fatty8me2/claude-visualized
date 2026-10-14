@@ -1,5 +1,7 @@
 import { MAIN } from '@core/state';
-import { modelLabel, toolLabel } from '@core/summarize';
+import { agentGoal, agentInsight } from '@core/insight';
+import { modelLabel } from '@core/summarize';
+import { GoalBadge } from './GoalBadge';
 import { useLiveState, useNow } from '../hooks';
 import { CtxChip } from './ContextMeter';
 import { UsageMeters } from './UsageMeters';
@@ -38,23 +40,25 @@ export function MiniView() {
             <b style={{ color: 'var(--fam)' }}>{modelLabel(main.model)}</b>
             <span className={`status ${st}`}>{STATUS_GLYPH[st]}</span>
             <CtxChip agent={main} />
-            {main.currentTool && (
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                ⚙ {toolLabel(main.currentTool.name)} {main.currentTool.summary}
-              </span>
-            )}
+            <GoalBadge goal={agentGoal(main, plan)} glyphOnly />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }} data-testid="mini-now">
+              {agentInsight(view.agents, main, now, plan).activity.line}
+            </span>
           </div>
           {(running.length > 0 || recentDone.length > 0) && (
             <div className="mini-chips">
-              {running.map((a) => (
-                <span key={a.id} className={`mini-chip ${famClass(a.model)}`} title={a.description}>
-                  ◐ {agentName(a)}
-                  {a.currentTool ? ` · ${toolLabel(a.currentTool.name)}` : ''}
-                </span>
-              ))}
+              {running.map((a) => {
+                const ins = agentInsight(view.agents, a, now);
+                return (
+                  <span key={a.id} className={`mini-chip ${famClass(a.model)}`} title={`${a.description}\n${ins.goal.because}`}>
+                    <GoalBadge goal={ins.goal} glyphOnly /> {agentName(a)} · {ins.activity.line}
+                  </span>
+                );
+              })}
               {recentDone.map((a) => (
                 <span key={a.id} className={`mini-chip done ${famClass(a.model)}`} title={a.description}>
-                  ✓ {agentName(a)}
+                  <GoalBadge goal={agentGoal(a)} glyphOnly /> ✓ {agentName(a)}
+                  {a.description ? ` · ${a.description}` : ''}
                 </span>
               ))}
             </div>

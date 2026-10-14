@@ -57,6 +57,30 @@ describe('app smoke (fixture data)', () => {
     await page.screenshot({ path: path.join(ART, 'fixture.png') });
   });
 
+  it('labels each agent with its goal and shows a detail drawer', async () => {
+    expect(await page.locator('[data-agent="a2"] [data-goal]').getAttribute('data-goal')).toBe('test');
+    expect(await page.locator('[data-agent="a1"] [data-goal]').getAttribute('data-goal')).toBe('search');
+    expect(await page.locator('[data-agent="wf:wf_x"] [data-goal]').getAttribute('data-goal')).toBe('workflow');
+    expect(await page.locator('[data-agent="a1"] [data-testid="now"]').innerText()).toContain('finished: Found it in src/api.ts');
+    await page.screenshot({ path: path.join(ART, 'agent-cards.png') });
+
+    await page.locator('[data-agent="a2"]').click();
+    const drawer = page.getByTestId('drawer');
+    await drawer.waitFor();
+    expect(await drawer.getByTestId('because').innerText()).toContain('test');
+    expect(await drawer.getByTestId('drawer-now').innerText()).toContain('finished');
+    const timeline = await drawer.getByTestId('timeline').innerText();
+    expect(timeline).toContain('Bash');
+    expect(timeline).toContain('npm test');
+    expect(await drawer.getByTestId('commands').innerText()).toContain('npm test');
+    await page.screenshot({ path: path.join(ART, 'agent-drawer.png') });
+    await page.locator('[data-agent="a1"]').click();
+    expect(await drawer.getByTestId('task').innerText()).toBe('find it');
+    expect(await drawer.getByTestId('files').count()).toBe(0);
+    await drawer.getByRole('button', { name: '×' }).click();
+    await drawer.waitFor({ state: 'detached' });
+  });
+
   it('picks up a new subagent written to disk', async () => {
     const sub = path.join(home, 'projects', 'C--demo-app', SID, 'subagents');
     fs.writeFileSync(path.join(sub, 'agent-a9.meta.json'), JSON.stringify({ agentType: 'Plan', description: 'design the docs update', toolUseId: 'toolu_new' }));
@@ -66,7 +90,8 @@ describe('app smoke (fixture data)', () => {
     );
     const card = page.locator('[data-agent="a9"]');
     await card.waitFor({ timeout: 10_000 });
-    expect(await card.innerText()).toContain('Glob');
+    expect(await card.innerText()).toContain('finding files (docs/**/*.md)');
+    expect(await card.locator('[data-goal]').getAttribute('data-goal')).toBe('plan');
     expect(await card.locator('.status').innerText()).toContain('running');
   });
 

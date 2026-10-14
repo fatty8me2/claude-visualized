@@ -44,7 +44,7 @@ export interface LayoutOptions {
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
   nodeW: 240,
-  nodeH: 158,
+  nodeH: 182,
   mainW: 330,
   mainH: 132,
   gapX: 22,

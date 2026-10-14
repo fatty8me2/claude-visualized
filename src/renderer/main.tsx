@@ -2,6 +2,7 @@ import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/600.css';
 import '@fontsource/jetbrains-mono/700.css';
 import './theme.css';
+import './agentInfo.css';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { MiniView } from './components/MiniView';

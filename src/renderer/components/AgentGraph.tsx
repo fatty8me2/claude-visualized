@@ -1,7 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { describeActivity, firstLine } from '@core/activity';
+import { agentGoal } from '@core/insight';
+import { GoalBadge } from './GoalBadge';
 import { DEFAULT_LAYOUT, layoutAgents } from '@core/layout';
 import { MAIN, type AgentNode, type SessionView } from '@core/state';
-import { formatDuration, formatTokens, modeLabel, modelLabel, toolLabel } from '@core/summarize';
+import { formatDuration, formatTokens, modeLabel, modelLabel } from '@core/summarize';
 import { CtxChip } from './ContextMeter';
 import { agentName, displayStatus, famClass, STATUS_GLYPH, type DisplayStatus } from '../util';
 
@@ -41,6 +44,12 @@ function NodeCard({ a, view, now, x, y, w, h, selected, onSelect }: { a: AgentNo
   const isMain = a.kind === 'main';
   const model = a.model ? modelLabel(a.model) : a.kind === 'workflow' ? 'workflow' : '—';
   const children = Object.values(view.agents).filter((c) => c.parentId === a.id && c.id !== a.id);
+  const plan = view.mode === 'plan';
+  const goal = useMemo(() => agentGoal(a, plan), [a.toolCount, a.description, a.prompt, a.phase, a.agentType, a.kind, plan]); // eslint-disable-line react-hooks/exhaustive-deps
+  const runningKids = children.filter((c) => c.status === 'running').length;
+  const act = describeActivity(a, { now, runningChildren: runningKids, totalChildren: children.length });
+  // a finished card already says what it ended with; otherwise show the agent's own last sentence
+  const says = act.kind === 'finished' || act.kind === 'idle' ? '' : firstLine(a.lastText, 120);
   return (
     <div
       className={`node ${famClass(a.model)} ${st === 'idle' && !isMain ? 'idle-agent' : st} ${isMain ? 'main' : ''} ${selected ? 'sel' : ''}`}
@@ -50,7 +59,7 @@ function NodeCard({ a, view, now, x, y, w, h, selected, onSelect }: { a: AgentNo
     >
       <div className="row1">
         <span className="name">{isMain ? `${model} · main` : agentName(a)}</span>
-        {!isMain && <span className={`status ${st}`}>{STATUS_GLYPH[st]}</span>}
+        <GoalBadge goal={goal} />
       </div>
       {isMain ? (
         <>
@@ -63,29 +72,22 @@ function NodeCard({ a, view, now, x, y, w, h, selected, onSelect }: { a: AgentNo
           </div>
         </>
       ) : (
-        <div className="model">
-          {model}
-          {a.phase ? ` · ${a.phase}` : ''}
-          {a.background ? ' · bg' : ''}
+        <div className="model2">
+          <span className="model">
+            {model}
+            {a.phase ? ` · ${a.phase}` : ''}
+            {a.background ? ' · bg' : ''}
+          </span>
+          <span className={`status ${st}`}>{STATUS_GLYPH[st]}</span>
         </div>
       )}
       <Bar status={st} />
       {!isMain && <div className="desc">{a.description || a.lastText || ''}</div>}
-      <div className="tool">
-        {a.currentTool ? (
-          <>
-            ⚙ <span className="tn">{toolLabel(a.currentTool.name)}</span> {a.currentTool.summary}
-          </>
-        ) : a.kind === 'workflow' ? (
-          <span style={{ color: 'var(--muted)' }}>
-            {children.filter((c) => c.status === 'running').length}/{children.length} agents running
-          </span>
-        ) : (
-          <span style={{ color: 'var(--muted)' }}>
-            {st === 'done' ? 'returned to parent' : st === 'error' ? 'stopped' : st === 'idle' ? (isMain ? 'waiting for your next prompt' : 'idle') : st === 'waiting' ? 'waiting on you' : st === 'quiet' ? 'no recent activity' : 'thinking…'}
-          </span>
-        )}
+      <div className={`now ${act.kind}`} title={act.line} data-testid="now">
+        <span className="lbl">now:</span> {act.phrase}
+        {act.since != null && now - act.since >= 1000 && <span className="dur"> · {formatDuration(now - act.since)}</span>}
       </div>
+      {!isMain && <div className="says" title={a.lastText ?? ''}>{says ? <>says: {says}</> : null}</div>}
       <div className="meta">
         <span>
           {a.toolCount} tools · {formatDuration(elapsed)} · {formatTokens(totalTokens(a))} tok
