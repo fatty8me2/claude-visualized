@@ -19,7 +19,7 @@ async function launch(env: Record<string, string>) {
   const app = await electron.launch({
     args: [ROOT],
     cwd: ROOT,
-    env: { ...process.env, CLAUDE_VIS_USER_DATA: userData, CLAUDE_VIS_PORT: String(PORT), CLAUDE_VIS_NO_EXTERNAL: '1', CLAUDE_VIS_NO_USAGE_API: '1', CLAUDE_VIS_DESKTOP_DIR: path.join(userData, 'no-desktop'), ...env } as Record<string, string>,
+    env: { ...process.env, CLAUDE_VIS_USER_DATA: userData, CLAUDE_VIS_PORT: String(PORT), CLAUDE_VIS_NO_EXTERNAL: '1', CLAUDE_VIS_NO_SYSTEM_INTEGRATION: '1', CLAUDE_VIS_NO_USAGE_API: '1', CLAUDE_VIS_DESKTOP_DIR: path.join(userData, 'no-desktop'), ...env } as Record<string, string>,
   });
   const page = await app.firstWindow();
   await page.setViewportSize({ width: 1440, height: 920 }).catch(() => {});
@@ -96,6 +96,26 @@ describe('app smoke (fixture data)', () => {
     expect(await mini.locator('.mini-chip').count()).toBeGreaterThan(0);
     await mini.screenshot({ path: path.join(ART, 'mini.png') });
     await mini.close();
+  });
+
+  it('settings dialog offers launch-at-login and the mini hotkey', async () => {
+    await page.getByRole('button', { name: /hooks/ }).click();
+    const login = page.getByLabel(/Start with Windows|Start at login/);
+    await login.waitFor({ timeout: 5000 });
+    expect(await login.isChecked()).toBe(false);
+    expect(await page.locator('.dialog').innerText()).toContain('disabled in this run');
+    const hk = page.getByLabel('Mini view hotkey');
+    expect(await hk.inputValue()).toBe('CommandOrControl+Alt+V');
+    // invalid shortcuts are rejected without touching the config
+    await hk.fill('CommandOrControl+V');
+    await page.getByRole('button', { name: 'Apply' }).first().click();
+    await page.getByText(/clash with copy\/paste/).waitFor({ timeout: 5000 });
+    // a valid one is accepted and stored
+    await hk.fill('Ctrl+Alt+M');
+    await page.getByRole('button', { name: 'Apply' }).first().click();
+    await page.getByText('Registered Ctrl+Alt+M').waitFor({ timeout: 5000 });
+    expect(JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).miniHotkey).toBe('Ctrl+Alt+M');
+    await page.getByRole('button', { name: '×' }).click();
   });
 
   it('shows every live session side by side on the overview page', async () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AppConfigView, HookPreviewView, HookServerStatusView, HookStateView } from '@core/api';
+import type { AppConfigView, HookPreviewView, HookServerStatusView, HookStateView, SystemInfoView } from '@core/api';
 
 const STATE_TEXT: Record<string, [string, string]> = {
   installed: ['installed', 'ok'],
@@ -15,6 +15,20 @@ export function SettingsDialog({ config, hookSrv, onClose }: { config: AppConfig
   const [result, setResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [port, setPort] = useState(String(config.port));
+  const [sys, setSys] = useState<SystemInfoView | null>(null);
+  const [hotkey, setHotkey] = useState(config.miniHotkey);
+  const [hotkeyMsg, setHotkeyMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    void window.api.getSystemInfo().then(setSys);
+    return window.api.onSystemInfo(setSys);
+  }, []);
+  const applyHotkey = async () => {
+    const r = await window.api.applyHotkey(hotkey);
+    setHotkeyMsg(r.ok ? { ok: true, text: `Registered ${r.accelerator}` } : { ok: false, text: r.error ?? 'Could not register that shortcut.' });
+    if (r.ok && r.accelerator) setHotkey(r.accelerator);
+  };
+  const loginName = window.api.platform === 'darwin' ? 'Start at login' : 'Start with Windows';
 
   const refresh = () => void window.api.hookState().then(setHs);
   useEffect(refresh, [config.port]);
@@ -143,6 +157,34 @@ export function SettingsDialog({ config, hookSrv, onClose }: { config: AppConfig
           <input type="checkbox" checked={config.miniAlwaysOnTop} onChange={(e) => set({ miniAlwaysOnTop: e.target.checked })} />
           Mini view stays on top of other windows
         </label>
+        <label className="chk">
+          <input type="checkbox" checked={config.launchAtLogin} onChange={(e) => set({ launchAtLogin: e.target.checked })} />
+          {loginName} (opens hidden in the tray)
+          {sys && sys.login !== 'active' && <span className="note"> {sys.login === 'dev' ? '— takes effect in the installed app' : '— disabled in this run'}</span>}
+        </label>
+        <div className="row">
+          <span>Mini view hotkey</span>
+          <input
+            style={{ width: 190 }}
+            aria-label="Mini view hotkey"
+            value={hotkey}
+            onChange={(e) => {
+              setHotkey(e.target.value);
+              setHotkeyMsg(null);
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && void applyHotkey()}
+          />
+          <button disabled={!hotkey.trim() || (hotkey.trim() === config.miniHotkey && sys?.hotkey.registered !== false)} onClick={() => void applyHotkey()}>
+            Apply
+          </button>
+          {hotkeyMsg ? (
+            <span style={{ color: hotkeyMsg.ok ? 'var(--ok)' : 'var(--err)' }}>{hotkeyMsg.text}</span>
+          ) : sys && !sys.hotkey.registered && sys.hotkey.error ? (
+            <span style={{ color: 'var(--err)' }}>{sys.hotkey.error}</span>
+          ) : (
+            <span className="note">toggles the mini view from anywhere, e.g. CommandOrControl+Alt+V</span>
+          )}
+        </div>
         <div className="row">
           <span>Receiver port</span>
           <input style={{ width: 90 }} value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))} />

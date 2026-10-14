@@ -1,6 +1,8 @@
 import path from 'node:path';
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, shell, Tray } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notification, shell, Tray } from 'electron';
 import { loadConfig, saveConfig, type AppConfig } from './config';
+import type { SystemInfoView } from '@core/api';
+import { loginSupport, shouldShowOnSecondInstance, shouldStartHidden, validateHotkey } from '@core/system';
 import { HookServer } from './hookServer';
 import fs from 'node:fs';
 import { applyQuota, applyStatusline, applyUsageApi, emptyUsage, settleUsage, type UsageView } from '@core/usage';
@@ -19,6 +21,78 @@ let miniWin: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
 let config: AppConfig;
+/** launched by the login item: keep the main window hidden until the user asks for it */
+let startHidden = false;
+/** tray "Open settings" used while the main window was still loading */
+let pendingOpenSettings = false;
+
+// ---- OS integration: launch at login + global hotkey (never touched in tests) ----
+const LOGIN_ARGS = ['--hidden'];
+const noIntegration = !!process.env.CLAUDE_VIS_NO_SYSTEM_INTEGRATION;
+const loginMode = () => loginSupport(app.isPackaged, noIntegration);
+let registeredHotkey: string | null = null;
+let hotkeyError: string | null = null;
+
+function systemInfo(): SystemInfoView {
+  return { login: loginMode(), hotkey: { registered: registeredHotkey !== null, error: hotkeyError }, platform: process.platform };
+}
+
+function broadcastSystem() {
+  broadcast('systeminfo', systemInfo());
+  rebuildTrayMenu();
+}
+
+/** The OS is the source of truth for the login item (the user can switch it off in Task Manager / Settings). */
+function readLoginItem(): boolean {
+  return app.getLoginItemSettings({ args: LOGIN_ARGS }).openAtLogin;
+}
+
+function applyLoginItem(on: boolean) {
+  if (loginMode() !== 'active') return; // dev would register electron.exe; tests must not touch the machine
+  try {
+    app.setLoginItemSettings({ openAtLogin: on, args: LOGIN_ARGS });
+    config.launchAtLogin = readLoginItem();
+  } catch (e) {
+    console.error('login item failed', e);
+  }
+}
+
+function tryRegisterHotkey(acc: string): string | null {
+  try {
+    return globalShortcut.register(acc, toggleMini) ? null : `${acc} is already in use by another app, or the system doesn't allow it.`;
+  } catch (e) {
+    return `Invalid shortcut: ${(e as Error).message}`;
+  }
+}
+
+/** Register the configured hotkey at startup. */
+function registerStartupHotkey() {
+  if (noIntegration) return;
+  const v = validateHotkey(config.miniHotkey);
+  const err = v.ok ? tryRegisterHotkey(v.accelerator) : v.error;
+  if (!err && v.ok) registeredHotkey = v.accelerator;
+  hotkeyError = err;
+}
+
+/** Validate and switch to a new hotkey; the previous one stays active if the new one can't be registered. */
+function applyHotkey(raw: string): { ok: boolean; error?: string; accelerator?: string } {
+  const v = validateHotkey(raw);
+  if (!v.ok) return { ok: false, error: v.error };
+  if (noIntegration) {
+    updateConfig({ miniHotkey: v.accelerator });
+    return { ok: true, accelerator: v.accelerator };
+  }
+  if (v.accelerator !== registeredHotkey) {
+    const err = tryRegisterHotkey(v.accelerator);
+    if (err) return { ok: false, error: err };
+    if (registeredHotkey) globalShortcut.unregister(registeredHotkey);
+    registeredHotkey = v.accelerator;
+  }
+  hotkeyError = null;
+  updateConfig({ miniHotkey: v.accelerator });
+  broadcastSystem();
+  return { ok: true, accelerator: v.accelerator };
+}
 
 const manager = new SessionManager();
 // ---- 5-hour / weekly usage limits, persisted so they show right after a restart ----
@@ -106,7 +180,9 @@ function createMain() {
     show: false,
     webPreferences: webPrefs(false),
   });
-  mainWin.once('ready-to-show', () => mainWin?.show());
+  mainWin.once('ready-to-show', () => {
+    if (!startHidden) mainWin?.show();
+  });
   mainWin.on('close', (e) => {
     if (!quitting && config.closeToTray && tray) {
       e.preventDefault();
@@ -122,12 +198,22 @@ function createMain() {
 }
 
 function showMain() {
+  startHidden = false;
   if (!mainWin) createMain();
   else {
     if (mainWin.isMinimized()) mainWin.restore();
     mainWin.show();
     mainWin.focus();
   }
+}
+
+function openSettings() {
+  const fresh = !mainWin;
+  showMain();
+  const wc = mainWin?.webContents;
+  if (!wc) return;
+  if (fresh || wc.isLoading()) pendingOpenSettings = true; // the renderer asks for it once mounted
+  else wc.send('ui:openSettings');
 }
 
 function toggleMini() {
@@ -178,7 +264,7 @@ function rebuildTrayMenu() {
   updateTrayTooltip();
   const sessions = manager.getSummaries().filter((s) => s.live).slice(0, 8);
   // rebuilding an open native menu makes it flicker; only rebuild when something visible changed
-  const sig = JSON.stringify([sessions.map((s) => [s.id, s.title, s.running, s.waiting]), !!miniWin, manager.followActive]);
+  const sig = JSON.stringify([sessions.map((s) => [s.id, s.title, s.running, s.waiting]), !!miniWin, manager.followActive, config.launchAtLogin, config.miniHotkey, registeredHotkey]);
   if (sig === traySignature) return;
   traySignature = sig;
   const items: Electron.MenuItemConstructorOptions[] = [
@@ -192,7 +278,8 @@ function rebuildTrayMenu() {
     })),
     { type: 'separator' },
     { label: 'Show window', click: showMain },
-    { label: miniWin ? 'Close mini view' : 'Mini view (always on top)', click: toggleMini },
+    { label: `${miniWin ? 'Close mini view' : 'Mini view'}${registeredHotkey ? ` (${registeredHotkey})` : ''}`, click: toggleMini },
+    { label: 'Open settings', click: openSettings },
     {
       label: 'Follow active session',
       type: 'checkbox',
@@ -201,6 +288,12 @@ function rebuildTrayMenu() {
         manager.setFollow(mi.checked);
         updateConfig({ followActive: mi.checked });
       },
+    },
+    {
+      label: process.platform === 'darwin' ? 'Start at login' : 'Start with Windows',
+      type: 'checkbox',
+      checked: config.launchAtLogin,
+      click: (mi) => updateConfig({ launchAtLogin: mi.checked }),
     },
     { type: 'separator' },
     {
@@ -228,6 +321,10 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
   manager.notifyAttention = config.notifyAttention;
   manager.notifyAgentDone = config.notifyAgentDone;
   if (patch.followActive !== undefined) manager.setFollow(config.followActive);
+  if (patch.launchAtLogin !== undefined) {
+    applyLoginItem(config.launchAtLogin);
+    saveConfig(config); // may differ from the request if the OS refused
+  }
   if (config.port !== prevPort) hookServer.start(config.port);
   if (miniWin && patch.miniAlwaysOnTop !== undefined) miniWin.setAlwaysOnTop(config.miniAlwaysOnTop, 'floating');
   broadcast('config', config);
@@ -300,6 +397,13 @@ function registerIpc() {
       return { ok: false, error: (e as Error).message };
     }
   });
+  ipcMain.handle('system:info', () => systemInfo());
+  ipcMain.handle('hotkey:apply', (_e, acc: string) => applyHotkey(String(acc ?? '')));
+  ipcMain.handle('ui:takeOpenSettings', () => {
+    const p = pendingOpenSettings;
+    pendingOpenSettings = false;
+    return p;
+  });
   ipcMain.handle('mini:toggle', () => toggleMini());
   ipcMain.handle('main:show', () => showMain());
   ipcMain.handle('path:open', (_e, p: string) => {
@@ -310,7 +414,10 @@ function registerIpc() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', showMain);
+  app.on('second-instance', (_e, argv) => {
+    // a hidden (login) launch must not pop the window; a normal launch brings it up
+    if (shouldShowOnSecondInstance(argv)) showMain();
+  });
   app.whenReady().then(() => {
     if (process.platform === 'win32') app.setAppUserModelId('com.fatty8me2.claudevisualized');
     config = loadConfig();
@@ -336,14 +443,27 @@ if (!app.requestSingleInstanceLock()) {
     void getHookState(config.port).then((h) => {
       if (h.statusLine === 'ours') void writeStatusLineScript(config.port);
     });
+    // reflect the real OS login-item state (the user may have switched it off outside the app)
+    if (loginMode() === 'active') {
+      try {
+        config.launchAtLogin = readLoginItem();
+        saveConfig(config);
+      } catch (e) {
+        console.error('login item read failed', e);
+      }
+    }
+    registerStartupHotkey();
     manager.start();
     if (!process.env.CLAUDE_VIS_NO_HOOK_SERVER) hookServer.start(config.port);
     if (!process.env.CLAUDE_VIS_NO_TRAY) createTray();
+    const openedAtLogin = process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin;
+    startHidden = shouldStartHidden(process.argv, openedAtLogin, !!tray);
     createMain();
     app.on('activate', showMain);
   });
   app.on('before-quit', () => {
     quitting = true;
+    globalShortcut.unregisterAll();
     manager.stop();
     hookServer.stop();
   });
