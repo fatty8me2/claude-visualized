@@ -4,7 +4,7 @@ import type { AgentEvent } from '@core/events';
 import { normalizeJournalLine, normalizeLine, normalizeMeta } from '@core/normalize';
 import { apply } from '@core/reducer';
 import { newSession, type SessionState } from '@core/state';
-import { FileTail } from './tail';
+import { FileTail, type TailSnapshot } from './tail';
 
 interface AgentFile {
   tail: FileTail;
@@ -13,6 +13,20 @@ interface AgentFile {
   spawned: boolean;
   firstSeen: number;
 }
+
+/** Everything a worker learned from the initial read, enough for the main thread to carry on tailing. */
+export interface BacklogSnapshot {
+  state: SessionState;
+  main: TailSnapshot;
+  agents: { file: string; agentId: string; workflowRunId?: string; spawned: boolean; firstSeen: number; tail: TailSnapshot }[];
+  journals: { runId: string; file: string; tail: TailSnapshot }[];
+  titleMtime: number;
+  /** the sorted backlog, only when requested (replay) */
+  events?: AgentEvent[];
+}
+
+/** Loads a session's initial backlog off the main thread. */
+export type BacklogLoader = (sessionId: string, mainFile: string, wantEvents: boolean) => Promise<BacklogSnapshot>;
 
 const AGENT_RE = /^agent-([A-Za-z0-9_-]+)\.jsonl$/;
 
@@ -36,6 +50,7 @@ export class SessionWatcher {
   constructor(
     readonly sessionId: string,
     readonly mainFile: string,
+    private loader?: BacklogLoader,
   ) {
     this.state = newSession(sessionId);
     this.main = new FileTail(mainFile);
@@ -98,10 +113,68 @@ export class SessionWatcher {
     this.titleMtime = 0;
   }
 
+  /** Snapshot of the folded state and tail positions, for handing over to another thread. */
+  snapshot(events?: AgentEvent[]): BacklogSnapshot {
+    return {
+      state: this.state,
+      main: this.main.snapshot(),
+      agents: [...this.agents.values()].map((a) => ({ file: a.tail.file, agentId: a.agentId, workflowRunId: a.workflowRunId, spawned: a.spawned, firstSeen: a.firstSeen, tail: a.tail.snapshot() })),
+      journals: [...this.journals.entries()].map(([runId, t]) => ({ runId, file: t.file, tail: t.snapshot() })),
+      titleMtime: this.titleMtime,
+      events,
+    };
+  }
+
+  private restore(s: BacklogSnapshot) {
+    this.state = s.state;
+    this.main.restore(s.main);
+    this.agents.clear();
+    for (const a of s.agents) {
+      const tail = new FileTail(a.file);
+      tail.restore(a.tail);
+      this.agents.set(a.file, { tail, agentId: a.agentId, workflowRunId: a.workflowRunId, spawned: a.spawned, firstSeen: a.firstSeen });
+    }
+    this.journals.clear();
+    for (const j of s.journals) {
+      const tail = new FileTail(j.file);
+      tail.restore(j.tail);
+      this.journals.set(j.runId, tail);
+    }
+    this.titleMtime = s.titleMtime;
+    // files created while the worker ran are picked up by the next directory scan
+    this.lastDirScan = 0;
+  }
+
+  /** Initial load on a worker; events ingested meanwhile are queued and applied after the backlog. */
+  private async loadOffThread(): Promise<boolean> {
+    this.buffer = [];
+    const snap = await this.loader!(this.sessionId, this.mainFile, !!this.backlogSink);
+    const queued = this.buffer;
+    this.buffer = null;
+    this.restore(snap);
+    if (snap.events) this.backlogSink?.(snap.events);
+    this.primed = true;
+    this.ingest(queued);
+    return true;
+  }
+
   /** Read anything new. Returns true if state changed. */
   async poll(): Promise<boolean> {
     if (this.busy) return false;
     this.busy = true;
+    if (!this.primed && this.loader) {
+      try {
+        return await this.loadOffThread();
+      } catch (e) {
+        console.error('worker load failed, loading in-process', this.sessionId, e);
+        this.loader = undefined;
+        this.buffer = null;
+        this.reset();
+      } finally {
+        this.busy = false;
+      }
+      return this.poll();
+    }
     if (!this.primed) this.buffer = [];
     try {
       const before = this.state.eventCount;
@@ -230,10 +303,19 @@ export class SessionWatcher {
 
   /** Every event in the session across all files, sorted by time (for replay). */
   async collectAllEvents(): Promise<AgentEvent[]> {
-    const fresh = new SessionWatcher(this.sessionId, this.mainFile);
+    const fresh = new SessionWatcher(this.sessionId, this.mainFile, this.loader);
     let all: AgentEvent[] = [];
     fresh.backlogSink = (evs) => (all = evs);
     await fresh.poll();
     return all;
   }
 }
+
+/** Same load as the worker performs, on the calling thread (tests, and the worker itself). */
+export const loadBacklogInProcess: BacklogLoader = async (sessionId, mainFile, wantEvents) => {
+  const w = new SessionWatcher(sessionId, mainFile);
+  let events: AgentEvent[] | undefined;
+  if (wantEvents) w.backlogSink = (evs) => (events = evs);
+  await w.poll();
+  return w.snapshot(events);
+};

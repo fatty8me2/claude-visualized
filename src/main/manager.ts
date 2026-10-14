@@ -5,6 +5,7 @@ import { normalizeHook } from '@core/normalize';
 import { MAIN, toView, type AgentStatus, type SessionSummary, type SessionView } from '@core/state';
 import { SessionIndexer, LIVE_MS } from './indexer';
 import { SessionWatcher } from './watcher';
+import { loadBacklogInWorker } from './workerLoader';
 import { claudeDeepLink } from './desktopSessions';
 
 const POLL_MS = 600;
@@ -132,7 +133,7 @@ export class SessionManager extends EventEmitter {
     if (w) return w;
     const f = file ?? this.summaries.find((s) => s.id === id)?.file;
     if (!f) return null;
-    w = new SessionWatcher(id, f);
+    w = new SessionWatcher(id, f, loadBacklogInWorker);
     this.watchers.set(id, w);
     return w;
   }
@@ -274,6 +275,6 @@ export class SessionManager extends EventEmitter {
   async replayEvents(id: string) {
     const f = this.summaries.find((s) => s.id === id)?.file ?? this.watchers.get(id)?.mainFile;
     if (!f) return [];
-    return new SessionWatcher(id, f).collectAllEvents();
+    return new SessionWatcher(id, f, loadBacklogInWorker).collectAllEvents();
   }
 }
