@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AppConfigView, HookServerStatusView } from '@core/api';
+import type { InboxSnapshot } from '@core/inbox';
 import type { SessionSummary, SessionView } from '@core/state';
 import type { UsageView } from '@core/usage';
 
@@ -77,6 +78,16 @@ export function useHookServer(): HookServerStatusView | null {
   useEffect(() => {
     void window.api.hookServerStatus().then(set);
     return window.api.onHookServerStatus((v) => set({ ...v }));
+  }, []);
+  return s;
+}
+
+/** The attention inbox (all sessions), pushed by the main process. */
+export function useInbox(): InboxSnapshot | null {
+  const [s, set] = useState<InboxSnapshot | null>(null);
+  useEffect(() => {
+    void window.api.getInbox().then(set);
+    return window.api.onInbox(set);
   }, []);
   return s;
 }

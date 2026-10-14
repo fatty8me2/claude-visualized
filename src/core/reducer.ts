@@ -2,7 +2,7 @@
 // (cheap for 10k+ event transcripts) and returns it; callers that need a new identity copy it.
 
 import type { AgentEvent, UsageNumbers } from './events';
-import { ACTIVITY_CAP, LOG_CAP, MAIN, newAgent, newSession, type AgentNode, type LogKind, type SessionState } from './state';
+import { ACTIVITY_CAP, LOG_CAP, MAIN, newAgent, newSession, type AgentNode, type AttentionKind, type LogEntry, type LogKind, type SessionState } from './state';
 import { summarizeTool, toolLabel } from './summarize';
 import { toolCategory } from './goal';
 import { COMMANDS_CAP, FILES_CAP, PROMPT_CAP, RECENT_CAP } from './state';
@@ -64,8 +64,10 @@ function ensureWorkflow(s: SessionState, runId: string, ts: number): AgentNode {
   return w;
 }
 
-function log(s: SessionState, ts: number, agentId: string, kind: LogKind, text: string) {
-  s.log.push({ seq: ++s.internal.logSeq, ts, agentId, kind, text: text.length > 240 ? text.slice(0, 239) + '…' : text });
+function log(s: SessionState, ts: number, agentId: string, kind: LogKind, text: string, attn?: AttentionKind) {
+  const entry: LogEntry = { seq: ++s.internal.logSeq, ts, agentId, kind, text: text.length > 240 ? text.slice(0, 239) + '…' : text };
+  if (attn) entry.attn = attn;
+  s.log.push(entry);
   if (s.log.length > LOG_CAP * 1.2) s.log.splice(0, s.log.length - LOG_CAP);
 }
 
@@ -387,7 +389,7 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
     }
     case 'quota': {
       s.quota = { limitType: e.limitType, status: e.status, resetsAt: e.resetsAt, ts };
-      if (e.status === 'rejected') log(s, ts, agentKey(e.ref.agentId), 'attention', `${e.limitType.replace('_', '-')} usage limit reached`);
+      if (e.status === 'rejected') log(s, ts, agentKey(e.ref.agentId), 'attention', `${e.limitType.replace('_', '-')} usage limit reached`, 'quota');
       break;
     }
     case 'compact': {
@@ -396,7 +398,7 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
     }
     case 'attention': {
       const a = ensureAgent(s, e.ref.agentId, ts);
-      log(s, ts, a.id, 'attention', e.detail);
+      log(s, ts, a.id, 'attention', e.detail, e.kind);
       if (e.kind !== 'error') finish(a, 'waiting', ts);
       break;
     }

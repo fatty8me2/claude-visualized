@@ -20,6 +20,8 @@ export interface NotifyRequest {
   title: string;
   body: string;
   sessionId: string;
+  /** 'attention' = a needs-you hook/transcript line (the inbox derives its own item); 'agent' = a subagent finished/failed */
+  kind?: 'attention' | 'agent';
 }
 
 /**
@@ -78,6 +80,19 @@ export class SessionManager extends EventEmitter {
       out.push(v);
     }
     return out;
+  }
+
+  /** Snapshots of every watched session (full logs, shared with the watchers: treat as read-only). */
+  watchedViews(): SessionView[] {
+    const out: SessionView[] = [];
+    for (const w of this.watchers.values()) if (w.primed) out.push(toView(w.state));
+    return out;
+  }
+
+  /** Title for a session id from the index, else the live state. */
+  titleOf(id: string): string | null {
+    const w = this.watchers.get(id);
+    return (w?.primed ? w.state.title : null) ?? this.summaries.find((s) => s.id === id)?.title ?? null;
   }
 
   markOverviewDirty() {
@@ -219,7 +234,10 @@ export class SessionManager extends EventEmitter {
       if (w.sessionId === this.selectedId) this.markDirty();
       this.overviewDirty = true;
     }
-    if (sessionsChanged) this.emitSessions();
+    if (sessionsChanged) {
+      this.emitSessions();
+      this.emit('changed');
+    }
   }
 
   /** last seen agent statuses per session, to detect transitions from any source */
@@ -236,7 +254,7 @@ export class SessionManager extends EventEmitter {
     const title = w.state.title ?? 'Claude session';
     for (const e of recent) {
       if (e.k === 'attention' && e.kind !== 'error' && this.notifyAttention && Date.now() - e.ts < 60_000) {
-        this.emit('notify', { title: `Needs you · ${title}`, body: e.detail, sessionId: w.sessionId } satisfies NotifyRequest);
+        this.emit('notify', { title: `Needs you · ${title}`, body: e.detail, sessionId: w.sessionId, kind: 'attention' } satisfies NotifyRequest);
       }
     }
     if (!this.notifyAgentDone) return;
@@ -248,6 +266,7 @@ export class SessionManager extends EventEmitter {
           title: `${a.agentType} ${a.status === 'done' ? 'finished' : 'failed'}`,
           body: a.description || title,
           sessionId: w.sessionId,
+          kind: 'agent',
         } satisfies NotifyRequest);
       }
     }
@@ -269,6 +288,7 @@ export class SessionManager extends EventEmitter {
     w.ingest(normalizeHook(payload, Date.now()));
     if (sessionId === this.selectedId) this.markDirty();
     this.overviewDirty = true;
+    this.emit('changed');
     if (this.followActive && sessionId !== this.selectedId) {
       void this.scan();
     }

@@ -1,10 +1,12 @@
 import type { AppConfig } from '../config';
 import type { HookServer } from '../hookServer';
+import type { InboxService } from '../inbox';
 import type { LocalMonitor } from '../localMonitor';
 import type { SessionManager } from '../manager';
 import type { SystemInfoView } from '@core/api';
 import type { UsageView } from '@core/usage';
 import { registerConfigIpc } from './config';
+import { registerInboxIpc } from './inbox';
 import { registerLocalIpc } from './local';
 import { registerSessionsIpc } from './sessions';
 import { registerSystemIpc } from './system';
@@ -17,6 +19,7 @@ import { registerUsageIpc } from './usage';
 export interface IpcContext {
   manager: SessionManager;
   hookServer: HookServer;
+  inbox: InboxService;
   getLocalMonitor: () => LocalMonitor;
   getConfig: () => AppConfig;
   updateConfig: (patch: Partial<AppConfig>) => AppConfig;
@@ -26,6 +29,8 @@ export interface IpcContext {
   applyHotkey: (accelerator: string) => { ok: boolean; error?: string; accelerator?: string };
   toggleMini: () => void;
   showMain: () => void;
+  /** main window on the inbox page */
+  showInbox: () => void;
   /** true once if the tray asked for the settings dialog while the window was still loading */
   takePendingOpenSettings: () => boolean;
 }
@@ -38,7 +43,14 @@ export type IpcRegistrar = (ctx: IpcContext) => void;
  * (`export const registerInboxIpc: IpcRegistrar = (ctx) => { ipcMain.handle('inbox:get', ...) }`), then add ONE line to this array.
  * Channel names are `<area>:<verb>`; the renderer-facing method goes in src/core/api.ts (VisApi) and src/preload/index.ts.
  */
-export const IPC_AREAS: readonly IpcRegistrar[] = [registerSessionsIpc, registerUsageIpc, registerConfigIpc, registerSystemIpc, registerLocalIpc];
+export const IPC_AREAS: readonly IpcRegistrar[] = [
+  registerSessionsIpc,
+  registerUsageIpc,
+  registerConfigIpc,
+  registerSystemIpc,
+  registerLocalIpc,
+  registerInboxIpc,
+];
 
 export function registerAllIpc(ctx: IpcContext): void {
   for (const register of IPC_AREAS) register(ctx);

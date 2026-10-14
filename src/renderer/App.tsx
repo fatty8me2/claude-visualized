@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Tour, Welcome } from './components/Onboarding';
 import { SessionList } from './components/SessionList';
 import { SettingsDialog } from './components/SettingsDialog';
-import { useConfig, useHookServer, useLiveState, useNow, useSelected, useSessions } from './hooks';
+import { useConfig, useHookServer, useInbox, useLiveState, useNow, useSelected, useSessions } from './hooks';
 import { SidebarResizeHandle, usePanelLayout } from './layout';
 import { useReplay } from './replay';
 import { useActiveOnly } from './state/activeOnly';
@@ -27,6 +27,9 @@ export function App() {
   const [activeOnly, setActiveOnly] = useActiveOnly();
   const [page, setPage] = usePage();
   const ui = useSessionUi(selected);
+  const inbox = useInbox();
+  /** an agent to open once its session is the selected one (inbox "show") */
+  const [pendingAgent, setPendingAgent] = useState<{ sessionId: string; agentId: string } | null>(null);
   const layoutApi = usePanelLayout();
   const { layout } = layoutApi;
   const {
@@ -44,6 +47,19 @@ export function App() {
     void window.api.select(id);
     setPage('session');
   };
+
+  const showAgent = (id: string, agentId: string | null) => {
+    openSession(id);
+    setPendingAgent(agentId && agentId !== 'main' ? { sessionId: id, agentId } : null);
+  };
+  useEffect(() => {
+    if (pendingAgent && selected === pendingAgent.sessionId && live?.id === selected) {
+      if (live.agents[pendingAgent.agentId]) ui.setAgentSel(pendingAgent.agentId);
+      setPendingAgent(null);
+    }
+  }, [selected, live, pendingAgent]);
+  // the tray menu / notifications ask for a page
+  useEffect(() => window.api.onNavigate((p) => PAGES.some((x) => x.id === p) && setPage(p)), []);
 
   // leaving the session ends replay
   useEffect(() => {
@@ -71,12 +87,14 @@ export function App() {
           onHelp={openWelcome}
           activeOnly={activeOnly}
           onActiveOnly={setActiveOnly}
+          badges={{ inbox: inbox?.count ?? 0 }}
         />
         {!collapsed && <SidebarResizeHandle api={layoutApi} />}
       </div>
       {current.render({
         selected,
         openSession,
+        showAgent,
         setPage,
         openSettings: () => setShowSettings(true),
         openWelcome,

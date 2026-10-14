@@ -48,6 +48,12 @@ const api: VisApi = {
   getLocalModels: () => ipcRenderer.invoke('local:get'),
   onLocalModels: (cb) => on('local', cb),
   refreshLocalModels: () => ipcRenderer.invoke('local:refresh'),
+  getInbox: () => ipcRenderer.invoke('inbox:get'),
+  onInbox: (cb) => on('inbox', cb),
+  dismissInbox: (id) => ipcRenderer.invoke('inbox:dismiss', id),
+  clearInbox: () => ipcRenderer.invoke('inbox:clear'),
+  showInbox: () => ipcRenderer.invoke('inbox:show'),
+  onNavigate: (cb) => on('ui:navigate', cb),
 };
 
 contextBridge.exposeInMainWorld('api', api);

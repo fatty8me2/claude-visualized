@@ -92,12 +92,16 @@ export interface PlanInfo {
 
 export type LogKind = 'prompt' | 'tool' | 'tool-error' | 'agent' | 'done' | 'mode' | 'model' | 'text' | 'notice' | 'attention';
 
+/** structured meaning of an 'attention' log line, for the inbox */
+export type AttentionKind = 'permission' | 'notification' | 'error' | 'quota';
+
 export interface LogEntry {
   seq: number;
   ts: number;
   agentId: string;
   kind: LogKind;
   text: string;
+  attn?: AttentionKind;
 }
 
 export interface SessionState {

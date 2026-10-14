@@ -12,6 +12,8 @@ import { getHookState } from './installer';
 import { writeStatusLineScript } from './statusline';
 import { SessionManager, type NotifyRequest } from './manager';
 import { LocalMonitor } from './localMonitor';
+import { InboxService } from './inbox';
+import { overlayIcon, withDot } from './trayBadge';
 import { applyUrlOverrides, normalizeLocalConfig } from '@core/localModels';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
@@ -99,6 +101,7 @@ function applyHotkey(raw: string): { ok: boolean; error?: string; accelerator?: 
 
 const manager = new SessionManager();
 let localMonitor: LocalMonitor;
+let inbox: InboxService;
 // ---- 5-hour / weekly usage limits, persisted so they show right after a restart ----
 const usageFile = () => path.join(app.getPath('userData'), 'usage.json');
 let usage: UsageView = emptyUsage();
@@ -139,6 +142,7 @@ function setUsage(next: UsageView) {
   }
   broadcast('usage', usage);
   updateTrayTooltip();
+  inbox?.schedule();
 }
 
 const hookServer = new HookServer(
@@ -186,6 +190,8 @@ function createMain() {
   });
   mainWin.once('ready-to-show', () => {
     if (!startHidden) mainWin?.show();
+    badgeShown = -1;
+    applyInboxBadge();
   });
   mainWin.on('close', (e) => {
     if (!quitting && config.closeToTray && tray) {
@@ -219,6 +225,36 @@ function openSettings() {
   if (fresh || wc.isLoading())
     pendingOpenSettings = true; // the renderer asks for it once mounted
   else wc.send('ui:openSettings');
+}
+
+/** Show the main window on a page (the renderer listens for 'ui:navigate'). */
+function navigate(page: string) {
+  showMain();
+  const send = () => mainWin?.webContents.send('ui:navigate', page);
+  if (mainWin?.webContents.isLoading()) mainWin.webContents.once('did-finish-load', () => setTimeout(send, 300));
+  else send();
+}
+
+const showInbox = () => navigate('inbox');
+
+let baseTrayImage: Electron.NativeImage | null = null;
+let dotTrayImage: Electron.NativeImage | null = null;
+let badgeShown = -1;
+
+/** Taskbar overlay + tray dot (Windows/Linux) or tray title (macOS) while something needs the user. */
+function applyInboxBadge() {
+  const n = inbox?.count ?? 0;
+  if (n === badgeShown) return;
+  badgeShown = n;
+  try {
+    if (process.platform !== 'darwin') mainWin?.setOverlayIcon(n > 0 ? overlayIcon() : null, n > 0 ? `${n} need you` : '');
+    if (tray && baseTrayImage) {
+      if (process.platform === 'darwin') tray.setTitle(n > 0 ? String(n) : '');
+      else tray.setImage(n > 0 ? (dotTrayImage ??= withDot(baseTrayImage)) : baseTrayImage);
+    }
+  } catch (e) {
+    console.error('badge failed', e);
+  }
 }
 
 function showWelcome() {
@@ -268,8 +304,9 @@ function updateTrayTooltip() {
   const sessions = manager.getSummaries().filter((s) => s.live);
   const running = sessions.reduce((n, s) => n + (s.running ?? 0), 0);
   const u = usageText();
+  const need = inbox?.count ?? 0;
   tray.setToolTip(
-    `Claude Visualized — ${sessions.length} live session${sessions.length === 1 ? '' : 's'}${running ? `, ${running} subagents running` : ''}${
+    `Claude Visualized — ${sessions.length} live session${sessions.length === 1 ? '' : 's'}${running ? `, ${running} subagents running` : ''}${need ? `, ${need} need you` : ''}${
       u
         ? `
 ${u}`
@@ -293,10 +330,13 @@ function rebuildTrayMenu() {
     config.launchAtLogin,
     config.miniHotkey,
     registeredHotkey,
+    inbox?.count ?? 0,
   ]);
   if (sig === traySignature) return;
   traySignature = sig;
+  const need = inbox?.count ?? 0;
   const items: Electron.MenuItemConstructorOptions[] = [
+    ...(need > 0 ? [{ label: `⚠ ${need} need you`, click: showInbox }, { type: 'separator' as const }] : []),
     { label: `${sessions.length} live session${sessions.length === 1 ? '' : 's'}`, enabled: false },
     ...sessions.map((s) => ({
       label: `${s.waiting ? '⚠ ' : s.running ? '● ' : '○ '}${(s.title ?? s.project).slice(0, 48)}${s.running ? `  (${s.running} running)` : ''}`,
@@ -339,9 +379,12 @@ function rebuildTrayMenu() {
 
 function createTray() {
   const img = nativeImage.createFromPath(assetPath('tray', process.platform === 'darwin' ? 'tray.png' : 'tray@2x.png'));
-  tray = new Tray(img.isEmpty() ? nativeImage.createEmpty() : img);
+  baseTrayImage = img.isEmpty() ? nativeImage.createEmpty() : img;
+  tray = new Tray(baseTrayImage);
   tray.on('click', showMain);
   rebuildTrayMenu();
+  badgeShown = -1;
+  applyInboxBadge();
 }
 
 function updateConfig(patch: Partial<AppConfig>): AppConfig {
@@ -368,12 +411,13 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
 }
 
 function notify(n: NotifyRequest) {
+  inbox.onNotify(n);
   if (!Notification.isSupported()) return;
   if (mainWin?.isFocused() && manager.selected === n.sessionId) return;
   const note = new Notification({ title: n.title, body: n.body.slice(0, 200), silent: false });
   note.on('click', () => {
     manager.select(n.sessionId);
-    showMain();
+    navigate('session');
   });
   note.show();
 }
@@ -383,6 +427,7 @@ function registerIpc() {
   registerAllIpc({
     manager,
     hookServer,
+    inbox,
     getLocalMonitor: () => localMonitor,
     getConfig: () => config,
     updateConfig,
@@ -392,6 +437,7 @@ function registerIpc() {
     applyHotkey,
     toggleMini,
     showMain,
+    showInbox,
     takePendingOpenSettings: () => {
       const p = pendingOpenSettings;
       pendingOpenSettings = false;
@@ -418,6 +464,12 @@ if (!app.requestSingleInstanceLock()) {
     manager.followActive = config.followActive;
     manager.notifyAttention = config.notifyAttention;
     manager.notifyAgentDone = config.notifyAgentDone;
+    inbox = new InboxService(manager, () => usage, path.join(app.getPath('userData'), 'inbox-dismissed.json'));
+    inbox.on('inbox', (snap) => {
+      broadcast('inbox', snap);
+      applyInboxBadge();
+      rebuildTrayMenu();
+    });
     registerIpc();
     manager.on('sessions', (s) => {
       broadcast('sessions', s);
@@ -447,6 +499,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     registerStartupHotkey();
     manager.start();
+    inbox.start();
     localMonitor.start();
     if (!process.env.CLAUDE_VIS_NO_HOOK_SERVER) hookServer.start(config.port);
     if (!process.env.CLAUDE_VIS_NO_TRAY) createTray();
@@ -459,6 +512,7 @@ if (!app.requestSingleInstanceLock()) {
     quitting = true;
     globalShortcut.unregisterAll();
     manager.stop();
+    inbox?.stop();
     localMonitor?.stop();
     hookServer.stop();
   });

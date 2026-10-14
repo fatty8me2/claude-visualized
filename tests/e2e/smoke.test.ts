@@ -619,6 +619,79 @@ describe('first-run welcome and tour', () => {
   });
 });
 
+describe('attention inbox', () => {
+  let home: string;
+  let userData: string;
+  let app: ElectronApplication;
+  let page: Page;
+  const post = (body: object) => fetch(`http://127.0.0.1:${PORT}/hook?src=claude-visualized`, { method: 'POST', body: JSON.stringify(body) });
+
+  beforeAll(async () => {
+    fs.mkdirSync(ART, { recursive: true });
+    home = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-inbox-home-'));
+    writeFixture(home);
+    fs.appendFileSync(path.join(home, 'projects', 'C--demo-app', `${SID}.jsonl`), freshLine(SID));
+    ({ app, page, userData } = await launch({ CLAUDE_VIS_HOME: home }));
+  });
+
+  afterAll(async () => {
+    await app?.close();
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(userData, { recursive: true, force: true });
+  });
+
+  it('starts empty, then shows a permission prompt with a badge and resolves it on the next prompt', async () => {
+    await page.getByText('Retry + docs').first().waitFor({ timeout: 20_000 });
+    expect(await page.getByTestId('badge-inbox').count()).toBe(0);
+    await page.getByTestId('nav-inbox').click();
+    await page.getByTestId('inbox-empty').waitFor();
+
+    await post({ session_id: SID, hook_event_name: 'PermissionRequest', tool_name: 'Bash' });
+    await page.getByTestId('badge-inbox').waitFor({ timeout: 10_000 });
+    expect((await page.getByTestId('badge-inbox').innerText()).trim()).toBe('1');
+    const item = page.locator('[data-testid="inbox-item"][data-kind="permission"]');
+    await item.waitFor();
+    expect(await item.getAttribute('data-resolved')).toBe('false');
+    expect(await item.innerText()).toContain('Permission needed: Bash');
+    await page.screenshot({ path: path.join(ART, 'inbox.png') });
+
+    // the user answers in Claude: a new prompt in that session resolves it
+    await post({ session_id: SID, hook_event_name: 'UserPromptSubmit', prompt: 'yes, go ahead with the Bash call' });
+    await page.locator('[data-testid="inbox-item"][data-kind="permission"][data-resolved="true"]').waitFor({ timeout: 10_000 });
+    await page.getByTestId('badge-inbox').waitFor({ state: 'detached', timeout: 10_000 });
+    await page.getByTestId('inbox-empty').waitFor({ state: 'detached' });
+  });
+
+  it('shows the count in the mini view', async () => {
+    await post({ session_id: SID, hook_event_name: 'Notification', message: 'Claude needs your permission to use Edit' });
+    await page.locator('[data-testid="inbox-item"][data-kind="input"]').waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: /one session/ }).click();
+    const [mini] = await Promise.all([app.waitForEvent('window'), page.getByRole('button', { name: /mini/ }).click()]);
+    await mini.getByTestId('mini-need').waitFor({ timeout: 10_000 });
+    expect(await mini.getByTestId('mini-need').innerText()).toContain('1 need you');
+    await mini.close();
+  });
+
+  it('dismisses an item and keeps it gone after a reload', async () => {
+    await page.getByTestId('nav-inbox').click();
+    const open = page.locator('[data-testid="inbox-item"][data-kind="input"]');
+    await open.getByTestId('inbox-dismiss').click();
+    await open.waitFor({ state: 'detached', timeout: 5000 });
+    await page.reload();
+    await page.getByTestId('nav-inbox').click();
+    await page.locator('[data-testid="inbox-item"][data-kind="permission"]').waitFor();
+    await page.waitForTimeout(1500);
+    expect(await page.locator('[data-testid="inbox-item"][data-kind="input"]').count()).toBe(0);
+    // dismissals are persisted in userData, not localStorage
+    const saved = JSON.parse(fs.readFileSync(path.join(userData, 'inbox-dismissed.json'), 'utf8'));
+    expect(Object.keys(saved).some((id) => id.includes(':input:'))).toBe(true);
+    // "dismiss all resolved" clears the resolved permission item
+    await page.getByTestId('inbox-clear').click();
+    await page.locator('[data-testid="inbox-item"]').first().waitFor({ state: 'detached', timeout: 5000 });
+    await page.getByTestId('inbox-empty').waitFor();
+  });
+});
+
 describe.skipIf(!process.env.SHOT_REAL)('real data screenshot', () => {
   it('renders the real ~/.claude', async () => {
     const { app, page, userData } = await launch({ CLAUDE_VIS_NO_HOOK_SERVER: '1' });

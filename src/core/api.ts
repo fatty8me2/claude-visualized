@@ -3,6 +3,7 @@ import type { AgentEvent } from './events';
 import type { HookInstallState, StatusLineState } from './hooksConfig';
 import type { UsageView } from './usage';
 import type { SessionSummary, SessionView } from './state';
+import type { InboxSnapshot } from './inbox';
 import type { LocalModelsConfig, LocalModelsView } from './localModels';
 
 export interface AppConfigView {
@@ -107,4 +108,14 @@ export interface VisApi {
   onLocalModels(cb: (v: LocalModelsView) => void): () => void;
   /** "check again": poll every enabled server now */
   refreshLocalModels(): Promise<void>;
+  /** attention inbox: everything across all sessions that needs the user */
+  getInbox(): Promise<InboxSnapshot>;
+  onInbox(cb: (s: InboxSnapshot) => void): () => void;
+  dismissInbox(id: string): Promise<void>;
+  /** dismiss every resolved item */
+  clearInbox(): Promise<void>;
+  /** bring the main window up on the inbox page */
+  showInbox(): Promise<void>;
+  /** the main process asks the window to show a page (tray menu, notification) */
+  onNavigate(cb: (page: string) => void): () => void;
 }

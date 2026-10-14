@@ -51,7 +51,10 @@ export function SessionList({
   onHelp,
   activeOnly = false,
   onActiveOnly,
+  badges = {},
 }: {
+  /** unread counts per page id (e.g. the inbox) */
+  badges?: Record<string, number>;
   activeOnly?: boolean;
   onActiveOnly?: (on: boolean) => void;
   sessions: SessionSummary[];
@@ -82,6 +85,7 @@ export function SessionList({
           {PAGES.map((p) => (
             <button key={p.id} className={page === p.id ? 'on' : ''} onClick={() => onPage(p.id)} title={p.collapsedTitle}>
               {p.icon}
+              {!!badges[p.id] && <span className="nav-badge">{badges[p.id]}</span>}
             </button>
           ))}
         </div>
@@ -118,6 +122,11 @@ export function SessionList({
         {PAGES.filter((p) => p.group === 'nav').map((p) => (
           <button key={p.id} className={`local-nav ${page === p.id ? 'on' : ''}`} data-testid={p.testId} onClick={() => onPage(p.id)} title={p.title}>
             {p.icon} {p.label}
+            {!!badges[p.id] && (
+              <span className="nav-badge" data-testid={`badge-${p.id}`}>
+                {badges[p.id]}
+              </span>
+            )}
           </button>
         ))}
         <input placeholder="search sessions…" value={q} onChange={(e) => setQ(e.target.value)} />

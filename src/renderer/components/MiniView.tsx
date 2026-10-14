@@ -2,7 +2,7 @@ import { MAIN } from '@core/state';
 import { agentGoal, agentInsight } from '@core/insight';
 import { modelLabel } from '@core/summarize';
 import { GoalBadge } from './GoalBadge';
-import { useLiveState, useNow } from '../hooks';
+import { useInbox, useLiveState, useNow } from '../hooks';
 import { CtxChip } from './ContextMeter';
 import { UsageMeters } from './UsageMeters';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
@@ -11,6 +11,7 @@ import { agentName, clock, displayStatus, famClass, STATUS_GLYPH } from '../util
 export function MiniView() {
   const view = useLiveState();
   const now = useNow();
+  const inbox = useInbox();
   const main = view?.agents[MAIN];
   const subs = view ? Object.values(view.agents).filter((a) => a.kind !== 'main') : [];
   const running = subs.filter((a) => a.status === 'running' || a.status === 'waiting');
@@ -35,6 +36,11 @@ export function MiniView() {
           ×
         </button>
       </div>
+      {!!inbox?.count && (
+        <div className="mini-need" data-testid="mini-need" title="Open the inbox" onClick={() => void window.api.showInbox()}>
+          {'⚠'} {inbox.count} need you
+        </div>
+      )}
       <div className="mini-usage">
         <UsageMeters compact />
         <LocalChip onOpen={() => window.api.showMain()} />

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { InboxPage } from '../components/InboxPage';
 import { LocalModelsPage } from '../components/LocalModelsPage';
 import { Overview } from '../components/Overview';
 import { SessionView, type SessionViewProps } from './SessionView';
@@ -17,6 +18,8 @@ export type PageId = string;
 export interface PageContext {
   selected: string | null;
   openSession: (id: string) => void;
+  /** select a session and, if given, open one of its agents */
+  showAgent: (sessionId: string, agentId: string | null) => void;
   setPage: (id: PageId) => void;
   openSettings: () => void;
   openWelcome: () => void;
@@ -83,6 +86,16 @@ export const PAGES: readonly PageDef[] = [
     collapsedTitle: 'One session',
     group: 'switch',
     render: (ctx) => (ctx.session ? <SessionView {...ctx.session} /> : <EmptySession selected={ctx.selected} onWelcome={ctx.openWelcome} />),
+  },
+  {
+    id: 'inbox',
+    icon: '!',
+    label: 'inbox',
+    title: 'Everything that needs you, across all sessions',
+    collapsedTitle: 'Attention inbox',
+    group: 'nav',
+    testId: 'nav-inbox',
+    render: (ctx) => <InboxPage onShow={ctx.showAgent} />,
   },
   {
     id: 'local',

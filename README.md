@@ -12,6 +12,7 @@ A desktop app (Windows + macOS) that shows what your Claude Code sessions are do
   whichever session is active right now.
 - **Tray icon + mini view**: a small always-on-top window with the mode, the main agent's current tool and the running subagents.
 - **Replay**: scrub or play back any past session at 1–128×.
+- **Inbox** (sidebar, with an unread badge): one list of everything that needs you across all sessions: permission prompts and "needs your input" (hooks), finished turns awaiting a reply, failed agents and bursts of failed tool calls (grouped), API errors, and the 5-hour / weekly limit at 90% or more. Items resolve themselves (a newer prompt, the agent resuming, usage dropping) or you dismiss them; dismissals are stored in the app's profile (`inbox-dismissed.json`). The derivation is `src/core/inbox.ts`; the tray menu/tooltip show "N need you" with a dot on the tray icon and a taskbar overlay, and the mini view shows a one-line count. Read-only: actions only jump to the chat in the Claude app.
 - **Notifications** when a session needs your input (with hooks) or, optionally, when a subagent finishes.
 
 It works with both the Claude desktop app's Code tab and the `claude` CLI, because both write the same transcripts.
