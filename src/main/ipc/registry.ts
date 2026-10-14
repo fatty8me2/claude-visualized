@@ -8,6 +8,7 @@ import type { Updater } from '../updater';
 import type { UsageView } from '@core/usage';
 import { registerConfigIpc } from './config';
 import { registerInboxIpc } from './inbox';
+import { registerHistoryIpc } from './history';
 import { registerLocalIpc } from './local';
 import { registerSessionsIpc } from './sessions';
 import { registerSystemIpc } from './system';
@@ -54,6 +55,7 @@ export const IPC_AREAS: readonly IpcRegistrar[] = [
   registerLocalIpc,
   registerInboxIpc,
   registerUpdatesIpc,
+  registerHistoryIpc,
 ];
 
 export function registerAllIpc(ctx: IpcContext): void {
