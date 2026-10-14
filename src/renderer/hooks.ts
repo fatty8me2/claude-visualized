@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AppConfigView, HookServerStatusView } from '@core/api';
 import type { SessionSummary, SessionView } from '@core/state';
+import type { UsageView } from '@core/usage';
 
 export function useNow(intervalMs = 1000): number {
   const [now, setNow] = useState(() => Date.now());
@@ -36,6 +37,30 @@ export function useSelected(): string | null {
     return window.api.onSelected(set);
   }, []);
   return s;
+}
+
+/** Live snapshots of every live session, while the calling component is mounted. */
+export function useOverview(): SessionView[] | null {
+  const [v, set] = useState<SessionView[] | null>(null);
+  useEffect(() => {
+    void window.api.getOverview().then(set);
+    void window.api.watchOverview(true);
+    const off = window.api.onOverview(set);
+    return () => {
+      off();
+      void window.api.watchOverview(false);
+    };
+  }, []);
+  return v;
+}
+
+export function useUsage(): UsageView | null {
+  const [u, set] = useState<UsageView | null>(null);
+  useEffect(() => {
+    void window.api.getUsage().then(set);
+    return window.api.onUsage(set);
+  }, []);
+  return u;
 }
 
 export function useConfig(): AppConfigView | null {

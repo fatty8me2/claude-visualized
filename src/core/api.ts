@@ -1,6 +1,7 @@
 // Typed surface the preload script exposes to the renderer as window.api.
 import type { AgentEvent } from './events';
-import type { HookInstallState } from './hooksConfig';
+import type { HookInstallState, StatusLineState } from './hooksConfig';
+import type { UsageView } from './usage';
 import type { SessionSummary, SessionView } from './state';
 
 export interface AppConfigView {
@@ -22,6 +23,7 @@ export interface HookServerStatusView {
 
 export interface HookStateView {
   state: HookInstallState | 'error';
+  statusLine: StatusLineState;
   error?: string;
   settingsFile: string;
 }
@@ -46,6 +48,10 @@ export interface VisApi {
   onState(cb: (s: SessionView | null) => void): () => void;
   onSelected(cb: (id: string | null) => void): () => void;
   replayEvents(id: string): Promise<AgentEvent[]>;
+  getOverview(): Promise<SessionView[]>;
+  /** start/stop receiving 'overview' pushes for this window */
+  watchOverview(on: boolean): Promise<void>;
+  onOverview(cb: (views: SessionView[]) => void): () => void;
   getConfig(): Promise<AppConfigView>;
   setConfig(patch: Partial<AppConfigView>): Promise<AppConfigView>;
   onConfig(cb: (c: AppConfigView) => void): () => void;
@@ -54,6 +60,8 @@ export interface VisApi {
   hookState(): Promise<HookStateView>;
   hookPreview(action: 'install' | 'uninstall'): Promise<HookPreviewView>;
   hookApply(action: 'install' | 'uninstall'): Promise<{ ok: boolean; backup?: string | null; error?: string }>;
+  getUsage(): Promise<UsageView>;
+  onUsage(cb: (u: UsageView) => void): () => void;
   toggleMini(): Promise<void>;
   showMain(): Promise<void>;
   openPath(p: string): Promise<void>;

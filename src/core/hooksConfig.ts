@@ -20,6 +20,21 @@ export const HOOK_EVENTS = [
   'SessionEnd',
 ] as const;
 
+/** file name of our status-line forwarder; also how we recognize our statusLine entry */
+export const STATUSLINE_FILE = 'claude-visualized-statusline.mjs';
+
+export function isOurStatusLine(sl: unknown): boolean {
+  return !!sl && typeof sl === 'object' && typeof (sl as Json).command === 'string' && (sl as Json).command.includes(STATUSLINE_FILE);
+}
+
+export type StatusLineState = 'ours' | 'other' | 'none';
+
+export function statusLineState(settings: Json): StatusLineState {
+  const sl = settings?.statusLine;
+  if (!sl) return 'none';
+  return isOurStatusLine(sl) ? 'ours' : 'other';
+}
+
 export function hookUrl(port: number): string {
   return `http://127.0.0.1:${port}/hook?src=${MARKER}`;
 }
@@ -35,6 +50,7 @@ function clone<T>(v: T): T {
 /** Remove our hooks; drop groups/events/hooks object only if we emptied them. */
 export function uninstallHooks(settings: Json): Json {
   const out = clone(settings ?? {});
+  if (isOurStatusLine(out.statusLine)) delete out.statusLine;
   const hooks = out.hooks;
   if (!hooks || typeof hooks !== 'object') return out;
   for (const ev of Object.keys(hooks)) {
@@ -57,8 +73,13 @@ export function uninstallHooks(settings: Json): Json {
   return out;
 }
 
-export function installHooks(settings: Json, port: number): Json {
+/**
+ * Adds our hooks, and our status line (the only source of live 5-hour / weekly usage) when
+ * `statusLineCommand` is given and the user has no status line of their own.
+ */
+export function installHooks(settings: Json, port: number, statusLineCommand?: string): Json {
   const out = uninstallHooks(settings);
+  if (statusLineCommand && !out.statusLine) out.statusLine = { type: 'command', command: statusLineCommand, padding: 0 };
   out.hooks = out.hooks && typeof out.hooks === 'object' ? out.hooks : {};
   for (const ev of HOOK_EVENTS) {
     const groups = Array.isArray(out.hooks[ev]) ? out.hooks[ev] : [];

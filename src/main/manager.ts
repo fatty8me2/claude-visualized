@@ -9,7 +9,10 @@ import { SessionWatcher } from './watcher';
 const POLL_MS = 600;
 const SCAN_MS = 2500;
 const PUSH_MS = 200;
-const MAX_LIVE_WATCHERS = 8;
+const MAX_LIVE_WATCHERS = 12;
+const OVERVIEW_MS = 500;
+/** log lines kept per session in overview snapshots */
+const OVERVIEW_LOG = 40;
 
 export interface NotifyRequest {
   title: string;
@@ -21,7 +24,8 @@ export interface NotifyRequest {
  * Owns the session index and one SessionWatcher per followed session (the selected one plus
  * recently live ones, so the tray can show what's running everywhere).
  *
- * Events: 'sessions' (SessionSummary[]), 'state' (SessionView | null), 'notify' (NotifyRequest)
+ * Events: 'sessions' (SessionSummary[]), 'state' (SessionView | null), 'notify' (NotifyRequest),
+ * 'overview' (SessionView[] of every live session, only while an overview is open)
  */
 export class SessionManager extends EventEmitter {
   private indexer = new SessionIndexer();
@@ -29,6 +33,9 @@ export class SessionManager extends EventEmitter {
   private summaries: SessionSummary[] = [];
   private selectedId: string | null = null;
   private dirty = false;
+  private overviewDirty = false;
+  /** number of windows currently showing the all-sessions overview */
+  overviewViewers = 0;
   private timers: NodeJS.Timeout[] = [];
   private lastHookBySession = new Map<string, number>();
   followActive = true;
@@ -47,6 +54,32 @@ export class SessionManager extends EventEmitter {
         }
       }, PUSH_MS),
     );
+    this.timers.push(
+      setInterval(() => {
+        if (this.overviewDirty && this.overviewViewers > 0) {
+          this.overviewDirty = false;
+          this.emit('overview', this.overview());
+        }
+      }, OVERVIEW_MS),
+    );
+  }
+
+  /** Snapshots of every live session (log trimmed), most recently active first. */
+  overview(): SessionView[] {
+    const out: SessionView[] = [];
+    for (const s of this.summaries) {
+      if (!s.live) continue;
+      const w = this.watchers.get(s.id);
+      if (!w || !w.primed) continue;
+      const v = toView(w.state);
+      v.log = [...v.log].sort((a, b) => a.ts - b.ts || a.seq - b.seq).slice(-OVERVIEW_LOG);
+      out.push(v);
+    }
+    return out;
+  }
+
+  markOverviewDirty() {
+    this.overviewDirty = true;
   }
 
   stop() {
@@ -112,6 +145,7 @@ export class SessionManager extends EventEmitter {
     for (const id of [...this.watchers.keys()]) if (!keep.has(id)) this.watchers.delete(id);
     if (this.followActive) this.autoSelect();
     this.emitSessions();
+    this.overviewDirty = true;
   }
 
   private recentHookSessions(): string[] {
@@ -161,15 +195,22 @@ export class SessionManager extends EventEmitter {
         continue;
       }
       this.notifyTransitions(w, wasPrimed);
+      const q = w.state.quota;
+      if (q && q.ts > (this.quotaSeen.get(w.sessionId) ?? 0)) {
+        this.quotaSeen.set(w.sessionId, q.ts);
+        this.emit('quota', q);
+      }
       if (!changed && wasPrimed) continue;
       sessionsChanged = true;
       if (w.sessionId === this.selectedId) this.markDirty();
+      this.overviewDirty = true;
     }
     if (sessionsChanged) this.emitSessions();
   }
 
   /** last seen agent statuses per session, to detect transitions from any source */
   private prevStatus = new Map<string, Map<string, AgentStatus>>();
+  private quotaSeen = new Map<string, number>();
 
   private notifyTransitions(w: SessionWatcher, wasPrimed: boolean) {
     const before = this.prevStatus.get(w.sessionId);
@@ -213,6 +254,7 @@ export class SessionManager extends EventEmitter {
     if (!w.primed) return;
     w.ingest(normalizeHook(payload, Date.now()));
     if (sessionId === this.selectedId) this.markDirty();
+    this.overviewDirty = true;
     if (this.followActive && sessionId !== this.selectedId) {
       void this.scan();
     }

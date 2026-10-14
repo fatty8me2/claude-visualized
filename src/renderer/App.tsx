@@ -5,9 +5,11 @@ import { AgentDrawer } from './components/AgentDrawer';
 import { AgentGraph } from './components/AgentGraph';
 import { LogPanel } from './components/LogPanel';
 import { ModePanel } from './components/ModePanel';
-import { SessionList } from './components/SessionList';
+import { Overview } from './components/Overview';
+import { SessionList, type Page } from './components/SessionList';
 import { SettingsDialog } from './components/SettingsDialog';
 import { StatusBar } from './components/StatusBar';
+import { UsageMeters } from './components/UsageMeters';
 import { useConfig, useHookServer, useLiveState, useNow, useSelected, useSessions } from './hooks';
 import { useReplay } from './replay';
 import { clock } from './util';
@@ -46,6 +48,25 @@ export function App() {
   const [agentSel, setAgentSel] = useState<string | null>(null);
   const [logAgent, setLogAgent] = useState<string | null>(null);
   const [showFinished, setShowFinished] = useState(true);
+  const [page, setPageState] = useState<Page>(() => {
+    try {
+      return localStorage.getItem('cvis.page') === 'overview' ? 'overview' : 'session';
+    } catch {
+      return 'session';
+    }
+  });
+  const setPage = (p: Page) => {
+    setPageState(p);
+    try {
+      localStorage.setItem('cvis.page', p);
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  const openSession = (id: string) => {
+    void window.api.select(id);
+    setPage('session');
+  };
 
   // leaving the session ends replay and clears per-session selections
   useEffect(() => {
@@ -65,17 +86,22 @@ export function App() {
         selected={selected}
         now={wallNow}
         follow={config?.followActive ?? true}
-        onSelect={(id) => void window.api.select(id)}
+        onSelect={openSession}
         onFollow={(on) => void window.api.setFollow(on)}
         collapsed={collapsed}
         onCollapse={() => setCollapsed(!collapsed)}
+        page={page}
+        onPage={setPage}
       />
-      {view ? (
+      {page === 'overview' ? (
+        <Overview onOpen={openSession} />
+      ) : view ? (
         <div className="view">
           <div className="topbar">
             <div className="title">
               {view.title ?? 'untitled session'} <span className="proj">· {summary?.project ?? view.cwd?.split(/[\\/]/).pop() ?? ''}</span>
             </div>
+            <UsageMeters />
             <div className="actions">
               {replay ? (
                 <button className="on" onClick={stop}>

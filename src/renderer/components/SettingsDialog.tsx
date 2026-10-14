@@ -70,6 +70,21 @@ export function SettingsDialog({ config, hookSrv, onClose }: { config: AppConfig
             {hs?.settingsFile}
           </span>
         </div>
+        <div className="row">
+          <span>usage-limit status line:</span>
+          {hs?.statusLine === 'ours' ? (
+            <span className="pill ok">installed</span>
+          ) : hs?.statusLine === 'other' ? (
+            <span className="pill warn">you have your own status line</span>
+          ) : (
+            <span className="pill">not installed</span>
+          )}
+          <span className="note">
+            {hs?.statusLine === 'other'
+              ? 'kept as-is; 5-hour / weekly meters then only show limits that were hit'
+              : 'feeds the 5-hour / weekly meters; installed together with the hooks'}
+          </span>
+        </div>
         {hs?.error && <p style={{ color: 'var(--err)' }}>{hs.error}</p>}
         <div className="row">
           <button className="primary" disabled={hs?.state === 'error'} onClick={() => doPreview('install')}>

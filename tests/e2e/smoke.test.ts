@@ -78,6 +78,11 @@ describe('app smoke (fixture data)', () => {
     expect(await res.text()).toBe('');
     await page.locator('.modebox .big', { hasText: 'BUILD MODE' }).waitFor({ timeout: 5000 });
     await page.locator('[data-agent="main"]', { hasText: 'README.md' }).waitFor({ timeout: 5000 });
+    // status-line payloads feed the 5-hour / weekly meters
+    const resets = Math.floor(Date.now() / 1000) + 2 * 3600;
+    await fetch(`http://127.0.0.1:${PORT}/statusline`, { method: 'POST', body: JSON.stringify({ session_id: SID, rate_limits: { five_hour: { used_percentage: 23.5, resets_at: resets }, seven_day: { used_percentage: 87, resets_at: resets + 3 * 86400 } } }) });
+    await page.locator('.topbar .meter.ok .m-pct', { hasText: '24%' }).waitFor({ timeout: 5000 });
+    expect(await page.locator('.topbar .meter.hot .m-pct').innerText()).toBe('87%');
     await post({ session_id: SID, hook_event_name: 'PermissionRequest', tool_name: 'Bash' });
     await page.locator('[data-agent="main"].waiting').waitFor({ timeout: 5000 });
     await page.screenshot({ path: path.join(ART, 'fixture-live.png') });
@@ -90,6 +95,30 @@ describe('app smoke (fixture data)', () => {
     expect(await mini.locator('.mini-chip').count()).toBeGreaterThan(0);
     await mini.screenshot({ path: path.join(ART, 'mini.png') });
     await mini.close();
+  });
+
+  it('shows every live session side by side on the overview page', async () => {
+    // a second live session in another project
+    const SID2 = '22222222-2222-4222-8222-222222222222';
+    const p2 = path.join(home, 'projects', 'C--other-proj');
+    fs.mkdirSync(p2, { recursive: true });
+    const lines = fs
+      .readFileSync(path.join(home, 'projects', 'C--demo-app', `${SID}.jsonl`), 'utf8')
+      .replaceAll(SID, SID2)
+      .replaceAll('Retry + docs', 'Second session')
+      .replaceAll('C:\\\\demo\\\\app', 'C:\\\\other\\\\proj');
+    fs.writeFileSync(path.join(p2, `${SID2}.jsonl`), lines);
+    await page.getByRole('button', { name: /all sessions/ }).click();
+    await page.locator(`.ov-panel[data-session="${SID2}"]`).waitFor({ timeout: 15_000 });
+    expect(await page.locator('.ov-panel').count()).toBe(2);
+    // each panel draws its own tree: a3 exists only in the first session's subagent files
+    expect(await page.locator(`.ov-panel[data-session="${SID}"] [data-agent="a3"]`).count()).toBe(1);
+    expect(await page.locator(`.ov-panel[data-session="${SID2}"] [data-agent="main"]`).count()).toBe(1);
+    expect(await page.locator(`.ov-panel[data-session="${SID2}"] [data-agent="a3"]`).count()).toBe(0);
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: path.join(ART, 'overview.png') });
+    await page.locator(`.ov-panel[data-session="${SID}"] .ov-head`).click();
+    await page.locator('.modebox').waitFor();
   });
 
   it('replays the session', async () => {
@@ -107,7 +136,7 @@ describe('app smoke (fixture data)', () => {
   it('opens the hooks dialog with a preview that keeps existing hooks', async () => {
     fs.writeFileSync(path.join(home, 'settings.json'), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'node', args: ['x.mjs'], async: true }] }] } }, null, 2));
     await page.getByRole('button', { name: /hooks/ }).click();
-    await page.getByText('not installed').waitFor();
+    await page.getByText('not installed').first().waitFor();
     await page.getByRole('button', { name: /Install hooks/ }).click();
     const after = await page.locator('.diff pre').nth(1).innerText();
     expect(after).toContain('x.mjs');
@@ -117,11 +146,15 @@ describe('app smoke (fixture data)', () => {
     const written = JSON.parse(fs.readFileSync(path.join(home, 'settings.json'), 'utf8'));
     expect(written.hooks.Stop).toHaveLength(2);
     expect(written.hooks.Stop[0].hooks[0].args).toEqual(['x.mjs']);
+    expect(written.statusLine.command).toContain('claude-visualized-statusline.mjs');
+    expect(fs.existsSync(path.join(home, 'claude-visualized-statusline.mjs'))).toBe(true);
     await page.screenshot({ path: path.join(ART, 'hooks-dialog.png') });
     await page.getByRole('button', { name: /Remove hooks/ }).click();
     await page.getByRole('button', { name: 'Remove hooks from settings.json' }).click();
     await page.getByText(/Done\./).waitFor();
-    expect(JSON.parse(fs.readFileSync(path.join(home, 'settings.json'), 'utf8')).hooks.Stop).toHaveLength(1);
+    const restored = JSON.parse(fs.readFileSync(path.join(home, 'settings.json'), 'utf8'));
+    expect(restored.hooks.Stop).toHaveLength(1);
+    expect(restored.statusLine).toBeUndefined();
   });
 });
 

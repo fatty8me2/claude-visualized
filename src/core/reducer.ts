@@ -330,6 +330,11 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       s.costByModel = e.byModel;
       break;
     }
+    case 'quota': {
+      s.quota = { limitType: e.limitType, status: e.status, resetsAt: e.resetsAt, ts };
+      if (e.status === 'rejected') log(s, ts, agentKey(e.ref.agentId), 'attention', `${e.limitType.replace('_', '-')} usage limit reached`);
+      break;
+    }
     case 'compact': {
       log(s, ts, agentKey(e.ref.agentId), 'notice', e.detail ? `compacted · ${e.detail.slice(0, 80)}` : 'context compacted');
       break;

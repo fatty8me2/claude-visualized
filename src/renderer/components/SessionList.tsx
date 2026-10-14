@@ -21,7 +21,9 @@ function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: 
   );
 }
 
-export function SessionList({ sessions, selected, now, follow, onSelect, onFollow, collapsed, onCollapse }: { sessions: SessionSummary[]; selected: string | null; now: number; follow: boolean; onSelect: (id: string) => void; onFollow: (on: boolean) => void; collapsed: boolean; onCollapse: () => void }) {
+export type Page = 'session' | 'overview';
+
+export function SessionList({ sessions, selected, now, follow, onSelect, onFollow, collapsed, onCollapse, page, onPage }: { sessions: SessionSummary[]; selected: string | null; now: number; follow: boolean; onSelect: (id: string) => void; onFollow: (on: boolean) => void; collapsed: boolean; onCollapse: () => void; page: Page; onPage: (p: Page) => void }) {
   const [q, setQ] = useState('');
   if (collapsed) {
     return (
@@ -29,6 +31,14 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
         <div className="sidebar-head">
           <button onClick={onCollapse} title="Show sessions">
             »
+          </button>
+        </div>
+        <div className="sidebar-head" style={{ flexDirection: 'column' }}>
+          <button className={page === 'overview' ? 'on' : ''} onClick={() => onPage('overview')} title="All sessions">
+            ▦
+          </button>
+          <button className={page === 'session' ? 'on' : ''} onClick={() => onPage('session')} title="One session">
+            ◉
           </button>
         </div>
       </div>
@@ -49,6 +59,14 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
         </button>
       </div>
       <div className="sidebar-tools">
+        <div className="page-switch">
+          <button className={page === 'overview' ? 'on' : ''} onClick={() => onPage('overview')} title="Every live session side by side">
+            ▦ all sessions
+          </button>
+          <button className={page === 'session' ? 'on' : ''} onClick={() => onPage('session')} title="One session in detail">
+            ◉ one session
+          </button>
+        </div>
         <input placeholder="search sessions…" value={q} onChange={(e) => setQ(e.target.value)} />
         <label className="follow">
           <input type="checkbox" checked={follow} onChange={(e) => onFollow(e.target.checked)} />

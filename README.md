@@ -81,6 +81,6 @@ tests/          vitest unit tests with a synthetic ~/.claude fixture, Playwright
 
 - **Windows:** `npm run dist:win` builds an NSIS installer that installs per user, with no admin needed. It is unsigned, so
   SmartScreen will warn until you sign it with a code-signing certificate.
-- **macOS:** build `npm run dist:mac` on a Mac or in CI (`.github/workflows/build.yml`). Without an Apple Developer ID
+- **macOS:** build `npm run dist:mac` on a Mac, or in CI by moving `ci/github-build.yml` to `.github/workflows/` (pushing it needs a GitHub token with the `workflow` scope). Without an Apple Developer ID
   the app is unsigned and not notarized. Open it the first time with right-click → Open, or run
   `xattr -dr com.apple.quarantine "/Applications/Claude Visualized.app"`.

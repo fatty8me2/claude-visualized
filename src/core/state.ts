@@ -69,6 +69,8 @@ export interface SessionState {
   totals: UsageNumbers;
   costUSD: number | null;
   costByModel: Record<string, number>;
+  /** last usage-limit record seen in this session's transcript */
+  quota: { limitType: string; status: string; resetsAt: number | null; ts: number } | null;
   startedAt: number | null;
   lastActivity: number | null;
   ended: boolean;
@@ -152,6 +154,7 @@ export function newSession(id: string): SessionState {
     totals: zeroUsage(),
     costUSD: null,
     costByModel: {},
+    quota: null,
     startedAt: null,
     lastActivity: null,
     ended: false,

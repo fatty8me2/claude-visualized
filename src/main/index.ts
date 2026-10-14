@@ -2,7 +2,10 @@ import path from 'node:path';
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, shell, Tray } from 'electron';
 import { loadConfig, saveConfig, type AppConfig } from './config';
 import { HookServer } from './hookServer';
+import fs from 'node:fs';
+import { applyQuota, applyStatusline, emptyUsage, settleUsage, type UsageView } from '@core/usage';
 import { applyHooks, getHookState, previewHooks } from './installer';
+import { writeStatusLineScript } from './statusline';
 import { SessionManager, type NotifyRequest } from './manager';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
@@ -17,8 +20,34 @@ let quitting = false;
 let config: AppConfig;
 
 const manager = new SessionManager();
+// ---- 5-hour / weekly usage limits, persisted so they show right after a restart ----
+const usageFile = () => path.join(app.getPath('userData'), 'usage.json');
+let usage: UsageView = emptyUsage();
+
+function loadUsage() {
+  try {
+    usage = { ...emptyUsage(), ...JSON.parse(fs.readFileSync(usageFile(), 'utf8')) };
+  } catch {
+    usage = emptyUsage();
+  }
+}
+
+function setUsage(next: UsageView) {
+  const settled = settleUsage(next, Date.now());
+  if (JSON.stringify(settled) === JSON.stringify(usage)) return;
+  usage = settled;
+  try {
+    fs.writeFileSync(usageFile(), JSON.stringify(usage));
+  } catch {
+    /* non-fatal */
+  }
+  broadcast('usage', usage);
+  updateTrayTooltip();
+}
+
 const hookServer = new HookServer(
   (payload) => manager.ingestHook(payload),
+  (payload) => setUsage(applyStatusline(usage, payload, Date.now())),
   (status) => broadcast('hookserver', status),
 );
 
@@ -112,15 +141,28 @@ function toggleMini() {
 
 let traySignature = '';
 
+function usageText(): string {
+  const p = (w: UsageView['fiveHour']) => (w ? `${Math.round(w.pct)}%` : '—');
+  return usage.fiveHour || usage.sevenDay ? `5-hour ${p(usage.fiveHour)} · weekly ${p(usage.sevenDay)}` : '';
+}
+
+function updateTrayTooltip() {
+  if (!tray) return;
+  const sessions = manager.getSummaries().filter((s) => s.live);
+  const running = sessions.reduce((n, s) => n + (s.running ?? 0), 0);
+  const u = usageText();
+  tray.setToolTip(`Claude Visualized — ${sessions.length} live session${sessions.length === 1 ? '' : 's'}${running ? `, ${running} subagents running` : ''}${u ? `
+${u}` : ''}`);
+}
+
 function rebuildTrayMenu() {
   if (!tray) return;
+  updateTrayTooltip();
   const sessions = manager.getSummaries().filter((s) => s.live).slice(0, 8);
-  const running = sessions.reduce((n, s) => n + (s.running ?? 0), 0);
   // rebuilding an open native menu makes it flicker; only rebuild when something visible changed
   const sig = JSON.stringify([sessions.map((s) => [s.id, s.title, s.running, s.waiting]), !!miniWin, manager.followActive]);
   if (sig === traySignature) return;
   traySignature = sig;
-  tray.setToolTip(`Claude Visualized — ${sessions.length} live session${sessions.length === 1 ? '' : 's'}${running ? `, ${running} subagents running` : ''}`);
   const items: Electron.MenuItemConstructorOptions[] = [
     { label: `${sessions.length} live session${sessions.length === 1 ? '' : 's'}`, enabled: false },
     ...sessions.map((s) => ({
@@ -186,7 +228,24 @@ function notify(n: NotifyRequest) {
   note.show();
 }
 
+/** webContents ids currently showing the overview page */
+const overviewWatchers = new Set<number>();
+
 function registerIpc() {
+  ipcMain.handle('usage:get', () => usage);
+  ipcMain.handle('overview:get', () => manager.overview());
+  ipcMain.handle('overview:watch', (e, on: boolean) => {
+    const id = e.sender.id;
+    if (on) {
+      overviewWatchers.add(id);
+      e.sender.once('destroyed', () => {
+        overviewWatchers.delete(id);
+        manager.overviewViewers = overviewWatchers.size;
+      });
+      manager.markOverviewDirty();
+    } else overviewWatchers.delete(id);
+    manager.overviewViewers = overviewWatchers.size;
+  });
   ipcMain.handle('sessions:get', () => manager.getSummaries());
   ipcMain.handle('state:get', () => manager.currentView());
   ipcMain.handle('selected:get', () => manager.selected);
@@ -235,8 +294,17 @@ if (!app.requestSingleInstanceLock()) {
       rebuildTrayMenu();
     });
     manager.on('state', (v) => broadcast('state', v));
+    manager.on('overview', (v) => broadcast('overview', v));
     manager.on('selected', (id) => broadcast('selected', id));
     manager.on('notify', notify);
+    manager.on('quota', (q) => setUsage(applyQuota(usage, q)));
+    loadUsage();
+    // windows that reset while the app was closed, and countdowns crossing a reset
+    setInterval(() => setUsage(usage), 30_000);
+    // keep the status-line forwarder in sync with the configured port
+    void getHookState(config.port).then((h) => {
+      if (h.statusLine === 'ours') void writeStatusLineScript(config.port);
+    });
     manager.start();
     if (!process.env.CLAUDE_VIS_NO_HOOK_SERVER) hookServer.start(config.port);
     if (!process.env.CLAUDE_VIS_NO_TRAY) createTray();

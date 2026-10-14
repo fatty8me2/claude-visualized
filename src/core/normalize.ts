@@ -226,6 +226,10 @@ export function normalizeLine(line: string, ctx: LineContext, fallbackTs = 0): A
   const u = usageFrom(msg.usage);
   if (u && str(msg.id)) ev({ k: 'usage', msgId: msg.id, usage: u });
   if (o.isApiErrorMessage) ev({ k: 'attention', kind: 'error', detail: str(o.error) ?? 'API error' });
+  const q = o.quotaLimits as Json | undefined;
+  if (q && str(q.status) && str(q.rateLimitType)) {
+    ev({ k: 'quota', limitType: q.rateLimitType, status: q.status, resetsAt: typeof q.resetsAt === 'number' ? q.resetsAt * 1000 : null });
+  }
   if (Array.isArray(content)) {
     for (const b of content as Json[]) {
       if (b?.type === 'tool_use' && str(b.id) && str(b.name)) {

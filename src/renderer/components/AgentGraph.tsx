@@ -95,18 +95,40 @@ function NodeCard({ a, view, now, x, y, w, h, selected, onSelect }: { a: AgentNo
   );
 }
 
-export function AgentGraph({ view, now, selectedAgent, onSelect, showFinished, onToggleFinished }: { view: SessionView; now: number; selectedAgent: string | null; onSelect: (id: string | null) => void; showFinished: boolean; onToggleFinished: () => void }) {
+export function AgentGraph({
+  view,
+  now,
+  selectedAgent,
+  onSelect,
+  showFinished,
+  onToggleFinished,
+  compact = false,
+}: {
+  view: SessionView;
+  now: number;
+  selectedAgent: string | null;
+  onSelect: (id: string | null) => void;
+  showFinished: boolean;
+  onToggleFinished: () => void;
+  /** overview panels: no toolbar, scale to fit both width and height */
+  compact?: boolean;
+}) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [wrapW, setWrapW] = useState(1000);
+  const [wrapH, setWrapH] = useState(600);
   const [fit, setFit] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWrapW(el.clientWidth));
+    const measure = () => {
+      setWrapW(el.clientWidth);
+      setWrapH(el.clientHeight);
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    setWrapW(el.clientWidth);
+    measure();
     return () => ro.disconnect();
   }, []);
 
@@ -114,13 +136,18 @@ export function AgentGraph({ view, now, selectedAgent, onSelect, showFinished, o
   useEffect(() => setExpanded(new Set()), [view.id]);
 
   const layout = layoutAgents(view.agents, { ...DEFAULT_LAYOUT, showFinished, expanded });
-  const pad = 36;
-  const scale = fit ? Math.max(0.45, Math.min(1, (wrapW - pad * 2) / Math.max(1, layout.width))) : 1;
+  const pad = compact ? 14 : 36;
+  const scale = compact
+    ? Math.max(0.28, Math.min(1, (wrapW - pad * 2) / Math.max(1, layout.width), (wrapH - pad * 2) / Math.max(1, layout.height)))
+    : fit
+      ? Math.max(0.45, Math.min(1, (wrapW - pad * 2) / Math.max(1, layout.width)))
+      : 1;
   const running = Object.values(view.agents).filter((a) => a.id !== MAIN && a.status === 'running').length;
   const total = Object.keys(view.agents).length - 1;
 
   return (
-    <div className="graph-wrap" ref={wrapRef} onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
+    <div className={`graph-wrap ${compact ? 'compact' : ''}`} ref={wrapRef} onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
+      {!compact && (
       <div className="graph-tools">
         <button className={fit ? 'on' : ''} onClick={() => setFit(!fit)} title="Fit graph to width">
           {fit ? '⤢ fit' : '1:1'}
@@ -132,6 +159,7 @@ export function AgentGraph({ view, now, selectedAgent, onSelect, showFinished, o
           subagents {running}/{total}
         </span>
       </div>
+      )}
       <div className="graph-canvas" style={{ width: layout.width * scale + pad * 2, height: layout.height * scale + pad * 2 }}>
         <div style={{ position: 'absolute', left: pad, top: pad, width: layout.width, height: layout.height, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
           <svg className="edges" width={layout.width} height={layout.height}>

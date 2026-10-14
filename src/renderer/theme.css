@@ -978,3 +978,228 @@ select:focus {
 .modebadge.plan {
   color: var(--opus);
 }
+
+/* ---------- all-sessions overview ---------- */
+.overview {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.ov-grid {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  min-height: 0;
+  overflow: auto;
+}
+.ov-panel {
+  --modec: var(--sonnet);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--line-2);
+  border-top: 3px solid var(--modec);
+  border-radius: 6px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.ov-panel.plan {
+  --modec: var(--opus);
+}
+.ov-panel.waiting {
+  border-color: var(--warn);
+  box-shadow: 0 0 22px -8px var(--warn);
+}
+.ov-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  cursor: pointer;
+  min-width: 0;
+}
+.ov-head:hover .ov-open {
+  color: var(--text);
+}
+.ov-num {
+  color: var(--modec);
+  font-weight: 700;
+  border: 1px solid var(--modec);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.ov-titles {
+  min-width: 0;
+  flex: 1;
+}
+.ov-title {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ov-sub {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ov-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+  flex-shrink: 1;
+}
+.ov-open {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.ov-tool {
+  padding: 4px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px dashed var(--line);
+  color: var(--text-2);
+}
+.ov-graph {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+}
+.graph-wrap.compact {
+  overflow: auto;
+}
+.graph-wrap.compact .node {
+  cursor: pointer;
+}
+.ov-log {
+  border-top: 1px dashed var(--line);
+  padding: 5px 12px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.ov-log div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.page-switch {
+  display: flex;
+  gap: 6px;
+}
+.page-switch button {
+  flex: 1;
+}
+.graph-wrap.compact {
+  display: grid;
+  align-content: center;
+  justify-content: center;
+}
+
+/* ---------- usage limit meters ---------- */
+.usage {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.meter {
+  --lvl: var(--ok);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--panel);
+  white-space: nowrap;
+  font-size: 11.5px;
+  cursor: default;
+}
+.meter.warn {
+  --lvl: var(--warn);
+}
+.meter.hot {
+  --lvl: var(--err);
+  border-color: color-mix(in srgb, var(--err) 55%, var(--line-2));
+  box-shadow: 0 0 14px -6px var(--err);
+}
+.meter.stale {
+  opacity: 0.6;
+}
+.meter.empty {
+  --lvl: var(--faint);
+}
+.m-label {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+.m-bar {
+  position: relative;
+  width: 86px;
+  height: 7px;
+  border-radius: 4px;
+  background: #241f30;
+  overflow: hidden;
+}
+.m-bar > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--lvl) 55%, transparent), var(--lvl));
+  transition: width 0.6s ease;
+}
+.m-bar > b {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text-2);
+  opacity: 0.55;
+}
+.m-pct {
+  color: var(--lvl);
+  font-weight: 700;
+  min-width: 30px;
+  text-align: right;
+}
+.meter.empty .m-pct {
+  color: var(--faint);
+}
+.m-reset {
+  color: var(--muted);
+  font-size: 11px;
+}
+.usage.compact {
+  gap: 6px;
+}
+.usage.compact .meter {
+  padding: 1px 7px;
+  gap: 5px;
+  font-size: 10.5px;
+}
+.usage.compact .m-bar {
+  width: 54px;
+  height: 5px;
+}
+.usage.compact .m-pct {
+  min-width: 26px;
+}
+.mini-usage {
+  padding: 6px 10px 0;
+}

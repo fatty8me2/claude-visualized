@@ -1,0 +1,104 @@
+import { MAIN, type SessionView } from '@core/state';
+import { formatTokens, modelLabel, toolLabel } from '@core/summarize';
+import { useNow, useOverview } from '../hooks';
+import { agentName, ago, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
+import { AgentGraph } from './AgentGraph';
+import { UsageMeters } from './UsageMeters';
+
+/** columns that keep panels roughly landscape on a typical monitor */
+function columnsFor(n: number): number {
+  if (n <= 1) return 1;
+  if (n <= 4) return 2;
+  if (n <= 9) return 3;
+  return 4;
+}
+
+function Panel({ v, index, now, onOpen }: { v: SessionView; index: number; now: number; onOpen: (id: string) => void }) {
+  const main = v.agents[MAIN];
+  const st = main ? displayStatus(main, now) : 'idle';
+  const subs = Object.values(v.agents).filter((a) => a.kind === 'agent');
+  const running = subs.filter((a) => a.status === 'running').length;
+  const plan = v.mode === 'plan';
+  const tokens = v.totals.in + v.totals.out + v.totals.cacheRead + v.totals.cacheWrite;
+  const recent = v.log.filter((l) => l.kind !== 'text').slice(-2);
+  const project = v.cwd?.split(/[\\/]/).filter(Boolean).pop() ?? '';
+  return (
+    <section className={`ov-panel ${plan ? 'plan' : 'build'} ${st === 'waiting' ? 'waiting' : ''}`} data-session={v.id}>
+      <header className="ov-head" onClick={() => onOpen(v.id)} title="Open this session">
+        <span className="ov-num">{index + 1}</span>
+        <span className={`modebadge ${plan ? 'plan' : ''}`}>{plan ? 'PLAN' : 'BUILD'}</span>
+        <div className="ov-titles">
+          <div className="ov-title">{v.title ?? 'untitled session'}</div>
+          <div className="ov-sub">
+            {project}
+            {v.entrypoint === 'claude-desktop' ? ' · desktop' : v.entrypoint ? ` · ${v.entrypoint}` : ''}
+            {v.lastActivity ? ` · ${ago(v.lastActivity, now)}` : ''}
+          </div>
+        </div>
+        <div className="ov-stats">
+          <span className={`status ${st} ${famClass(main?.model)}`}>
+            <b style={{ color: 'var(--fam)' }}>{modelLabel(main?.model)}</b> {STATUS_GLYPH[st]}
+          </span>
+          <span className="ov-sub">
+            agents {running}/{subs.length} · {formatTokens(tokens)} tok{v.costUSD != null ? ` · $${v.costUSD.toFixed(2)}` : ''}
+          </span>
+        </div>
+        <span className="ov-open">open ›</span>
+      </header>
+      {main?.currentTool && (
+        <div className={`ov-tool ${famClass(main.model)}`}>
+          ⚙ <span style={{ color: 'var(--fam)' }}>{toolLabel(main.currentTool.name)}</span> {main.currentTool.summary}
+        </div>
+      )}
+      <div className="ov-graph">
+        <AgentGraph view={v} now={now} selectedAgent={null} onSelect={() => onOpen(v.id)} showFinished onToggleFinished={() => {}} compact />
+      </div>
+      <footer className="ov-log">
+        {recent.length === 0 && <div className="empty-note">no activity yet</div>}
+        {recent.map((l) => (
+          <div key={l.seq}>
+            <span style={{ color: 'var(--faint)' }}>{clock(l.ts)}</span>{' '}
+            <span className={famClass(v.agents[l.agentId]?.model)} style={{ color: 'var(--fam)' }}>
+              {agentName(v.agents[l.agentId])}
+            </span>{' '}
+            {l.text}
+          </div>
+        ))}
+      </footer>
+    </section>
+  );
+}
+
+export function Overview({ onOpen }: { onOpen: (id: string) => void }) {
+  const views = useOverview();
+  const now = useNow(1000);
+  if (!views) return <div className="empty">loading sessions…</div>;
+  const n = views.length;
+  const cols = columnsFor(n);
+  const rows = Math.max(1, Math.ceil(n / cols));
+  const running = views.reduce((k, v) => k + Object.values(v.agents).filter((a) => a.kind === 'agent' && a.status === 'running').length, 0);
+  return (
+    <div className="overview">
+      <div className="topbar">
+        <div className="title">
+          ALL SESSIONS <span className="proj">· {n} live · {running} subagents running · click a panel to open it</span>
+        </div>
+        <UsageMeters />
+      </div>
+      {n === 0 ? (
+        <div className="empty">
+          <div>
+            <div style={{ fontSize: 15, color: 'var(--text)', marginBottom: 8 }}>No live sessions right now</div>
+            <div>Sessions show up here as soon as Claude Code starts working in them.</div>
+          </div>
+        </div>
+      ) : (
+        <div className="ov-grid" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(300px, 1fr))` }}>
+          {views.map((v, i) => (
+            <Panel key={v.id} v={v} index={i} now={now} onOpen={onOpen} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

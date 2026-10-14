@@ -1,6 +1,7 @@
 import { MAIN } from '@core/state';
 import { modelLabel, toolLabel } from '@core/summarize';
 import { useLiveState, useNow } from '../hooks';
+import { UsageMeters } from './UsageMeters';
 import { agentName, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
 
 export function MiniView() {
@@ -26,6 +27,9 @@ export function MiniView() {
         <button onClick={() => window.close()} title="Close mini view">
           ×
         </button>
+      </div>
+      <div className="mini-usage">
+        <UsageMeters compact />
       </div>
       {view && main && (
         <div className="mini-body">

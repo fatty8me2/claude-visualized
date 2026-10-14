@@ -54,6 +54,8 @@ export type AgentEvent = Base &
     | { k: 'text'; role: 'assistant'; preview: string; endTurn: boolean }
     | { k: 'turn.end' }
     | { k: 'cost'; totalCostUSD: number; byModel: Record<string, number> }
+    /** recorded by Claude Code when a usage limit is hit or near (assistant line quotaLimits) */
+    | { k: 'quota'; limitType: string; status: string; resetsAt: number | null }
     | { k: 'compact'; detail?: string }
     | { k: 'attention'; kind: 'permission' | 'notification' | 'error'; detail: string }
     | { k: 'session.end'; detail?: string }

@@ -18,6 +18,7 @@ export class HookServer {
 
   constructor(
     private onPayload: (payload: Record<string, unknown>) => void,
+    private onStatusline: (payload: Record<string, unknown>) => void,
     private onStatus: (s: HookServerStatus) => void,
   ) {}
 
@@ -30,7 +31,8 @@ export class HookServer {
         res.end(JSON.stringify({ ok: true, app: 'claude-visualized' }));
         return;
       }
-      if (req.method !== 'POST' || !req.url?.startsWith('/hook')) {
+      const isStatusline = req.url?.startsWith('/statusline') ?? false;
+      if (req.method !== 'POST' || !(req.url?.startsWith('/hook') || isStatusline)) {
         res.writeHead(404);
         res.end();
         return;
@@ -46,6 +48,10 @@ export class HookServer {
         res.end();
         try {
           const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          if (isStatusline) {
+            this.onStatusline(payload);
+            return;
+          }
           this.status.received++;
           this.status.lastAt = Date.now();
           this.onPayload(payload);
