@@ -68,6 +68,12 @@ export function App() {
     setPage('session');
   };
 
+  // tray "Open settings": either pushed, or waiting for us if the window was still loading
+  useEffect(() => {
+    void window.api.takeOpenSettings().then((pending) => pending && setShowSettings(true));
+    return window.api.onOpenSettings(() => setShowSettings(true));
+  }, []);
+
   // leaving the session ends replay and clears per-session selections
   useEffect(() => {
     if (replay && replay.sessionId !== selected) stop();

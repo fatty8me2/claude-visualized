@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { DEFAULT_MINI_HOTKEY } from '@core/system';
 
 export interface AppConfig {
   port: number;
@@ -9,6 +10,8 @@ export interface AppConfig {
   notifyAgentDone: boolean;
   closeToTray: boolean;
   miniAlwaysOnTop: boolean;
+  launchAtLogin: boolean;
+  miniHotkey: string;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -18,6 +21,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   notifyAgentDone: false,
   closeToTray: true,
   miniAlwaysOnTop: true,
+  launchAtLogin: false,
+  miniHotkey: DEFAULT_MINI_HOTKEY,
 };
 
 function file() {

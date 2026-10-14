@@ -39,6 +39,24 @@ Claude Code doesn't report a percentage for an agent, so the app doesn't invent 
 - The sparkline shows tool calls over the last 12 minutes.
 - An agent that's still marked running but has been silent for a few minutes is shown as *quiet*.
 
+## Everyday use
+
+Settings (the **⚙ hooks** dialog, section **App**) and the tray menu expose:
+
+- **Start with Windows / Start at login** (`launchAtLogin`, default off). Registers a login item that launches the app
+  with `--hidden`, so it starts in the tray without opening the window (on macOS it also honours "opened at login").
+  The checkbox reflects the real OS state, which you can also change in Task Manager > Startup apps or System Settings.
+  Only packaged builds register anything; a dev run keeps the setting but shows "takes effect in the installed app".
+- **Mini view hotkey** (`miniHotkey`, default `CommandOrControl+Alt+V`). A global shortcut that toggles the
+  always-on-top mini view from any app. Type an [Electron accelerator](https://www.electronjs.org/docs/latest/api/accelerator)
+  and press **Apply**; it must contain a modifier plus one key, and plain copy/paste combos are refused. If another app
+  already owns the shortcut you get an error and the previous hotkey stays active.
+- **Tray menu**: *Mini view (hotkey)*, *Open settings*, and the start-at-login checkbox, next to *Show window*,
+  *Follow active session* and *Quit*.
+
+A second launch of the app focuses the running window; a second launch with `--hidden` (what the login item uses) does not.
+Set `CLAUDE_VIS_NO_SYSTEM_INTEGRATION=1` to skip login-item and global-hotkey registration (the e2e tests do).
+
 ## Develop
 
 ```bash

@@ -11,6 +11,16 @@ export interface AppConfigView {
   notifyAgentDone: boolean;
   closeToTray: boolean;
   miniAlwaysOnTop: boolean;
+  launchAtLogin: boolean;
+  miniHotkey: string;
+}
+
+export interface SystemInfoView {
+  /** 'active': login item is really registered; 'dev': unpackaged build, config only; 'disabled': test runs */
+  login: 'active' | 'dev' | 'disabled';
+  /** whether the global hotkey is currently registered, and why not if it isn't */
+  hotkey: { registered: boolean; error: string | null };
+  platform: string;
 }
 
 export interface HookServerStatusView {
@@ -65,6 +75,13 @@ export interface VisApi {
   onUsage(cb: (u: UsageView) => void): () => void;
   /** open the session in the Claude desktop app (claude:// deep link) */
   openInClaude(id: string): Promise<{ ok: boolean; url?: string; error?: string }>;
+  getSystemInfo(): Promise<SystemInfoView>;
+  /** validate + register a new global hotkey for the mini view; the old one stays if this fails */
+  applyHotkey(accelerator: string): Promise<{ ok: boolean; error?: string; accelerator?: string }>;
+  onSystemInfo(cb: (s: SystemInfoView) => void): () => void;
+  /** the tray's "Open settings" was used before this window finished loading */
+  takeOpenSettings(): Promise<boolean>;
+  onOpenSettings(cb: () => void): () => void;
   toggleMini(): Promise<void>;
   showMain(): Promise<void>;
   openPath(p: string): Promise<void>;
