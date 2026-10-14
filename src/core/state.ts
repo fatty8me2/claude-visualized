@@ -151,7 +151,14 @@ export interface SessionInternal {
   /** task id -> last notified status; notifications arrive via queue, attachment and user line */
   notified: Record<string, string>;
   logSeq: number;
+  /** running sizes of seenTools / usage[agent], so the caps in the reducer don't have to count keys each time (set lazily) */
+  seenCount?: number;
+  usageCount?: Record<string, number>;
 }
+
+/** bookkeeping caps for hours-long sessions: oldest entries go first (dedupe only needs recent ones) */
+export const SEEN_TOOLS_CAP = 40_000;
+export const USAGE_MSGS_CAP = 500;
 
 export const LOG_CAP = 1500;
 export const ACTIVITY_CAP = 120;
