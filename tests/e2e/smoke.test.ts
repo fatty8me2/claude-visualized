@@ -277,6 +277,16 @@ describe('app smoke (fixture data)', () => {
     await page.getByRole('button', { name: 'done' }).click();
   });
 
+  it('"active only" hides recent sessions and finished agents', async () => {
+    expect(await page.locator('[data-agent="a1"]').count()).toBe(1); // a finished agent
+    await page.getByTestId('active-only').click();
+    await page.locator('.node.collapsed').first().waitFor();
+    expect(await page.locator('[data-agent="a1"]').count()).toBe(0);
+    expect(await page.locator('.group-label', { hasText: 'recent' }).count()).toBe(0);
+    await page.getByTestId('active-only').click();
+    await page.locator('[data-agent="a1"]').waitFor();
+  });
+
   it('replays the session', async () => {
     await page.getByRole('button', { name: /replay/ }).click();
     await page.locator('.replaybar').waitFor();

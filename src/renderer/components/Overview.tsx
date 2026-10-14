@@ -17,7 +17,7 @@ function columnsFor(n: number): number {
   return 4;
 }
 
-function Panel({ v, index, now, onOpen }: { v: SessionView; index: number; now: number; onOpen: (id: string) => void }) {
+function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: number; now: number; onOpen: (id: string) => void; activeOnly: boolean }) {
   const main = v.agents[MAIN];
   const st = main ? displayStatus(main, now) : 'idle';
   const subs = Object.values(v.agents).filter((a) => a.kind === 'agent');
@@ -77,7 +77,7 @@ function Panel({ v, index, now, onOpen }: { v: SessionView; index: number; now: 
         </div>
       )}
       <div className="ov-graph">
-        <AgentGraph view={v} now={now} selectedAgent={null} onSelect={() => onOpen(v.id)} showFinished onToggleFinished={() => {}} compact />
+        <AgentGraph view={v} now={now} selectedAgent={null} onSelect={() => onOpen(v.id)} showFinished={!activeOnly} onToggleFinished={() => {}} compact />
       </div>
       <footer className="ov-log">
         {recent.length === 0 && <div className="empty-note">no activity yet</div>}
@@ -95,7 +95,7 @@ function Panel({ v, index, now, onOpen }: { v: SessionView; index: number; now: 
   );
 }
 
-export function Overview({ onOpen }: { onOpen: (id: string) => void }) {
+export function Overview({ onOpen, activeOnly = false }: { onOpen: (id: string) => void; activeOnly?: boolean }) {
   const views = useOverview();
   const now = useNow(1000);
   if (!views) return <div className="empty">loading sessions…</div>;
@@ -121,7 +121,7 @@ export function Overview({ onOpen }: { onOpen: (id: string) => void }) {
       ) : (
         <div className="ov-grid" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(300px, 1fr))` }}>
           {views.map((v, i) => (
-            <Panel key={v.id} v={v} index={i} now={now} onOpen={onOpen} />
+            <Panel key={v.id} v={v} index={i} now={now} onOpen={onOpen} activeOnly={activeOnly} />
           ))}
         </div>
       )}

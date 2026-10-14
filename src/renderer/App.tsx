@@ -53,7 +53,23 @@ export function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [agentSel, setAgentSel] = useState<string | null>(null);
   const [logAgent, setLogAgent] = useState<string | null>(null);
-  const [showFinished, setShowFinished] = useState(true);
+  // "active only": hide recent sessions and finished agents everywhere (remembered per machine)
+  const [activeOnly, setActiveOnlyState] = useState(() => {
+    try {
+      return localStorage.getItem('cvis.activeOnly') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setActiveOnly = (on: boolean) => {
+    setActiveOnlyState(on);
+    try {
+      localStorage.setItem('cvis.activeOnly', on ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  const showFinished = !activeOnly;
   const [hlAgents, setHlAgents] = useState<Set<string> | undefined>(undefined);
   const [hoverAgent, setHoverAgent] = useState<string | null>(null);
   const planPrefs = usePlanRailPrefs();
@@ -135,11 +151,13 @@ export function App() {
         page={page}
         onPage={setPage}
         onHelp={() => setOnboarding('welcome')}
+        activeOnly={activeOnly}
+        onActiveOnly={setActiveOnly}
       />
       {!collapsed && <SidebarResizeHandle api={layoutApi} />}
       </div>
       {page === 'overview' ? (
-        <Overview onOpen={openSession} />
+        <Overview onOpen={openSession} activeOnly={activeOnly} />
       ) : view ? (
         <div className="view">
           <div className="topbar">
@@ -201,7 +219,7 @@ export function App() {
                       selectedAgent={agentSel}
                       onSelect={setAgentSel}
                       showFinished={showFinished}
-                      onToggleFinished={() => setShowFinished(!showFinished)}
+                      onToggleFinished={() => setActiveOnly(!activeOnly)}
                       highlight={hlAgents}
                       onHoverAgent={plan ? setHoverAgent : undefined}
                       extraTools={plan ? <PlanToggle plan={plan} prefs={planPrefs} /> : undefined}

@@ -34,7 +34,7 @@ function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: 
 
 export type Page = 'session' | 'overview';
 
-export function SessionList({ sessions, selected, now, follow, onSelect, onFollow, collapsed, onCollapse, page, onPage, onHelp }: { sessions: SessionSummary[]; selected: string | null; now: number; follow: boolean; onSelect: (id: string) => void; onFollow: (on: boolean) => void; collapsed: boolean; onCollapse: () => void; page: Page; onPage: (p: Page) => void; onHelp: () => void }) {
+export function SessionList({ sessions, selected, now, follow, onSelect, onFollow, collapsed, onCollapse, page, onPage, onHelp, activeOnly = false, onActiveOnly }: { activeOnly?: boolean; onActiveOnly?: (on: boolean) => void; sessions: SessionSummary[]; selected: string | null; now: number; follow: boolean; onSelect: (id: string) => void; onFollow: (on: boolean) => void; collapsed: boolean; onCollapse: () => void; page: Page; onPage: (p: Page) => void; onHelp: () => void }) {
   const [q, setQ] = useState('');
   if (collapsed) {
     return (
@@ -91,6 +91,10 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
           <input type="checkbox" checked={follow} onChange={(e) => onFollow(e.target.checked)} />
           follow the active session
         </label>
+        <label className="follow" title="Hide recent sessions and finished agents" data-testid="active-only">
+          <input type="checkbox" checked={activeOnly} onChange={(e) => onActiveOnly?.(e.target.checked)} />
+          active only
+        </label>
       </div>
       <div className="session-list">
         <div className="group-label">live · {live.length}</div>
@@ -98,10 +102,10 @@ export function SessionList({ sessions, selected, now, follow, onSelect, onFollo
         {live.map((s) => (
           <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />
         ))}
-        <div className="group-label">recent</div>
-        {recent.map((s) => (
-          <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />
-        ))}
+        {!activeOnly && <div className="group-label">recent</div>}
+        {!activeOnly &&
+          recent.map((s) => <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />)}
+        {activeOnly && <div className="empty-note" style={{ padding: '10px 12px' }}>recent sessions hidden · untick “active only” to see them</div>}
       </div>
     </div>
   );
