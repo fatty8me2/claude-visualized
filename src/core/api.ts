@@ -70,6 +70,8 @@ export interface VisApi {
   hookState(): Promise<HookStateView>;
   hookPreview(action: 'install' | 'uninstall'): Promise<HookPreviewView>;
   hookApply(action: 'install' | 'uninstall'): Promise<{ ok: boolean; backup?: string | null; error?: string }>;
+  /** the user's Claude Code default model alias from settings.json (e.g. "opus[1m]") */
+  claudeModelSetting(): Promise<string | null>;
   getUsage(): Promise<UsageView>;
   refreshUsage(): Promise<void>;
   onUsage(cb: (u: UsageView) => void): () => void;

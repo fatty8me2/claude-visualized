@@ -30,6 +30,7 @@ const api: VisApi = {
   hookState: () => ipcRenderer.invoke('hooks:state'),
   hookPreview: (action) => ipcRenderer.invoke('hooks:preview', action),
   hookApply: (action) => ipcRenderer.invoke('hooks:apply', action),
+  claudeModelSetting: () => ipcRenderer.invoke('claude:model'),
   getUsage: () => ipcRenderer.invoke('usage:get'),
   refreshUsage: () => ipcRenderer.invoke('usage:refresh'),
   onUsage: (cb) => on('usage', cb),

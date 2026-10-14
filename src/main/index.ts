@@ -7,6 +7,7 @@ import { HookServer } from './hookServer';
 import fs from 'node:fs';
 import { applyQuota, applyStatusline, applyUsageApi, emptyUsage, settleUsage, type UsageView } from '@core/usage';
 import { fetchUsage } from './usageApi';
+import { settingsPath } from './paths';
 import { applyHooks, getHookState, previewHooks } from './installer';
 import { writeStatusLineScript } from './statusline';
 import { SessionManager, type NotifyRequest } from './manager';
@@ -348,6 +349,14 @@ const overviewWatchers = new Set<number>();
 
 function registerIpc() {
   ipcMain.handle('usage:get', () => usage);
+  ipcMain.handle('claude:model', () => {
+    try {
+      const m = JSON.parse(fs.readFileSync(settingsPath(), 'utf8'))?.model;
+      return typeof m === 'string' ? m : null;
+    } catch {
+      return null;
+    }
+  });
   ipcMain.handle('usage:refresh', () => pollUsageApi());
   ipcMain.handle('session:openInClaude', async (_e, id: string) => {
     const url = manager.deepLink(id);

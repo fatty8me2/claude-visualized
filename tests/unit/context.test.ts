@@ -69,3 +69,11 @@ describe('contextWindow', () => {
     expect(contextInfo({ model: null, contextTokens: 0, contextPeak: 0 })).toBeNull();
   });
 });
+
+describe('settings model hint', () => {
+  it('gives the 1M window to agents of the family the user set to [1m]', () => {
+    expect(contextWindow('claude-opus-5-5', 0, 'opus[1m]')).toEqual({ size: 1_000_000, estimated: false });
+    expect(contextWindow('claude-haiku-5-5', 0, 'opus[1m]').size).toBe(200_000);
+    expect(contextWindow('claude-opus-5-5', 0, 'opus').size).toBe(200_000);
+  });
+});

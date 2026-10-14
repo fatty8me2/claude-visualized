@@ -14,8 +14,22 @@ export interface ContextWindow {
  * 1M if the model string says so; otherwise 1M if the agent has ever been observed past the
  * standard window (it could not have fit otherwise); otherwise the standard 200k, as a guess.
  */
-export function contextWindow(model: string | null | undefined, peakTokens = 0): ContextWindow {
-  if (model && /\[1m\]|(?:^|[-_\s])1m(?:$|[-_\s\]])/i.test(model)) return { size: WINDOW_1M, estimated: false };
+const ONE_M = /\[1m\]|(?:^|[-_\s])1m(?:$|[-_\s\]])/i;
+
+/** model family word from an id or alias, e.g. "claude-opus-5-5" or "opus[1m]" -> "opus" */
+function family(m: string): string | null {
+  return /(opus|sonnet|haiku|fable)/i.exec(m)?.[1]?.toLowerCase() ?? null;
+}
+
+/**
+ * `settingsModel` is the user's Claude Code default (settings.json "model", e.g. "opus[1m]");
+ * when it asks for the 1M window, agents of that model family run with it.
+ */
+export function contextWindow(model: string | null | undefined, peakTokens = 0, settingsModel?: string | null): ContextWindow {
+  if (model && ONE_M.test(model)) return { size: WINDOW_1M, estimated: false };
+  if (model && settingsModel && ONE_M.test(settingsModel) && family(model) !== null && family(model) === family(settingsModel)) {
+    return { size: WINDOW_1M, estimated: false };
+  }
   if (peakTokens > WINDOW_STD) return { size: WINDOW_1M, estimated: true };
   return { size: WINDOW_STD, estimated: true };
 }
@@ -37,9 +51,9 @@ export function contextLevel(fraction: number): ContextLevel {
 }
 
 /** null when no usage has been seen for the agent yet. */
-export function contextInfo(a: { model: string | null; contextTokens: number; contextPeak: number }): ContextInfo | null {
+export function contextInfo(a: { model: string | null; contextTokens: number; contextPeak: number }, settingsModel?: string | null): ContextInfo | null {
   if (!a.contextTokens) return null;
-  const w = contextWindow(a.model, Math.max(a.contextPeak, a.contextTokens));
+  const w = contextWindow(a.model, Math.max(a.contextPeak, a.contextTokens), settingsModel);
   const fraction = a.contextTokens / w.size;
   return { tokens: a.contextTokens, size: w.size, estimated: w.estimated, fraction, pct: Math.round(fraction * 100), level: contextLevel(fraction) };
 }
