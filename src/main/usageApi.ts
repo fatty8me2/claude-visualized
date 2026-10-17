@@ -1,13 +1,14 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { refreshIfNeeded } from './oauthRefresh';
 import { claudeHome } from './paths';
 
 /**
  * Reads 5-hour / weekly plan usage the same way Claude Code's /usage does: with the OAuth login
  * Claude Code saved locally, against Anthropic's usage endpoint. The token is only ever sent to
- * api.anthropic.com, is never logged, and is never refreshed here (refreshing rotates it and
- * would sign the CLI out) — an expired login is reported so the user can run `claude /login`.
+ * api.anthropic.com and is never logged. When it is (nearly) expired the app renews it the way the
+ * CLI does (oauthRefresh.ts, owner decision); only a dead refresh token needs `claude /login`.
  */
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
@@ -49,11 +50,16 @@ async function readLogin(): Promise<Login | null> {
   return null;
 }
 
-export async function fetchUsage(): Promise<UsageApiResult> {
+const DEAD_LOGIN = 'Claude Code is signed out on this computer. Run `claude /login` in a terminal once; after that the app keeps the login fresh by itself.';
+
+export async function fetchUsage(retried = false): Promise<UsageApiResult> {
+  const renewal = await refreshIfNeeded(retried);
+  if (renewal === 'dead') return { ok: false, state: 'expired', message: DEAD_LOGIN };
   const login = await readLogin();
   if (!login) return { ok: false, state: 'no-login', message: 'No Claude Code login found. Run `claude` once and sign in (claude /login).' };
   if (login.expiresAt && login.expiresAt < Date.now()) {
-    return { ok: false, state: 'expired', message: 'Claude Code login has expired. Run `claude /login` in a terminal to refresh it.' };
+    const transient = renewal === 'failed' || renewal === 'busy';
+    return { ok: false, state: transient ? 'error' : 'expired', message: transient ? 'Could not renew the Claude Code login just now; will retry.' : DEAD_LOGIN };
   }
   try {
     const res = await fetch(USAGE_URL, {
@@ -61,7 +67,9 @@ export async function fetchUsage(): Promise<UsageApiResult> {
       signal: AbortSignal.timeout(10_000),
     });
     if (res.status === 401 || res.status === 403) {
-      return { ok: false, state: 'expired', message: 'Claude Code login was rejected (expired or signed out). Run `claude /login` in a terminal.' };
+      // the pass may have been revoked early: renew once and try again
+      if (!retried) return fetchUsage(true);
+      return { ok: false, state: 'expired', message: DEAD_LOGIN };
     }
     if (res.status === 429) {
       const ra = Number(res.headers.get('retry-after'));

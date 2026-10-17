@@ -1,0 +1,146 @@
+import { execFile } from 'node:child_process';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { applyRefresh, isDeadRefresh, needsRefresh, oauthOf, refreshRequestBody, TOKEN_URL } from '@core/oauth';
+import { claudeHome } from './paths';
+
+/**
+ * Keeps Claude Code's saved login fresh so the usage meters keep working when only the desktop app
+ * is in use (its separate login never renews the CLI's). Owner decision: the app may renew it.
+ *
+ * Safety: tokens are never logged; the file is re-read under a lock right before writing, and if
+ * the CLI renewed it meanwhile its copy wins; writes are atomic (temp file + rename) and keep every
+ * other field. A dead refresh token is reported, never "fixed" by clearing anything.
+ */
+
+export type RefreshOutcome = 'fresh' | 'refreshed' | 'dead' | 'failed' | 'no-login' | 'busy';
+
+interface Store {
+  read(): Promise<string | null>;
+  write(raw: string): Promise<void>;
+  lockPath: string;
+}
+
+function fileStore(): Store {
+  const file = path.join(claudeHome(), '.credentials.json');
+  return {
+    lockPath: `${file}.claude-visualized.lock`,
+    async read() {
+      try {
+        return await fs.readFile(file, 'utf8');
+      } catch {
+        return null;
+      }
+    },
+    async write(raw) {
+      const tmp = `${file}.claude-visualized.tmp`;
+      await fs.writeFile(tmp, raw, { encoding: 'utf8', mode: 0o600 });
+      await fs.rename(tmp, file);
+    },
+  };
+}
+
+const KEYCHAIN_SERVICE = 'Claude Code-credentials';
+
+function run(cmd: string, args: string[]): Promise<{ ok: boolean; out: string }> {
+  return new Promise((resolve) => execFile(cmd, args, { timeout: 8000 }, (err, out) => resolve({ ok: !err, out: String(out ?? '') })));
+}
+
+/** macOS: Claude Code keeps the login in the login keychain under this service name. */
+function keychainStore(): Store {
+  return {
+    lockPath: path.join(claudeHome(), '.credentials.claude-visualized.lock'),
+    async read() {
+      const r = await run('security', ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-w']);
+      return r.ok ? r.out.trim() : null;
+    },
+    async write(raw) {
+      const info = await run('security', ['find-generic-password', '-s', KEYCHAIN_SERVICE]);
+      const account = /"acct"<blob>="([^"]*)"/.exec(info.out)?.[1] ?? process.env.USER ?? '';
+      const r = await run('security', ['add-generic-password', '-U', '-s', KEYCHAIN_SERVICE, '-a', account, '-w', raw]);
+      if (!r.ok) throw new Error('keychain write failed');
+    },
+  };
+}
+
+async function activeStore(): Promise<Store> {
+  const f = fileStore();
+  if ((await f.read()) !== null || process.platform !== 'darwin') return f;
+  return keychainStore();
+}
+
+async function withLock<T>(lockPath: string, fn: () => Promise<T>): Promise<T | 'busy'> {
+  let fh: fs.FileHandle | null = null;
+  try {
+    fh = await fs.open(lockPath, 'wx');
+  } catch {
+    // a lock older than a minute is from a crashed run
+    try {
+      const st = await fs.stat(lockPath);
+      if (Date.now() - st.mtimeMs < 60_000) return 'busy';
+      await fs.rm(lockPath, { force: true });
+      fh = await fs.open(lockPath, 'wx');
+    } catch {
+      return 'busy';
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    await fh.close().catch(() => {});
+    await fs.rm(lockPath, { force: true }).catch(() => {});
+  }
+}
+
+function tokenUrl(): string {
+  return process.env.CLAUDE_VIS_OAUTH_TOKEN_URL || TOKEN_URL;
+}
+
+/** Renew the saved login if it is (nearly) expired, or always when `force` (the usage API rejected it). */
+export async function refreshIfNeeded(force = false): Promise<RefreshOutcome> {
+  const store = await activeStore();
+  const first = await store.read();
+  if (first === null) return 'no-login';
+  let creds: Record<string, any>;
+  try {
+    creds = JSON.parse(first);
+  } catch {
+    return 'failed';
+  }
+  if (!needsRefresh(oauthOf(creds), Date.now(), force)) return oauthOf(creds)?.refreshToken ? 'fresh' : oauthOf(creds) ? 'dead' : 'no-login';
+
+  const result = await withLock(store.lockPath, async (): Promise<RefreshOutcome> => {
+    // the CLI may have renewed while we waited
+    const before = await store.read();
+    if (before === null) return 'no-login';
+    const cur = JSON.parse(before);
+    if (!needsRefresh(oauthOf(cur), Date.now(), force && before === first)) return 'fresh';
+
+    let res: Response;
+    try {
+      res = await fetch(tokenUrl(), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(refreshRequestBody(oauthOf(cur)!)),
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch {
+      return 'failed';
+    }
+    let body: Record<string, any> | null = null;
+    try {
+      body = (await res.json()) as Record<string, any>;
+    } catch {
+      body = null;
+    }
+    if (!res.ok) return isDeadRefresh(res.status, body) ? 'dead' : 'failed';
+
+    const next = applyRefresh(cur, body ?? {}, Date.now());
+    // last check: if the CLI wrote in the meantime, keep its copy
+    const latest = await store.read();
+    if (latest !== before) return 'fresh';
+    await store.write(JSON.stringify(next));
+    return 'refreshed';
+  });
+  return result;
+}
