@@ -64,6 +64,14 @@ const api: VisApi = {
   downloadUpdate: () => ipcRenderer.invoke('updates:download'),
   installUpdate: () => ipcRenderer.invoke('updates:install'),
   onUpdates: (cb) => on('updates', cb),
+  getPeers: () => ipcRenderer.invoke('peers:status'),
+  onPeers: (cb) => on('peers', cb),
+  setSharing: (on) => ipcRenderer.invoke('peers:share', on),
+  newPairingCode: () => ipcRenderer.invoke('peers:newCode'),
+  setDiscovering: (on) => ipcRenderer.invoke('peers:discover', on),
+  pairWith: (a) => ipcRenderer.invoke('peers:pair', a),
+  unpairDevice: (key) => ipcRenderer.invoke('peers:unpair', key),
+  setPeerPort: (port) => ipcRenderer.invoke('peers:port', port),
 };
 
 contextBridge.exposeInMainWorld('api', api);

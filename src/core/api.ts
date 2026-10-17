@@ -63,6 +63,65 @@ export interface HookPreviewView {
   changed: boolean;
 }
 
+/** A paired computer. role 'host': we watch it; role 'viewer': it may watch us. */
+export interface PeerDeviceView {
+  key: string;
+  deviceId: string;
+  name: string;
+  role: 'host' | 'viewer';
+  host?: string;
+  port?: number;
+  online: boolean;
+  /** hosts: link state; viewers: 'online' or 'offline' */
+  state: 'connecting' | 'online' | 'offline' | 'revoked' | 'error';
+  error: string | null;
+  /** when the link dropped (null while online or before the first attempt) */
+  offlineSince: number | null;
+  lastSeen: number | null;
+  pairedAt: number;
+}
+
+export interface DiscoveredHostView {
+  name: string;
+  host: string;
+  port: number;
+  id: string;
+  seenAt: number;
+  /** already paired as a host */
+  paired: boolean;
+}
+
+/** Peer link state (see docs/PEER-LINK.md), pushed on the 'peers' channel. */
+export interface PeersView {
+  self: { deviceId: string; name: string };
+  sharing: boolean;
+  listening: boolean;
+  port: number;
+  error: string | null;
+  code: { code: string; expiresAt: number } | null;
+  codeState: 'none' | 'active' | 'expired' | 'locked' | 'used';
+  failuresLeft: number;
+  /** the last pairing attempt that failed on this (sharing) side, for the UI */
+  lastPairFailure: { reason: string; at: number } | null;
+  discovering: boolean;
+  discovered: DiscoveredHostView[];
+  devices: PeerDeviceView[];
+}
+
+export interface PairResult {
+  ok: boolean;
+  error?: string;
+  name?: string;
+}
+
+export interface OpenInClaudeResult {
+  ok: boolean;
+  url?: string;
+  error?: string;
+  /** the session runs on another computer: nothing was opened */
+  machine?: string;
+}
+
 export interface VisApi {
   platform: string;
   isMini: boolean;
@@ -100,7 +159,7 @@ export interface VisApi {
   historyRebuild(): Promise<void>;
   onHistory(cb: (s: HistoryStatus) => void): () => void;
   /** open the session in the Claude desktop app (claude:// deep link) */
-  openInClaude(id: string): Promise<{ ok: boolean; url?: string; error?: string }>;
+  openInClaude(id: string): Promise<OpenInClaudeResult>;
   getSystemInfo(): Promise<SystemInfoView>;
   /** validate + register a new global hotkey for the mini view; the old one stays if this fails */
   applyHotkey(accelerator: string): Promise<{ ok: boolean; error?: string; accelerator?: string }>;
@@ -137,4 +196,14 @@ export interface VisApi {
   /** quit and install the downloaded update */
   installUpdate(): Promise<boolean>;
   onUpdates(cb: (u: UpdateView) => void): () => void;
+  /** peer link: share with / watch other computers */
+  getPeers(): Promise<PeersView>;
+  onPeers(cb: (p: PeersView) => void): () => void;
+  setSharing(on: boolean): Promise<PeersView>;
+  newPairingCode(): Promise<PeersView>;
+  /** listen for LAN beacons while the Devices page is open */
+  setDiscovering(on: boolean): Promise<void>;
+  pairWith(args: { host: string; port: number; code: string }): Promise<PairResult>;
+  unpairDevice(key: string): Promise<PeersView>;
+  setPeerPort(port: number): Promise<PeersView>;
 }

@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import { normalizeHook } from '@core/normalize';
 import { MAIN, toView, type AgentStatus, type SessionSummary, type SessionView } from '@core/state';
 import { OverviewEncoder, ViewEncoder, type OverviewMsg, type ViewMsg } from '@core/sync';
+import { isRemoteId } from '@core/remote';
 import { SessionIndexer, LIVE_MS } from './indexer';
 import { SessionWatcher } from './watcher';
 import { loadBacklogInWorker } from './workerLoader';
@@ -26,6 +27,20 @@ export interface NotifyRequest {
 }
 
 /**
+ * Another computer's sessions (the peer link's viewer side, see main/peer/service.ts). Ids are namespaced (remote:<deviceId>:<id>).
+ * Events: 'sessions', 'view' (id), 'overview'.
+ */
+export interface RemoteSource {
+  summaries(): SessionSummary[];
+  view(id: string): SessionView | null;
+  overview(): SessionView[];
+  setSelected(id: string | null): void;
+  setOverviewWanted(on: boolean): void;
+  on(event: 'sessions' | 'overview', fn: () => void): unknown;
+  on(event: 'view', fn: (id: string) => void): unknown;
+}
+
+/**
  * Owns the session index and one SessionWatcher per followed session (the selected one plus
  * recently live ones, so the tray can show what's running everywhere).
  *
@@ -41,8 +56,39 @@ export class SessionManager extends EventEmitter {
   private overviewEnc = new OverviewEncoder();
   private dirty = false;
   private overviewDirty = false;
+  private ovViewers = 0;
+  private remote: RemoteSource | null = null;
+  /** per-session change stamps (from one clock, so a value never repeats) and the overview's, for the peer link's sharer */
+  private versions = new Map<string, number>();
+  private clock = 0;
+  private ovVersion = 0;
+  /** sessions a peer viewer is subscribed to: kept followed like the selected one */
+  private retained = new Map<string, number>();
+
   /** number of windows currently showing the all-sessions overview */
-  overviewViewers = 0;
+  get overviewViewers(): number {
+    return this.ovViewers;
+  }
+  set overviewViewers(n: number) {
+    this.ovViewers = n;
+    this.remote?.setOverviewWanted(n > 0);
+  }
+
+  /** Merge another computer's sessions into the list, the overview and the selection. */
+  setRemote(r: RemoteSource) {
+    this.remote = r;
+    r.on('sessions', () => this.emitSessions());
+    r.on('view', (id: string) => {
+      if (id === this.selectedId) this.markDirty();
+    });
+    r.on('overview', () => (this.overviewDirty = true));
+    r.setOverviewWanted(this.ovViewers > 0);
+  }
+
+  private touch(id: string) {
+    this.versions.set(id, ++this.clock);
+    this.ovVersion++;
+  }
   private timers: NodeJS.Timeout[] = [];
   private lastHookBySession = new Map<string, number>();
   followActive = true;
@@ -71,8 +117,14 @@ export class SessionManager extends EventEmitter {
     );
   }
 
-  /** Snapshots of every live session (log trimmed), most recently active first. */
+  /** Snapshots of every live session (log trimmed), most recently active first, then other computers' live sessions. */
   overview(): SessionView[] {
+    const local = this.localOverview();
+    return this.remote ? [...local, ...this.remote.overview()] : local;
+  }
+
+  /** This machine's live sessions only (what the peer link shares). */
+  localOverview(): SessionView[] {
     const out: SessionView[] = [];
     for (const s of this.summaries) {
       if (!s.live) continue;
@@ -94,6 +146,7 @@ export class SessionManager extends EventEmitter {
 
   /** Title for a session id from the index, else the live state. */
   titleOf(id: string): string | null {
+    if (isRemoteId(id)) return this.remote?.summaries().find((s) => s.id === id)?.title ?? null;
     const w = this.watchers.get(id);
     return (w?.primed ? w.state.title : null) ?? this.summaries.find((s) => s.id === id)?.title ?? null;
   }
@@ -127,12 +180,51 @@ export class SessionManager extends EventEmitter {
     return claudeDeepLink(id, this.indexer.desktop.byCliId.get(id));
   }
 
+  /** This machine's sessions, then other computers' (namespaced, with a machine name). */
   getSummaries(): SessionSummary[] {
+    return this.remote ? [...this.summaries, ...this.remote.summaries()] : this.summaries;
+  }
+
+  /** This machine's sessions only (what the peer link shares). */
+  localSummaries(): SessionSummary[] {
     return this.summaries;
+  }
+
+  /** A local session's live view (the peer link's sharer streams these); null until loaded. */
+  localView(id: string): SessionView | null {
+    const w = this.watchers.get(id);
+    return w && w.primed ? toView(w.state) : null;
+  }
+
+  /** Change stamp of a local session's view: differs whenever the view may have changed. */
+  versionOf(id: string): number {
+    return this.versions.get(id) ?? 0;
+  }
+
+  get overviewVersion(): number {
+    return this.ovVersion;
+  }
+
+  /** Keep following a local session while a peer viewer is subscribed to it. */
+  retain(id: string) {
+    this.retained.set(id, (this.retained.get(id) ?? 0) + 1);
+    const w = this.ensureWatcher(id);
+    if (w)
+      void w.poll().then(
+        () => this.touch(id),
+        () => {},
+      );
+  }
+
+  release(id: string) {
+    const n = (this.retained.get(id) ?? 0) - 1;
+    if (n > 0) this.retained.set(id, n);
+    else this.retained.delete(id);
   }
 
   currentView(): SessionView | null {
     if (!this.selectedId) return null;
+    if (isRemoteId(this.selectedId)) return this.remote?.view(this.selectedId) ?? null;
     const w = this.watchers.get(this.selectedId);
     return w && w.primed ? toView(w.state) : null;
   }
@@ -140,7 +232,8 @@ export class SessionManager extends EventEmitter {
   select(id: string | null, manual = true) {
     if (manual) this.followActive = false;
     this.selectedId = id;
-    if (id) {
+    this.remote?.setSelected(id && isRemoteId(id) ? id : null);
+    if (id && !isRemoteId(id)) {
       const w = this.ensureWatcher(id);
       if (w) void w.poll().then(() => this.markDirty());
     }
@@ -161,7 +254,7 @@ export class SessionManager extends EventEmitter {
     let w = this.watchers.get(id);
     if (w) return w;
     const f = file ?? this.summaries.find((s) => s.id === id)?.file;
-    if (!f) return null;
+    if (!f || isRemoteId(id)) return null;
     w = new SessionWatcher(id, f, loadBacklogInWorker);
     this.watchers.set(id, w);
     return w;
@@ -177,11 +270,12 @@ export class SessionManager extends EventEmitter {
     // follow recently live sessions; drop watchers that are neither live nor selected
     const live = this.summaries.filter((s) => s.live).slice(0, MAX_LIVE_WATCHERS);
     for (const s of live) this.ensureWatcher(s.id, s.file);
-    const keep = new Set([...live.map((s) => s.id), this.selectedId, ...this.recentHookSessions()]);
+    const keep = new Set([...live.map((s) => s.id), this.selectedId, ...this.recentHookSessions(), ...this.retained.keys()]);
     for (const id of [...this.watchers.keys()]) if (!keep.has(id)) this.watchers.delete(id);
     if (this.followActive) this.autoSelect();
     this.emitSessions();
     this.overviewDirty = true;
+    this.ovVersion++;
   }
 
   private recentHookSessions(): string[] {
@@ -210,7 +304,7 @@ export class SessionManager extends EventEmitter {
         s.live = !w.state.ended && (Date.now() - s.mtime < LIVE_MS || (busy && Date.now() - s.mtime < 60 * 60_000));
       }
     }
-    this.emit('sessions', this.summaries);
+    this.emit('sessions', this.getSummaries());
   }
 
   private autoSelect() {
@@ -245,6 +339,7 @@ export class SessionManager extends EventEmitter {
       }
       if (!changed && wasPrimed) continue;
       sessionsChanged = true;
+      this.touch(w.sessionId);
       if (w.sessionId === this.selectedId) this.markDirty();
       this.overviewDirty = true;
     }
@@ -300,6 +395,7 @@ export class SessionManager extends EventEmitter {
     // hooks for an unprimed watcher would be applied before the backlog; the transcript will carry them
     if (!w.primed) return;
     w.ingest(normalizeHook(payload, Date.now()));
+    this.touch(sessionId);
     if (sessionId === this.selectedId) this.markDirty();
     this.overviewDirty = true;
     this.emit('changed');

@@ -243,8 +243,8 @@ export function newSession(id: string): SessionState {
   };
 }
 
-/** The renderer-facing snapshot: everything except bookkeeping. */
-export type SessionView = Omit<SessionState, 'internal'>;
+/** The renderer-facing snapshot: everything except bookkeeping. `machine` is set on sessions of another computer (peer link). */
+export type SessionView = Omit<SessionState, 'internal'> & { machine?: string };
 
 export function toView(s: SessionState): SessionView {
   const { internal: _internal, ...view } = s;
@@ -271,4 +271,8 @@ export interface SessionSummary {
   desktopId?: string | null;
   /** hidden in the desktop app's sidebar */
   archived?: boolean;
+  /** set on sessions of another computer (peer link): its name, device id, and when the link dropped (null while online) */
+  machine?: string;
+  deviceId?: string;
+  offlineSince?: number | null;
 }

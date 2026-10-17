@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { deriveInbox, noticeItem, snapshotOf, type InboxItem, type InboxSnapshot } from '@core/inbox';
+import { mergeInbox, type RemoteInbox } from '@core/remote';
 import type { UsageView } from '@core/usage';
 import type { NotifyRequest, SessionManager } from './manager';
 
@@ -14,7 +15,11 @@ const DISMISSED_KEEP_MS = 30 * 24 * 3_600_000;
  * and emits 'inbox' (InboxSnapshot) whenever the visible result changes.
  */
 export class InboxService extends EventEmitter {
+  /** derived from this machine's sessions */
   private items: InboxItem[] = [];
+  /** plus other computers' items (peer link), what the UI shows */
+  private merged: InboxItem[] = [];
+  private remote: RemoteInbox[] = [];
   private dismissed = new Map<string, number>();
   private timer: NodeJS.Timeout | null = null;
   private tick: NodeJS.Timeout | null = null;
@@ -42,11 +47,22 @@ export class InboxService extends EventEmitter {
   }
 
   snapshot(): InboxSnapshot {
-    return snapshotOf(this.items);
+    return snapshotOf(this.merged);
   }
 
   get count(): number {
-    return this.items.filter((i) => !i.resolved).length;
+    return this.merged.filter((i) => !i.resolved).length;
+  }
+
+  /** This machine's own items (what the peer link shares). */
+  localItems(): InboxItem[] {
+    return this.items;
+  }
+
+  /** Other computers' items, labelled by machine. Dismissing one only hides it here. */
+  setRemote(remote: RemoteInbox[]) {
+    this.remote = remote;
+    this.schedule();
   }
 
   /** Coalesce bursts of changes into one derivation. */
@@ -59,8 +75,10 @@ export class InboxService extends EventEmitter {
   }
 
   recompute(now = Date.now()) {
-    this.items = deriveInbox(this.items, this.manager.watchedViews(), this.getUsage(), now, new Set(this.dismissed.keys()));
-    const snap = snapshotOf(this.items);
+    const dismissed = new Set(this.dismissed.keys());
+    this.items = deriveInbox(this.items, this.manager.watchedViews(), this.getUsage(), now, dismissed);
+    this.merged = this.remote.length ? mergeInbox(this.items, this.remote, dismissed) : this.items;
+    const snap = snapshotOf(this.merged);
     const sig = JSON.stringify(snap.items);
     if (sig === this.lastSig) return;
     this.lastSig = sig;
@@ -87,7 +105,7 @@ export class InboxService extends EventEmitter {
 
   /** Dismiss every resolved item. */
   clearResolved() {
-    for (const i of this.items) if (i.resolved) this.dismissed.set(i.id, Date.now());
+    for (const i of this.merged) if (i.resolved) this.dismissed.set(i.id, Date.now());
     this.save();
     this.recompute();
   }

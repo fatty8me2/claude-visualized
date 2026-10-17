@@ -1,12 +1,19 @@
 import { ipcMain, shell } from 'electron';
+import { isRemoteId } from '@core/remote';
+import type { OpenInClaudeResult } from '@core/api';
 import type { IpcRegistrar } from './registry';
 
 /** webContents ids currently showing the overview page */
 const overviewWatchers = new Set<number>();
 
 /** Sessions: list, selection, live state, replay, overview and "open in Claude". */
-export const registerSessionsIpc: IpcRegistrar = ({ manager, updateConfig }) => {
-  ipcMain.handle('session:openInClaude', async (_e, id: string) => {
+export const registerSessionsIpc: IpcRegistrar = ({ manager, updateConfig, peers }) => {
+  ipcMain.handle('session:openInClaude', async (_e, id: string): Promise<OpenInClaudeResult> => {
+    // another computer's session: never open anything here (the peer link is read-only)
+    if (isRemoteId(id)) {
+      const machine = peers.machineOf(id) ?? 'another computer';
+      return { ok: false, machine, error: `This session is running on ${machine}` };
+    }
     const url = manager.deepLink(id);
     // tests must not launch the real Claude app
     if (process.env.CLAUDE_VIS_NO_EXTERNAL) return { ok: true, url };

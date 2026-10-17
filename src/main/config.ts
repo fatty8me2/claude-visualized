@@ -17,6 +17,9 @@ export interface AppConfig {
   onboardingDone?: boolean;
   onboardingVersion?: number;
   localModels: LocalModelsConfig;
+  /** peer link: "Share with my other computers" (off by default) and its TCP port */
+  shareEnabled: boolean;
+  peerPort: number;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -30,6 +33,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   autoDownloadUpdates: true,
   miniHotkey: DEFAULT_MINI_HOTKEY,
   localModels: DEFAULT_LOCAL_CONFIG,
+  shareEnabled: false,
+  peerPort: 47830,
 };
 
 function file() {

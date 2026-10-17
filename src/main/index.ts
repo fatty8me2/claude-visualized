@@ -17,6 +17,9 @@ import { overlayIcon, withDot } from './trayBadge';
 import { applyUrlOverrides, normalizeLocalConfig } from '@core/localModels';
 import { Updater } from './updater';
 import { RELEASES_URL } from '@core/updates';
+import { mergeUsage } from '@core/remote';
+import { PeerService, type ShareSource } from './peer/service';
+import { deviceName } from './peer/name';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 
@@ -105,6 +108,7 @@ const manager = new SessionManager();
 let localMonitor: LocalMonitor;
 let inbox: InboxService;
 let updater: Updater;
+let peers: PeerService;
 // ---- 5-hour / weekly usage limits, persisted so they show right after a restart ----
 const usageFile = () => path.join(app.getPath('userData'), 'usage.json');
 let usage: UsageView = emptyUsage();
@@ -143,7 +147,22 @@ function setUsage(next: UsageView) {
   } catch {
     /* non-fatal */
   }
-  broadcast('usage', usage);
+  broadcastUsage();
+}
+
+/** What the meters show: per window, the freshest reading from this machine or a paired one (same account). */
+function shownUsage(): UsageView {
+  const remote = peers?.remoteUsage() ?? [];
+  return remote.length ? settleUsage(mergeUsage(usage, remote), Date.now()) : usage;
+}
+
+let lastUsageJson = '';
+function broadcastUsage() {
+  const u = shownUsage();
+  const j = JSON.stringify(u);
+  if (j === lastUsageJson) return;
+  lastUsageJson = j;
+  broadcast('usage', u);
   updateTrayTooltip();
   inbox?.schedule();
 }
@@ -309,6 +328,7 @@ function toggleMini() {
 let traySignature = '';
 
 function usageText(): string {
+  const usage = shownUsage();
   const p = (w: UsageView['fiveHour']) => (w ? `${Math.round(w.pct)}%` : '—');
   return usage.fiveHour || usage.sevenDay ? `5-hour ${p(usage.fiveHour)} · weekly ${p(usage.sevenDay)}` : '';
 }
@@ -319,8 +339,9 @@ function updateTrayTooltip() {
   const running = sessions.reduce((n, s) => n + (s.running ?? 0), 0);
   const u = usageText();
   const need = inbox?.count ?? 0;
+  const sharing = peers?.isSharing ? ' · sharing with your other computers' : '';
   tray.setToolTip(
-    `Claude Visualized — ${sessions.length} live session${sessions.length === 1 ? '' : 's'}${running ? `, ${running} subagents running` : ''}${need ? `, ${need} need you` : ''}${
+    `Claude Visualized — ${sessions.length} live session${sessions.length === 1 ? '' : 's'}${running ? `, ${running} subagents running` : ''}${need ? `, ${need} need you` : ''}${sharing}${
       u
         ? `
 ${u}`
@@ -359,6 +380,8 @@ function rebuildTrayMenu() {
     updater?.state.status,
     updater?.state.version,
     updater?.state.mode,
+    peers?.isSharing,
+    peers?.status().devices.filter((d) => d.role === 'viewer' && d.online).length,
   ]);
   if (sig === traySignature) return;
   traySignature = sig;
@@ -393,6 +416,15 @@ function rebuildTrayMenu() {
       checked: config.launchAtLogin,
       click: (mi) => updateConfig({ launchAtLogin: mi.checked }),
     },
+    { type: 'separator' },
+    ...(peers?.isSharing ? [{ label: `● Sharing with ${viewersText()}`, enabled: false }] : []),
+    {
+      label: 'Share with my other computers',
+      type: 'checkbox',
+      checked: !!peers?.isSharing,
+      click: (mi) => void setSharing(mi.checked),
+    },
+    { label: 'Devices…', click: () => navigate('devices') },
     ...updateTrayItems(),
     { type: 'separator' },
     {
@@ -404,6 +436,24 @@ function rebuildTrayMenu() {
     },
   ];
   tray.setContextMenu(Menu.buildFromTemplate(items));
+}
+
+function viewersText(): string {
+  const n = peers?.status().devices.filter((d) => d.role === 'viewer' && d.online).length ?? 0;
+  return n ? `${n} computer${n === 1 ? '' : 's'} watching` : 'your other computers';
+}
+
+/** "Share with my other computers": persisted, off by default; while off there is no listener. */
+async function setSharing(on: boolean) {
+  updateConfig({ shareEnabled: on });
+  await peers.setSharing(on);
+  rebuildTrayMenu();
+}
+
+async function setPeerPort(port: number) {
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) return;
+  updateConfig({ peerPort: port });
+  await peers.setPort(port);
 }
 
 function createTray() {
@@ -460,7 +510,7 @@ function registerIpc() {
     getLocalMonitor: () => localMonitor,
     getConfig: () => config,
     updateConfig,
-    getUsage: () => usage,
+    getUsage: shownUsage,
     pollUsageApi,
     systemInfo,
     applyHotkey,
@@ -468,6 +518,9 @@ function registerIpc() {
     showMain,
     showInbox,
     updater,
+    peers,
+    setSharing,
+    setPeerPort,
     takePendingOpenSettings: () => {
       const p = pendingOpenSettings;
       pendingOpenSettings = false;
@@ -504,7 +557,35 @@ if (!app.requestSingleInstanceLock()) {
     manager.followActive = config.followActive;
     manager.notifyAttention = config.notifyAttention;
     manager.notifyAgentDone = config.notifyAgentDone;
-    inbox = new InboxService(manager, () => usage, path.join(app.getPath('userData'), 'inbox-dismissed.json'));
+    inbox = new InboxService(manager, shownUsage, path.join(app.getPath('userData'), 'inbox-dismissed.json'));
+    if (process.env.CLAUDE_VIS_PEER_PORT) config.peerPort = Number(process.env.CLAUDE_VIS_PEER_PORT);
+    // the peer link shares only this machine's own data (never what it receives from other peers)
+    const shareSource: ShareSource = {
+      summaries: () => manager.localSummaries(),
+      view: (id) => manager.localView(id),
+      version: (id) => manager.versionOf(id),
+      retain: (id) => manager.retain(id),
+      release: (id) => manager.release(id),
+      overview: () => manager.localOverview(),
+      overviewVersion: () => manager.overviewVersion,
+      inbox: () => inbox.localItems(),
+      usage: () => usage,
+    };
+    peers = new PeerService({
+      storeFile: path.join(app.getPath('userData'), 'peers.json'),
+      name: deviceName(),
+      source: shareSource,
+      port: config.peerPort,
+      bindHost: process.env.CLAUDE_VIS_PEER_BIND || undefined,
+      discovery: !process.env.CLAUDE_VIS_NO_DISCOVERY,
+    });
+    manager.setRemote(peers);
+    peers.on('status', (st) => {
+      broadcast('peers', st);
+      rebuildTrayMenu();
+    });
+    peers.on('inbox', () => inbox.setRemote(peers.remoteInbox()));
+    peers.on('usage', broadcastUsage);
     inbox.on('inbox', (snap) => {
       broadcast('inbox', snap);
       applyInboxBadge();
@@ -542,6 +623,8 @@ if (!app.requestSingleInstanceLock()) {
     inbox.start();
     localMonitor.start();
     updater.start();
+    peers.start();
+    if (config.shareEnabled) void peers.setSharing(true);
     if (!process.env.CLAUDE_VIS_NO_HOOK_SERVER) hookServer.start(config.port);
     if (!process.env.CLAUDE_VIS_NO_TRAY) createTray();
     const openedAtLogin = process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin;
@@ -557,6 +640,7 @@ if (!app.requestSingleInstanceLock()) {
     localMonitor?.stop();
     updater?.stop();
     hookServer.stop();
+    void peers?.stop();
   });
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin' && (!tray || quitting)) app.quit();

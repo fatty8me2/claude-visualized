@@ -26,6 +26,8 @@ export interface InboxItem {
   agentName: string | null;
   resolved: boolean;
   resolvedAt: number | null;
+  /** set on items of another computer (peer link) */
+  machine?: string;
 }
 
 export interface InboxSnapshot {
