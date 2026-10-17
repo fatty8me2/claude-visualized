@@ -3,7 +3,8 @@ import { Tour, Welcome } from './components/Onboarding';
 import { SessionList } from './components/SessionList';
 import { SettingsDialog } from './components/SettingsDialog';
 import { UpdatePill, useUpdates } from './components/UpdatesSettings';
-import { useConfig, useHookServer, useInbox, useLiveState, useNow, useSelected, useSessions } from './hooks';
+import { useConfig, useHookServer, useInbox, useLiveState, useNow, usePeers, useSelected, useSessions } from './hooks';
+import { useToasts } from './state/toast';
 import { SidebarResizeHandle, usePanelLayout } from './layout';
 import { useReplay } from './replay';
 import { useActiveOnly } from './state/activeOnly';
@@ -30,6 +31,8 @@ export function App() {
   const [page, setPage] = usePage();
   const ui = useSessionUi(selected);
   const inbox = useInbox();
+  const peers = usePeers();
+  const toasts = useToasts();
   /** an agent to open once its session is the selected one (inbox "show") */
   const [pendingAgent, setPendingAgent] = useState<{ sessionId: string; agentId: string } | null>(null);
   const layoutApi = usePanelLayout();
@@ -90,6 +93,7 @@ export function App() {
           activeOnly={activeOnly}
           onActiveOnly={setActiveOnly}
           badges={{ inbox: inbox?.count ?? 0 }}
+          peers={peers}
         />
         {!collapsed && <SidebarResizeHandle api={layoutApi} />}
       </div>
@@ -118,6 +122,15 @@ export function App() {
           : null,
       })}
       <UpdatePill updates={updates} />
+      {toasts.length > 0 && (
+        <div className="toasts" role="status">
+          {toasts.map((t) => (
+            <div key={t.id} className="toast" data-testid="toast">
+              {t.text}
+            </div>
+          ))}
+        </div>
+      )}
       {showSettings && config && (
         <SettingsDialog
           config={config}

@@ -84,6 +84,14 @@ Settings (the **⚙ hooks** dialog, section **App**) and the tray menu expose:
 A second launch of the app focuses the running window; a second launch with `--hidden` (what the login item uses) does not.
 Set `CLAUDE_VIS_NO_SYSTEM_INTEGRATION=1` to skip login-item and global-hotkey registration (the e2e tests do).
 
+## Watching another computer
+
+The **devices** page links two installs, e.g. a Mac that runs Claude Code and a Windows PC you look at it from. On the Mac, tick
+**Share with my other computers** (off by default; nothing listens on the network until you do). It shows a one-time code. On the PC, enter the
+Mac's host name or IP (or its Tailscale name), port `47830` and the code. From then on the PC shows the Mac's live sessions in the sidebar under
+the Mac's name, on the all-sessions page and in the inbox, and the usage meters use the freshest reading from either machine. The link is
+read-only and encrypted. Design and security notes: [docs/PEER-LINK.md](docs/PEER-LINK.md). Building on a Mac: [docs/MAC.md](docs/MAC.md).
+
 ## Launching
 
 - **Installed app:** run `release/<version>/Claude Visualized Setup <version>.exe` once. It installs per user (no admin), adds **Claude Visualized** to the Start menu, so you can just search for it, and puts a shortcut on the desktop.
@@ -135,6 +143,10 @@ Environment overrides (mainly for tests):
 | `CLAUDE_VIS_NO_HOOK_SERVER` | don't start the hook receiver |
 | `CLAUDE_VIS_NO_TRAY` | don't create a tray icon |
 | `CLAUDE_VIS_SKIP_ONBOARDING` | don't show the first-run welcome screen (tests) |
+| `CLAUDE_VIS_PEER_PORT` | peer link port while sharing (default 47830) |
+| `CLAUDE_VIS_PEER_BIND` | interface to share on, e.g. `127.0.0.1` (default: all interfaces; the e2e tests stay on loopback) |
+| `CLAUDE_VIS_NO_DISCOVERY` | no LAN discovery beacon / listener |
+| `CLAUDE_VIS_DEVICE_NAME` | this computer's name as shown on paired computers |
 
 ### Layout
 
@@ -154,6 +166,6 @@ tests/          vitest unit tests with a synthetic ~/.claude fixture, Playwright
   SmartScreen will warn until you sign it with a code-signing certificate.
 - **Updates:** installed apps update themselves from GitHub Releases (Windows; unsigned macOS builds link to the release page). See
   [RELEASING.md](RELEASING.md) for cutting a release, `release:win` / `release:mac`, and testing updates locally. `dist:*` never publishes.
-- **macOS:** build `npm run dist:mac` on a Mac, or in CI by moving `ci/github-build.yml` to `.github/workflows/` (pushing it needs a GitHub token with the `workflow` scope). Without an Apple Developer ID
+- **macOS:** step-by-step in [docs/MAC.md](docs/MAC.md). Build `npm run dist:mac` on a Mac, or in CI by moving `ci/github-build.yml` to `.github/workflows/` (pushing it needs a GitHub token with the `workflow` scope). Without an Apple Developer ID
   the app is unsigned and not notarized. Open it the first time with right-click → Open, or run
   `xattr -dr com.apple.quarantine "/Applications/Claude Visualized.app"`.

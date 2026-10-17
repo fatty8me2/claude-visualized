@@ -2,6 +2,8 @@ import type { InboxItem, InboxKind } from '@core/inbox';
 import { groupBySession } from '@core/inbox';
 import { useInbox, useNow } from '../hooks';
 import { ago } from '../util';
+import { openInClaude } from '../state/toast';
+import { MachineChip } from './MachineChip';
 
 export const KIND_ICON: Record<InboxKind, string> = {
   permission: '\u{1F510}',
@@ -38,6 +40,7 @@ function Row({ item, now, onShow }: { item: InboxItem; now: number; onShow: (ses
         {KIND_ICON[item.kind]}
       </span>
       <div className="ttl">
+        <MachineChip machine={item.machine} />
         <b>{item.title}</b>
         {item.count > 1 && <span className="count">x{item.count}</span>}
         {item.resolved && <span className="tag">resolved</span>}
@@ -52,7 +55,10 @@ function Row({ item, now, onShow }: { item: InboxItem; now: number; onShow: (ses
       <div className="acts">
         {item.sessionId && (
           <>
-            <button title="Open this session in the Claude desktop app" onClick={() => void window.api.openInClaude(item.sessionId!)}>
+            <button
+              title={item.machine ? `This session is running on ${item.machine}` : 'Open this session in the Claude desktop app'}
+              onClick={() => void openInClaude(item.sessionId!)}
+            >
               {'↗'} open in Claude
             </button>
             <button title="Select this session here" onClick={() => onShow(item.sessionId!, item.agentId)}>
@@ -100,6 +106,7 @@ export function InboxPage({ onShow }: { onShow: (sessionId: string, agentId: str
         <div className="inbox-group" key={g.sessionId ?? 'account'}>
           <div className="inbox-group-title">
             <span className="t">{g.title}</span>
+            <MachineChip machine={g.items[0]?.machine} />
           </div>
           {g.items.map((i) => (
             <Row key={i.id} item={i} now={now} onShow={onShow} />

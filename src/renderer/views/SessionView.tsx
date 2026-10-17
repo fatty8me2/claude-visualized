@@ -13,6 +13,8 @@ import { LayoutToolbar, PanelGrid, type LayoutApi } from '../layout';
 import type { useReplay } from '../replay';
 import type { SessionUi } from '../state/sessionUi';
 import { clock } from '../util';
+import { MachineChip } from '../components/MachineChip';
+import { openInClaude } from '../state/toast';
 import { eventIndexAt } from '@core/timeline';
 import { GRAPH_VIEWS } from './graphViews';
 
@@ -90,19 +92,29 @@ export function SessionView({
     <div className="view">
       <div className="topbar">
         <div className="title">
+          {view.machine && (
+            <>
+              <MachineChip machine={view.machine} offline={summary?.offlineSince != null} />{' '}
+            </>
+          )}
           {view.title ?? 'untitled session'} <span className="proj">· {summary?.project ?? view.cwd?.split(/[\\/]/).pop() ?? ''}</span>
         </div>
         <UsageMeters />
         <LocalChip onOpen={onLocal} />
         <div className="actions">
-          <button data-tour="open-in-claude" onClick={() => void window.api.openInClaude(view.id)} title="Open this session in the Claude desktop app">
+          <button
+            data-tour="open-in-claude"
+            data-testid="open-in-claude"
+            onClick={() => void openInClaude(view.id)}
+            title={view.machine ? `This session is running on ${view.machine}` : 'Open this session in the Claude desktop app'}
+          >
             ↗ open in Claude
           </button>
           {replay ? (
             <button className="on" onClick={stop}>
               ■ back to live
             </button>
-          ) : (
+          ) : view.machine ? null : (
             <button onClick={() => void start(view.id)} title="Replay this session from the start">
               ⟲ replay
             </button>

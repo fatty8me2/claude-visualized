@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AppConfigView, HookServerStatusView } from '@core/api';
+import type { AppConfigView, HookServerStatusView, PeersView } from '@core/api';
 import type { InboxSnapshot } from '@core/inbox';
 import type { SessionSummary, SessionView } from '@core/state';
 import { OverviewDecoder, ViewDecoder } from '@core/sync';
@@ -133,4 +133,14 @@ export function useInbox(): InboxSnapshot | null {
     return window.api.onInbox(set);
   }, []);
   return s;
+}
+
+/** Peer link state: sharing, pairing code, paired and discovered computers. */
+export function usePeers(): PeersView | null {
+  const [p, set] = useState<PeersView | null>(null);
+  useEffect(() => {
+    void window.api.getPeers().then(set);
+    return window.api.onPeers(set);
+  }, []);
+  return p;
 }

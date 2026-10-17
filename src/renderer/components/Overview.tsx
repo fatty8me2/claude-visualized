@@ -9,6 +9,8 @@ import { agentName, ago, clock, displayStatus, famClass, STATUS_GLYPH } from '..
 import { AgentGraph } from './AgentGraph';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
 import { UsageMeters } from './UsageMeters';
+import { MachineChip } from './MachineChip';
+import { openInClaude } from '../state/toast';
 
 /** columns that keep panels roughly landscape on a typical monitor */
 function columnsFor(n: number): number {
@@ -34,7 +36,14 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
         <span className="ov-num">{index + 1}</span>
         <span className={`modebadge ${plan ? 'plan' : ''}`}>{plan ? 'PLAN' : 'BUILD'}</span>
         <div className="ov-titles">
-          <div className="ov-title">{v.title ?? 'untitled session'}</div>
+          <div className="ov-title">
+            {v.machine && (
+              <>
+                <MachineChip machine={v.machine} />{' '}
+              </>
+            )}
+            {v.title ?? 'untitled session'}
+          </div>
           <div className="ov-sub">
             {project}
             {v.entrypoint === 'claude-desktop' ? ' · desktop' : v.entrypoint ? ` · ${v.entrypoint}` : ''}
@@ -55,10 +64,10 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
         </div>
         <button
           className="ov-claude"
-          title="Open in the Claude desktop app"
+          title={v.machine ? `This session is running on ${v.machine}` : 'Open in the Claude desktop app'}
           onClick={(e) => {
             e.stopPropagation();
-            void window.api.openInClaude(v.id);
+            void openInClaude(v.id);
           }}
         >
           ↗ Claude

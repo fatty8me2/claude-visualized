@@ -5,6 +5,7 @@ import './theme.css';
 import './agentInfo.css';
 import './local.css';
 import './inbox.css';
+import './peers.css';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { MiniView } from './components/MiniView';

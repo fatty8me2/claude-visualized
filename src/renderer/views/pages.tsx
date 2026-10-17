@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { DevicesPage } from '../components/DevicesPage';
 import { InboxPage } from '../components/InboxPage';
 import { HistoryPage } from '../components/HistoryPage';
 import { LocalModelsPage } from '../components/LocalModelsPage';
@@ -117,6 +118,16 @@ export const PAGES: readonly PageDef[] = [
     group: 'nav',
     testId: 'nav-history',
     render: (ctx) => <HistoryPage onOpenSession={ctx.openSession} />,
+  },
+  {
+    id: 'devices',
+    icon: '⇄',
+    label: 'devices',
+    title: 'Share with your other computers, or watch theirs',
+    collapsedTitle: 'Devices (share / pair)',
+    group: 'nav',
+    testId: 'nav-devices',
+    render: () => <DevicesPage />,
   },
 ];
 

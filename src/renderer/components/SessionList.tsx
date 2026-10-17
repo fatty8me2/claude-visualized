@@ -1,13 +1,21 @@
 import { useState } from 'react';
+import type { PeersView } from '@core/api';
 import type { SessionSummary } from '@core/state';
-import { ago } from '../util';
+import { openInClaude } from '../state/toast';
+import { ago, clock } from '../util';
+import { localMachineName, MachineChip } from './MachineChip';
 import { PAGES, type PageId } from '../views/pages';
 
 function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: number; onSelect: (id: string) => void }) {
   const active = now - s.mtime < 60_000;
   const dot = s.waiting ? 'waiting' : active ? 'active' : s.live ? 'live' : '';
   return (
-    <div className={`session-row ${sel ? 'sel' : ''}`} onClick={() => onSelect(s.id)} title={s.cwd ?? s.file}>
+    <div
+      className={`session-row ${sel ? 'sel' : ''} ${s.machine ? 'remote' : ''}`}
+      onClick={() => onSelect(s.id)}
+      title={s.machine ? `${s.cwd ?? s.project} · running on ${s.machine}` : (s.cwd ?? s.file)}
+      data-session={s.id}
+    >
       <span className={`dot ${dot}`} />
       <span className="t">{s.title ?? '(untitled)'}</span>
       <span style={{ display: 'flex', gap: 4 }}>
@@ -21,20 +29,30 @@ function Row({ s, sel, now, onSelect }: { s: SessionSummary; sel: boolean; now: 
       </span>
       <button
         className="row-claude"
-        title="Open in the Claude desktop app"
+        title={s.machine ? `This session is running on ${s.machine}` : 'Open in the Claude desktop app'}
         onClick={(e) => {
           e.stopPropagation();
-          void window.api.openInClaude(s.id);
+          void openInClaude(s.id);
         }}
       >
         ↗
       </button>
       <span className="sub">
+        {s.machine && !s.live && (
+          <>
+            <MachineChip machine={s.machine} offline={s.offlineSince != null} />{' '}
+          </>
+        )}
         {s.project} · {ago(s.mtime, now)}
         {s.entrypoint === 'claude-desktop' ? ' · desktop' : s.entrypoint === 'cli' ? ' · cli' : ''}
       </span>
     </div>
   );
+}
+
+function sharingWith(p: PeersView): string {
+  const n = p.devices.filter((d) => d.role === 'viewer' && d.online).length;
+  return n ? `${n} computer${n === 1 ? '' : 's'} watching` : 'your other computers';
 }
 
 export function SessionList({
@@ -52,7 +70,10 @@ export function SessionList({
   activeOnly = false,
   onActiveOnly,
   badges = {},
+  peers = null,
 }: {
+  /** paired computers: live sessions are grouped by machine once there is one */
+  peers?: PeersView | null;
   /** unread counts per page id (e.g. the inbox) */
   badges?: Record<string, number>;
   activeOnly?: boolean;
@@ -95,7 +116,12 @@ export function SessionList({
   const query = q.trim().toLowerCase();
   const match = (s: SessionSummary) => !query || (s.title ?? '').toLowerCase().includes(query) || s.project.toLowerCase().includes(query);
   const live = sessions.filter((s) => s.live && match(s));
-  const recent = sessions.filter((s) => !s.live && match(s)).slice(0, 120);
+  const localLive = live.filter((s) => !s.machine);
+  const hosts = peers?.devices.filter((d) => d.role === 'host') ?? [];
+  const recentAll = sessions.filter((s) => !s.live && match(s));
+  // other computers' sessions come after ours in the list: interleave them by time
+  if (sessions.some((s) => s.machine)) recentAll.sort((a, b) => b.mtime - a.mtime);
+  const recent = recentAll.slice(0, 120);
   return (
     <div className="sidebar" data-tour="sessions">
       <div className="sidebar-head">
@@ -129,6 +155,16 @@ export function SessionList({
             )}
           </button>
         ))}
+        {peers?.sharing && (
+          <button
+            className="sharing-banner"
+            data-testid="sidebar-sharing"
+            onClick={() => onPage('devices')}
+            title="This computer's sessions are visible to the computers you paired with (read-only). Click to manage."
+          >
+            ● sharing with {sharingWith(peers)}
+          </button>
+        )}
         <input placeholder="search sessions…" value={q} onChange={(e) => setQ(e.target.value)} />
         <label className="follow" data-tour="follow">
           <input type="checkbox" checked={follow} onChange={(e) => onFollow(e.target.checked)} />
@@ -140,15 +176,59 @@ export function SessionList({
         </label>
       </div>
       <div className="session-list">
-        <div className="group-label">live · {live.length}</div>
-        {live.length === 0 && (
-          <div className="empty-note" style={{ padding: '2px 12px' }}>
-            no session active in the last 10 min
-          </div>
+        {hosts.length === 0 ? (
+          <>
+            <div className="group-label">live · {live.length}</div>
+            {live.length === 0 && (
+              <div className="empty-note" style={{ padding: '2px 12px' }}>
+                no session active in the last 10 min
+              </div>
+            )}
+            {live.map((s) => (
+              <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />
+            ))}
+          </>
+        ) : (
+          <>
+            <div className="machine-group" data-testid="machine-group" data-machine="local">
+              <div className="group-label machine-label">
+                <span className="mdot on" />
+                {localMachineName()} · {localLive.length} live
+              </div>
+              {localLive.length === 0 && (
+                <div className="empty-note" style={{ padding: '2px 12px' }}>
+                  no session active in the last 10 min
+                </div>
+              )}
+              {localLive.map((s) => (
+                <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />
+              ))}
+            </div>
+            {hosts.map((h) => {
+              const rows = live.filter((s) => s.deviceId === h.deviceId);
+              const state = h.online
+                ? `${rows.length} live`
+                : h.state === 'connecting'
+                  ? 'connecting…'
+                  : h.state === 'revoked'
+                    ? 'un-paired there'
+                    : h.offlineSince
+                      ? `offline since ${clock(h.offlineSince)}`
+                      : 'offline';
+              return (
+                <div className="machine-group" key={h.key} data-testid="machine-group" data-machine={h.name} data-online={h.online}>
+                  <div className="group-label machine-label" title={h.error ?? `${h.host}:${h.port}`}>
+                    <span className={`mdot ${h.online ? 'on' : 'off'}`} />
+                    {h.name} · {state}
+                  </div>
+                  {rows.map((s) => (
+                    <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />
+                  ))}
+                </div>
+              );
+            })}
+          </>
         )}
-        {live.map((s) => (
-          <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />
-        ))}
         {!activeOnly && <div className="group-label">recent</div>}
         {!activeOnly && recent.map((s) => <Row key={s.id} s={s} sel={s.id === selected} now={now} onSelect={onSelect} />)}
         {activeOnly && (
