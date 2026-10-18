@@ -1,0 +1,191 @@
+/* Connectors between agents: a calm tree of rounded lines, with work visibly flowing down running branches (see GraphEdges.tsx).
+   Colours: --fam is the child's model colour, --pfam the parent's. Lines are opaque (mixed into the background) so siblings that share
+   a trunk do not double up where their paths overlap. */
+
+.pfam-opus { --pfam: var(--opus); }
+.pfam-sonnet { --pfam: var(--sonnet); }
+.pfam-haiku { --pfam: var(--haiku); }
+.pfam-fable { --pfam: var(--fable); }
+.pfam-local { --pfam: var(--local, var(--other)); }
+.pfam-other { --pfam: var(--other); }
+
+.gf .gf-base,
+.gf .gf-flow {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.gf .gf-base {
+  stroke: color-mix(in srgb, var(--line-2) 70%, var(--bg));
+  stroke-width: 1.5px;
+  transition: stroke 0.7s ease;
+}
+.gf .gf-flow {
+  stroke-width: 2px;
+}
+.gf .gf-s0 {
+  stop-color: color-mix(in srgb, var(--pfam) 55%, var(--bg));
+}
+.gf .gf-s1 {
+  stop-color: color-mix(in srgb, var(--fam) 90%, white);
+}
+
+/* running: the track is tinted and the gradient lights it up from parent colour to child colour */
+.gf .gf-running .gf-base {
+  stroke: color-mix(in srgb, var(--fam) 30%, var(--bg));
+}
+/* finished: calm, dim, solid */
+.gf .gf-done .gf-base {
+  stroke: color-mix(in srgb, var(--fam) 34%, var(--bg));
+}
+/* idle and quiet: barely there */
+.gf .gf-idle .gf-base,
+.gf .gf-quiet .gf-base {
+  stroke: color-mix(in srgb, var(--line-2) 45%, var(--bg));
+  stroke-width: 1.2px;
+}
+.gf .gf-error .gf-base {
+  stroke: color-mix(in srgb, var(--err) 42%, var(--bg));
+  stroke-dasharray: 3px 6px;
+}
+/* needs you: amber, slowly breathing */
+.gf .gf-waiting .gf-base {
+  stroke: color-mix(in srgb, var(--warn) 28%, var(--bg));
+}
+.gf .gf-waiting .gf-flow {
+  stroke: var(--warn);
+  animation: gf-breathe 3.4s ease-in-out infinite;
+}
+.gf.calm .gf-waiting .gf-flow {
+  animation: none;
+  opacity: 0.7;
+}
+@keyframes gf-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+/* result going home: the gradient lets go while the pulse travels up */
+.gf .gf-ret .gf-flow {
+  animation: gf-settle 0.9s ease-out forwards;
+}
+.gf .gf-ret.gf-error .gf-flow {
+  stroke: var(--err);
+}
+@keyframes gf-settle {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* spawn: the edge draws itself from the parent. Dashes under non-scaling-stroke are measured on screen, so this uses the scaled stroke
+   (width compensated by --gf-s) and a normalised path length. */
+.gf .gf-spawn .gf-base,
+.gf .gf-spawn .gf-flow {
+  vector-effect: none;
+  stroke-width: calc(1.6px / var(--gf-s, 1));
+  stroke-dasharray: 1 1;
+  animation: gf-draw 0.5s cubic-bezier(0.25, 0.7, 0.3, 1) both;
+}
+@keyframes gf-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.gf .gf-spawn .gf-particles {
+  animation: gf-fade 0.9s ease-in both;
+}
+@keyframes gf-fade {
+  from {
+    opacity: 0;
+  }
+  60% {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* particles */
+.gf-halo {
+  fill: var(--fam);
+  opacity: 0.22;
+}
+.gf-spark {
+  fill: color-mix(in srgb, var(--fam) 35%, white);
+}
+.gf-pulse .gf-halo {
+  fill: color-mix(in srgb, var(--pfam) 50%, var(--fam));
+  opacity: 0.32;
+}
+.gf-pulse .gf-core {
+  fill: color-mix(in srgb, var(--fam) 25%, white);
+}
+.gf-pulse.err .gf-halo {
+  fill: var(--err);
+  opacity: 0.4;
+}
+.gf-pulse.err .gf-core {
+  fill: color-mix(in srgb, var(--err) 60%, white);
+}
+
+/* hovering a card: its incoming edge and the way up to the root */
+.gf-hot {
+  fill: none;
+  stroke: color-mix(in srgb, var(--fam) 85%, white);
+  stroke-width: 2.4px;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  animation: gf-fade-in 0.18s ease-out both;
+}
+@keyframes gf-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gf .gf-base {
+    transition: none;
+  }
+  .gf .gf-spawn .gf-base,
+  .gf .gf-spawn .gf-flow {
+    vector-effect: non-scaling-stroke;
+    stroke-width: 1.6px;
+    stroke-dasharray: none;
+    animation: none;
+  }
+  .gf .gf-waiting .gf-flow {
+    animation: none;
+    opacity: 0.8;
+  }
+  .gf .gf-ret .gf-flow {
+    animation: none;
+  }
+  .gf .gf-spawn .gf-particles {
+    animation: none;
+  }
+  .gf-particles,
+  .gf-pulse {
+    display: none;
+  }
+  .gf-hot {
+    animation: none;
+  }
+}
