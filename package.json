@@ -58,7 +58,7 @@
         "provider": "github",
         "owner": "fatty8me2",
         "repo": "claude-visualized",
-        "releaseType": "release"
+        "releaseType": "draft"
       }
     ],
     "directories": {

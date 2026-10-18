@@ -21,9 +21,11 @@ download in the background and offer "Restart to update".
      npm run release:win      # Windows NSIS installer
      npm run release:mac      # on a Mac only
      ```
-4. electron-builder creates the release for the tag (`releaseType: release`, so it is published immediately, not a draft) and uploads
-   the installer, its `.blockmap` and `latest.yml` (`latest-mac.yml` on macOS). Edit the release notes on GitHub; the "release notes"
-   snippet in Settings → Updates shows them.
+4. electron-builder creates a **draft** release (`releaseType: draft`) and uploads the installer, its `.blockmap` and `latest.yml`
+   (`latest-mac.yml` on macOS). Publishing straight to a non-draft release races (it tries to create the release twice and one upload
+   fails, leaving `latest.yml` out of sync with the installer). Check the three assets, write the notes, then publish:
+   `gh release edit v<version> --draft=false`. Users only see drafts once published; the "release notes" snippet in Settings → Updates shows them.
+   Never build twice into the same `release/<version>` folder before uploading: `latest.yml`'s sha512 must match the uploaded installer.
 
 `npm run dist:win` / `dist:mac` build local installers into `release/<version>/` with `--publish never`; nothing is uploaded.
 
