@@ -91,3 +91,11 @@ The first push is still the whole view (1.4 to 1.5 MB); only later pushes are in
 - Time to first render of a huge session is dominated by the worker's backlog read and fold (1.6 s for the 292-agent session), not by rendering.
 - The first full push of a 300-agent session is still about 1.5 MB. Dropping `activity` / `recent` / `files` from it and fetching them when the drawer opens
   would cut it by roughly half, at the cost of changing what consumers can rely on in `AgentNode`.
+
+## Card motion
+
+Card animations (`src/renderer/cardMotion.ts` plans, `cardFx.ts` plays them with the Web Animations API; looks that last are CSS in `graphCards.css`) only use
+transform / opacity and run on the compositor; nothing goes through React state. They play only for changes seen while watching: the first snapshot, a session
+switch and bulk changes (more than 12 cards appearing, more than 8 status changes, more than 80 cards moving) plan nothing, which also keeps replay scrubbing
+and loading 300 agents instant. With more than 16 running agents the sheen and bar shimmer stand still (`.graph-canvas.calm`). `prefers-reduced-motion: reduce`
+removes all of it. Benchmark after the change, same machine: synthetic-live 10.6 to 11 ms average frame (before 11.8), expanded 9.5 to 10.1 ms (before 11.5).
