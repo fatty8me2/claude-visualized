@@ -9,5 +9,7 @@ export default defineConfig({
     testTimeout: 90_000,
     hookTimeout: 90_000,
     fileParallelism: false,
+    // app windows open off-screen and never take focus (see backgroundWindows in src/main/index.ts)
+    env: { CLAUDE_VIS_BACKGROUND_WINDOWS: '1' },
   },
 });

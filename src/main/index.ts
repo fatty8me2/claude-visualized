@@ -203,8 +203,24 @@ function webPrefs(mini: boolean): Electron.WebPreferences {
     contextIsolation: true,
     nodeIntegration: false,
     sandbox: false,
+    backgroundThrottling: !backgroundWindows,
     additionalArguments: mini ? ['--vis-mini'] : [],
   };
+}
+
+/**
+ * Test runs (CLAUDE_VIS_BACKGROUND_WINDOWS=1): windows open far off-screen, never take focus, stay out of the
+ * taskbar and never float on top, so automated runs don't pop up over what the user is doing. Rendering is
+ * kept unthrottled so screenshots and animations still work.
+ */
+const backgroundWindows = !!process.env.CLAUDE_VIS_BACKGROUND_WINDOWS;
+if (backgroundWindows) app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+const backgroundOpts = (): Electron.BrowserWindowConstructorOptions =>
+  backgroundWindows ? { x: -30000, y: -30000, skipTaskbar: true, focusable: false, alwaysOnTop: false } : {};
+
+function reveal(win: BrowserWindow) {
+  if (backgroundWindows) win.showInactive();
+  else win.show();
 }
 
 function createMain() {
@@ -220,9 +236,10 @@ function createMain() {
     autoHideMenuBar: true,
     show: false,
     webPreferences: webPrefs(false),
+    ...backgroundOpts(),
   });
   mainWin.once('ready-to-show', () => {
-    if (!startHidden) mainWin?.show();
+    if (!startHidden && mainWin) reveal(mainWin);
     badgeShown = -1;
     applyInboxBadge();
   });
@@ -245,8 +262,8 @@ function showMain() {
   if (!mainWin) createMain();
   else {
     if (mainWin.isMinimized()) mainWin.restore();
-    mainWin.show();
-    mainWin.focus();
+    reveal(mainWin);
+    if (!backgroundWindows) mainWin.focus();
   }
 }
 
@@ -315,8 +332,9 @@ function toggleMini() {
     backgroundColor: '#0e0c14',
     title: 'Claude Visualized (mini)',
     webPreferences: webPrefs(true),
+    ...backgroundOpts(),
   });
-  miniWin.setAlwaysOnTop(config.miniAlwaysOnTop, 'floating');
+  if (!backgroundWindows) miniWin.setAlwaysOnTop(config.miniAlwaysOnTop, 'floating');
   miniWin.on('closed', () => {
     miniWin = null;
     rebuildTrayMenu();
