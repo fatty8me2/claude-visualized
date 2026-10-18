@@ -57,6 +57,10 @@ import {
   TriangleAlert,
   Undo2,
   Workflow,
+  Wrench,
+  Quote,
+  Dot,
+  Shapes,
   X,
   Zap,
   ZoomIn,
@@ -142,6 +146,11 @@ export const ICONS = {
   reply: Undo2,
   apiError: Zap,
   checklist: ClipboardList,
+  // log line kinds
+  tool: Wrench,
+  text: Quote,
+  notice: Dot,
+  model: Shapes,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

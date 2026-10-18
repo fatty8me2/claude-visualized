@@ -311,7 +311,7 @@ describe('app smoke (fixture data)', () => {
     await page.getByRole('button', { name: 'Apply' }).first().click();
     await page.getByText('Registered Ctrl+Alt+M').waitFor({ timeout: 5000 });
     expect(JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).miniHotkey).toBe('Ctrl+Alt+M');
-    await page.getByRole('button', { name: '×' }).click();
+    await page.getByRole('button', { name: 'close', exact: true }).click();
   });
 
   it('shows every live session side by side on the overview page', async () => {
@@ -377,7 +377,7 @@ describe('app smoke (fixture data)', () => {
 
     // hide the log from edit mode, then reset everything
     await page.getByTestId('layout-toggle').click();
-    await page.getByRole('button', { name: '≡ log' }).click();
+    await page.getByRole('button', { name: 'log', exact: true }).click();
     await page.waitForTimeout(700);
     expect(await page.locator('.lp-log').count()).toBe(0);
     await page.getByTestId('layout-reset').click();
@@ -578,7 +578,7 @@ describe('local models (fake Ollama, qwen + llama fixture session)', () => {
   });
 
   it('has local model settings with the polling options', async () => {
-    await page.getByRole('button', { name: '⚙ settings' }).click();
+    await page.getByRole('button', { name: 'settings', exact: true }).click();
     const s = page.getByTestId('local-settings');
     await s.waitFor();
     expect(await page.getByLabel('Ollama URL').inputValue()).toBe(fake.url);
@@ -592,7 +592,7 @@ describe('local models (fake Ollama, qwen + llama fixture session)', () => {
     await s.scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(ART, 'local-settings.png') });
     await s.getByRole('button', { name: 'Remove', exact: true }).click();
-    await page.getByRole('button', { name: '×' }).click();
+    await page.getByRole('button', { name: 'close', exact: true }).click();
   });
 
   it('shows a friendly empty state and hides the chip once the server is gone', async () => {

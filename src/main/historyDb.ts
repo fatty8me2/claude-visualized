@@ -2,6 +2,7 @@
 // can answer "what did I spend over 90 days" and "where did I fix that retry bug" without reading 1 GB of JSONL.
 // It is a cache. Every row can be rebuilt from ~/.claude (which this code only ever reads), so a schema bump just drops it.
 
+import { estimateRows } from '@core/pricing';
 import fs from 'node:fs';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import {
@@ -418,6 +419,8 @@ export class HistoryDb {
       cacheWrite: r.cache_write,
       messages: r.messages,
     }));
+    // exact per model: each usage row carries its model
+    const est = estimateRows(rows.map((r) => ({ model: r.model, in: r.tokensIn, out: r.tokensOut, cacheRead: r.cacheRead, cacheWrite: r.cacheWrite })));
     const first = rows.length ? rows.reduce((m, r) => (r.day < m ? r.day : m), rows[0].day) : today;
     const startDay = fromDay ?? first;
     let groups = aggregateUsage(rows, args.groupBy);
@@ -449,7 +452,16 @@ export class HistoryDb {
       groupBy: args.groupBy,
       fromDay: fromDay,
       toDay: today,
-      kpis: { tokens: sumRows(rows), costUsd: sess.cost, costSessions: sess.withcost ?? 0, sessions: sess.n, agents: agents.n, activeDays: active.n },
+      kpis: {
+        tokens: sumRows(rows),
+        costUsd: sess.cost,
+        costSessions: sess.withcost ?? 0,
+        costEstimatedUsd: est.usd,
+        costUnpriced: est.unpriced,
+        sessions: sess.n,
+        agents: agents.n,
+        activeDays: active.n,
+      },
       groups,
       byProject: aggregateUsage(rows, 'project'),
       byModel: aggregateUsage(rows, 'model'),

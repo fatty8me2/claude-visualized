@@ -44,7 +44,7 @@ describe('agent card motion (fixture data)', () => {
     const pad = sel === '.graph-wrap' ? 0 : 14;
     const clip = { x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.width + pad * 2, height: box.height + pad * 2, scale: 2 };
     const r = await cdp.send('Page.captureScreenshot', { format: 'png', clip });
-    fs.writeFileSync(path.join(ART, `cards-${name}.png`),Buffer.from(r.data, 'base64'));
+    fs.writeFileSync(path.join(ART, `cards-${name}.png`), Buffer.from(r.data, 'base64'));
   };
   /** every element.animate() call on a card since `mark()`: which card, and which properties */
   const animated = () => page.evaluate(() => (window as unknown as { __anims: string[] }).__anims.slice());
@@ -87,6 +87,9 @@ describe('agent card motion (fixture data)', () => {
     });
     page = await app.firstWindow();
     await page.setViewportSize({ width: 1440, height: 920 }).catch(() => {});
+    // these tests are about the full cards' motion: keep the graph from switching to compact cards in a narrow panel
+    await page.evaluate(() => localStorage.setItem('cvis.graph.v1', JSON.stringify({ zoom: 'fit', compact: 'off', hideFinished: false })));
+    await page.reload();
     cdp = await page.context().newCDPSession(page);
     // record (and optionally freeze) every Web Animations call made on a card
     await page.evaluate(() => {
@@ -158,7 +161,9 @@ describe('agent card motion (fixture data)', () => {
     await hook({ session_id: SID, hook_event_name: 'SubagentStop', agent_id: 'a10' });
     await page.locator('[data-agent="a10"].done').waitFor({ timeout: 15_000 });
     await page.waitForTimeout(150);
-    expect((await animated()).filter((a) => a.startsWith('a10:'))).toEqual(expect.arrayContaining(['a10:transform+opacity+transformOrigin', 'a10:strokeDasharray+strokeDashoffset']));
+    expect((await animated()).filter((a) => a.startsWith('a10:'))).toEqual(
+      expect.arrayContaining(['a10:transform+opacity+transformOrigin', 'a10:strokeDasharray+strokeDashoffset']),
+    );
     await shot('done-mid');
     await shot('done-mid-card', '[data-agent="a10"]');
     await freeze(null);

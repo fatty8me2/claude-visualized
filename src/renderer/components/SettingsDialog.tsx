@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Icon } from './Icon';
+import { useDialogFocus } from '../state/dialogFocus';
 import { LocalModelsSettings } from './LocalModelsSettings';
 import { UpdatesSettings } from './UpdatesSettings';
 import type { AppConfigView, HookPreviewView, HookServerStatusView, HookStateView, SystemInfoView } from '@core/api';
@@ -71,10 +73,12 @@ export function SettingsDialog({
 
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="dialog">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h3>Live hooks &amp; settings</h3>
-          <button onClick={onClose}>×</button>
+      <div className="dialog panel-raised" role="dialog" aria-modal="true" aria-labelledby="settings-title" ref={useDialogFocus(onClose)}>
+        <div className="row dialog-head">
+          <h3 id="settings-title">Live hooks &amp; settings</h3>
+          <button className="btn-icon ghost" onClick={onClose} aria-label="close" title="Close (Esc)">
+            <Icon name="close" />
+          </button>
         </div>
         <p>
           Without hooks, the app reads Claude Code's transcript files (about a second behind, no setup). Installing hooks makes Claude Code send each event to
@@ -108,7 +112,7 @@ export function SettingsDialog({
           )}
           <span className="note">
             {hs?.statusLine === 'other'
-              ? 'kept as-is; 5-hour / weekly meters then only show limits that were hit'
+              ? 'kept as-is; the 5-hour / weekly meters read your usage from Claude instead'
               : 'feeds the 5-hour / weekly meters; installed together with the hooks'}
           </span>
         </div>

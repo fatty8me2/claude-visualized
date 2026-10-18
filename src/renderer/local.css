@@ -97,14 +97,15 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 14px 18px 24px;
+  padding: 14px var(--gutter) 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 .lm-server {
-  border: 1px solid color-mix(in srgb, var(--local) 40%, var(--line));
-  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--local) 30%, var(--line));
+  border-top: 2px solid var(--local);
+  border-radius: var(--r-3);
   background: var(--panel);
   padding: 10px 14px 12px;
 }
@@ -116,17 +117,16 @@
 }
 .lm-server h5 {
   margin: 12px 0 6px;
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 600;
 }
-.lm-server h5.lm-toggle {
-  cursor: pointer;
-  user-select: none;
+.lm-toggle {
+  padding: 1px 4px;
+  margin-left: -4px;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
 }
-.lm-server h5.lm-toggle:hover {
+.lm-toggle:hover {
   color: var(--text-2);
 }
 .lm-dot {
@@ -149,7 +149,7 @@
 .lm-pill {
   color: var(--text-2);
   border: 1px solid var(--line-2);
-  border-radius: 3px;
+  border-radius: var(--r-1);
   padding: 0 5px;
   font-size: 10.5px;
   line-height: 1.5;
@@ -173,7 +173,7 @@
   border-top: 1px dashed var(--line);
   padding: 8px 0;
 }
-.lm-model:first-of-type {
+h5 + .lm-model {
   border-top: 0;
 }
 .lm-model-head {
@@ -205,8 +205,8 @@
   display: inline-block;
   width: 140px;
   height: 8px;
-  background: color-mix(in srgb, var(--warn) 55%, var(--line));
-  border-radius: 2px;
+  background: var(--track);
+  border-radius: var(--r-pill);
   overflow: hidden;
 }
 .lm-bar > i {
@@ -258,10 +258,8 @@
   padding-left: 18px;
   line-height: 1.8;
 }
-.lm-hints a {
+.lm-hints button.link {
   color: var(--local);
-  cursor: pointer;
-  text-decoration: underline;
 }
 .lm-actions {
   display: flex;

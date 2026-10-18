@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { PeerDeviceView, PeersView } from '@core/api';
 import { useNow, usePeers } from '../hooks';
 import { ago, clock } from '../util';
+import { Icon } from './Icon';
 
 const FAILURE_TEXT: Record<string, string> = {
   'bad-code': 'someone entered a wrong code',
@@ -34,7 +35,7 @@ function ShareSection({ p, now }: { p: PeersView; now: number }) {
         {p.sharing ? (
           p.listening ? (
             <span className="share-pill on" data-testid="sharing-indicator">
-              ● sharing on port {p.port}
+              <span className="mdot on" /> sharing on port {p.port}
               {watching ? ` · ${watching} watching` : ''}
             </span>
           ) : (
@@ -187,6 +188,7 @@ function PairSection({ p }: { p: PeersView }) {
 }
 
 function DeviceRow({ d, now }: { d: PeerDeviceView; now: number }) {
+  const [confirming, setConfirming] = useState(false);
   const state =
     d.state === 'online'
       ? 'online'
@@ -211,19 +213,21 @@ function DeviceRow({ d, now }: { d: PeerDeviceView; now: number }) {
       <span className="note" title={d.error ?? undefined}>
         {state}
       </span>
-      <button
-        className="danger"
-        onClick={() => {
-          if (
-            confirm(
-              `Un-pair ${d.name}? ${d.role === 'host' ? 'You will stop seeing its sessions' : 'It will no longer be able to watch this computer'} until you pair again.`,
-            )
-          )
-            void window.api.unpairDevice(d.key);
-        }}
-      >
-        un-pair
-      </button>
+      {confirming ? (
+        <span className="dev-confirm">
+          <span className="note">
+            {d.role === 'host' ? 'You will stop seeing its sessions' : 'It will no longer be able to watch this computer'} until you pair again.
+          </span>
+          <button className="danger" onClick={() => void window.api.unpairDevice(d.key)}>
+            un-pair {d.name}
+          </button>
+          <button onClick={() => setConfirming(false)}>cancel</button>
+        </span>
+      ) : (
+        <button className="danger" onClick={() => setConfirming(true)}>
+          un-pair
+        </button>
+      )}
     </div>
   );
 }
@@ -246,22 +250,27 @@ export function DevicesPage() {
   const hosts = p.devices.filter((d) => d.role === 'host');
   const viewers = p.devices.filter((d) => d.role === 'viewer');
   return (
-    <div className="devices-page" data-testid="devices-page">
-      <div className="inbox-head">
-        <h2>Devices</h2>
+    <div className="page" data-testid="devices-page">
+      <div className="page-head">
+        <h2>
+          <Icon name="devices" size="md" />
+          Devices
+        </h2>
         <span className="sub">watch your sessions across computers</span>
       </div>
-      <ShareSection p={p} now={now} />
-      <PairSection p={p} />
-      <section className="dev-card" data-testid="paired-section">
-        <header>
-          <b>Paired computers</b>
-        </header>
-        <div className="dev-sub">This computer watches</div>
-        {hosts.length === 0 ? <div className="note">none yet</div> : hosts.map((d) => <DeviceRow key={d.key} d={d} now={now} />)}
-        <div className="dev-sub">Can watch this computer</div>
-        {viewers.length === 0 ? <div className="note">none yet</div> : viewers.map((d) => <DeviceRow key={d.key} d={d} now={now} />)}
-      </section>
+      <div className="devices-page">
+        <ShareSection p={p} now={now} />
+        <PairSection p={p} />
+        <section className="dev-card" data-testid="paired-section">
+          <header>
+            <b>Paired computers</b>
+          </header>
+          <div className="dev-sub">This computer watches</div>
+          {hosts.length === 0 ? <div className="note">none yet</div> : hosts.map((d) => <DeviceRow key={d.key} d={d} now={now} />)}
+          <div className="dev-sub">Can watch this computer</div>
+          {viewers.length === 0 ? <div className="note">none yet</div> : viewers.map((d) => <DeviceRow key={d.key} d={d} now={now} />)}
+        </section>
+      </div>
     </div>
   );
 }

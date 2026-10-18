@@ -45,6 +45,8 @@ export interface LayoutOptions {
   showFinished: boolean;
   /** parents whose finished children the user expanded */
   expanded?: ReadonlySet<string>;
+  /** parents the user folded: their finished children go into a chip even when the group is small */
+  folded?: ReadonlySet<string>;
 }
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
@@ -118,7 +120,9 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
     let collapsedBox: Box | null = null;
     // finished subtrees with nothing still running inside them
     const finishedLeaves = children.filter((c) => isFinished(c) && !hasLiveDescendant(c.id));
-    const crowded = children.length > opt.collapseAbove && finishedLeaves.length > 1 && !opt.expanded?.has(a.id);
+    const crowded =
+      !opt.expanded?.has(a.id) &&
+      ((children.length > opt.collapseAbove && finishedLeaves.length > 1) || (!!opt.folded?.has(a.id) && finishedLeaves.length > 0));
     if (!opt.showFinished || crowded) {
       if (finishedLeaves.length > 0) {
         const ids = new Set(finishedLeaves.map((c) => c.id));

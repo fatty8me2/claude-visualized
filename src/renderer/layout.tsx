@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Icon, type IconName } from './components/Icon';
 import {
   ARRANGEMENTS,
   DEFAULT_LAYOUT,
@@ -176,7 +177,7 @@ export function SidebarResizeHandle({ api }: { api: LayoutApi }) {
 // ---------- the panel grid ----------
 
 const PANEL_LABEL: Record<PanelId, string> = { mode: 'Mode & checklist', graph: 'Agent graph', log: 'Session log' };
-const PANEL_ICON: Record<PanelId, string> = { mode: '◆', graph: '⌬', log: '≡' };
+const PANEL_ICON: Record<PanelId, IconName> = { mode: 'plan', graph: 'agent', log: 'text' };
 
 export function PanelGrid({ api, editing, panels }: { api: LayoutApi; editing: boolean; panels: Record<PanelId, ReactNode> }) {
   const { layout } = api;
@@ -227,7 +228,9 @@ export function PanelGrid({ api, editing, panels }: { api: LayoutApi; editing: b
             {editing && (
               <div className="lp-edit" onPointerDown={startDrag(p)} data-testid={`drag-${p}`}>
                 <div className="lp-edit-card">
-                  <span className="lp-icon">{PANEL_ICON[p]}</span>
+                  <span className="lp-icon">
+                    <Icon name={PANEL_ICON[p]} size="lg" />
+                  </span>
                   <b>{PANEL_LABEL[p]}</b>
                   <span>drag onto another panel to swap</span>
                   {p !== 'graph' && (
@@ -243,8 +246,8 @@ export function PanelGrid({ api, editing, panels }: { api: LayoutApi; editing: b
       })}
       {drag && (
         <div className="drag-ghost" style={{ left: drag.x, top: drag.y }}>
-          {PANEL_ICON[drag.panel]} {PANEL_LABEL[drag.panel]}
-          {drag.over ? <span> ⇄ {PANEL_LABEL[drag.over]}</span> : null}
+          <Icon name={PANEL_ICON[drag.panel]} size="xs" /> {PANEL_LABEL[drag.panel]}
+          {drag.over ? <span> → {PANEL_LABEL[drag.over]}</span> : null}
         </div>
       )}
     </div>
@@ -297,7 +300,7 @@ export function LayoutToolbar({ api, onDone }: { api: LayoutApi; onDone: () => v
   }, [onDone]);
   return (
     <div className="layout-bar" data-testid="layout-bar">
-      <span className="lb-title">LAYOUT</span>
+      <span className="lb-title eyebrow">layout</span>
       <div className="lb-presets">
         {ARRANGEMENTS.map((a) => (
           <button
@@ -314,10 +317,10 @@ export function LayoutToolbar({ api, onDone }: { api: LayoutApi; onDone: () => v
       </div>
       <div className="lb-group">
         <button className={layout.hidden.mode ? '' : 'on'} onClick={() => toggle('mode')}>
-          ◆ mode
+          mode
         </button>
         <button className={layout.hidden.log ? '' : 'on'} onClick={() => toggle('log')}>
-          ≡ log
+          log
         </button>
         <button className={layout.hidden.legend ? '' : 'on'} onClick={() => toggle('legend')}>
           legend
@@ -331,13 +334,16 @@ export function LayoutToolbar({ api, onDone }: { api: LayoutApi; onDone: () => v
           onClick={() => change((l) => ({ ...l, sidebar: { ...l.sidebar, side: l.sidebar.side === 'left' ? 'right' : 'left' } }))}
           title="Move the session list to the other side"
         >
-          ⇆ sessions {layout.sidebar.side === 'left' ? 'right' : 'left'}
+          <Icon name="swap" size="xs" />
+          sessions {layout.sidebar.side === 'left' ? 'right' : 'left'}
         </button>
         <button onClick={() => change((l) => shuffled(l))} title="Surprise me">
-          ✦ shuffle
+          <Icon name="shuffle" size="xs" />
+          shuffle
         </button>
         <button className="danger" onClick={() => change(() => DEFAULT_LAYOUT)} data-testid="layout-reset" title="Back to the default layout">
-          ↺ reset
+          <Icon name="reset" size="xs" />
+          reset
         </button>
         <button className="primary" onClick={onDone}>
           done

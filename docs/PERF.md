@@ -99,3 +99,12 @@ transform / opacity and run on the compositor; nothing goes through React state.
 switch and bulk changes (more than 12 cards appearing, more than 8 status changes, more than 80 cards moving) plan nothing, which also keeps replay scrubbing
 and loading 300 agents instant. With more than 16 running agents the sheen and bar shimmer stand still (`.graph-canvas.calm`). `prefers-reduced-motion: reduce`
 removes all of it. Benchmark after the change, same machine: synthetic-live 10.6 to 11 ms average frame (before 11.8), expanded 9.5 to 10.1 ms (before 11.5).
+
+## Zoom and compact cards (0.4)
+
+Zoom scales one wrapper around the cards and edges (the edge layer reads the scale from a CSS variable), so ctrl+wheel and the zoom
+buttons re-render `AgentGraph` only: cards and edges are memoized and keep their props. Panning scrolls the wrapper. When fit would shrink
+full cards below 0.8, the graph lays out compact cards instead (`COMPACT_LAYOUT` in `src/core/layout.ts`, with hysteresis between 0.8 and
+0.9 so it does not flip back and forth); a variant switch counts as a bulk change, so no card or edge animation plays. Compact cards show
+less time-dependent text, so they re-render less often. Benchmark after the change (same machine, `PERF_LABEL=after-0.4`): synthetic-live
+0 long tasks, 8.3 ms average frame (p95 8.4); synthetic-live-expanded (301 cards) 0 long tasks, 8.9 ms average frame (p95 16.6).

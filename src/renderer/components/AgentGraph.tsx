@@ -14,7 +14,7 @@ import { agentName, displayStatus, famClass, type DisplayStatus } from '../util'
 import { MotionTracker, playMoves } from '../cardFx';
 import { Fade, StatusLabel } from './cardParts';
 import { Icon } from './Icon';
-import { useExpandedGroups, useGraphPrefs } from '../state/graphPrefs';
+import { useGraphPrefs, useGroupFolds } from '../state/graphPrefs';
 
 const LOCAL_ROWS_H = 30;
 
@@ -272,8 +272,9 @@ export function AgentGraph({
   const [wrapW, setWrapW] = useState(0);
   const [wrapH, setWrapH] = useState(600);
   const [prefs, setPrefs] = useGraphPrefs();
-  const [storedExpanded, setExpanded] = useExpandedGroups(view.id);
-  const expanded = embedded ? NO_GROUPS : storedExpanded;
+  const groups = useGroupFolds(view.id);
+  const expanded = embedded ? NO_GROUPS : groups.expanded;
+  const folded = embedded ? NO_GROUPS : groups.folded;
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [cardMode, setCardMode] = useState<CardMode>(embedded ? 'compact' : 'full');
 
@@ -299,17 +300,17 @@ export function AgentGraph({
     return k;
   }, [view.agents]);
   const build = (base: LayoutOptions, rows: number) =>
-    layoutAgents(view.agents, { ...base, nodeH: base.nodeH + rows, mainH: base.mainH + rows, showFinished, expanded });
+    layoutAgents(view.agents, { ...base, nodeH: base.nodeH + rows, mainH: base.mainH + (rows ? rows + 22 : 0), showFinished, expanded, folded });
   const layoutFull = useMemo(
     () => build(DEFAULT_LAYOUT, extra),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [structureKey, extra, showFinished, expanded],
+    [structureKey, extra, showFinished, expanded, folded],
   );
   const wantCompact = embedded || cardMode === 'compact';
   const layoutCompact = useMemo(
     () => (wantCompact ? build(COMPACT_LAYOUT, 0) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wantCompact, structureKey, showFinished, expanded],
+    [wantCompact, structureKey, showFinished, expanded, folded],
   );
 
   // scale and card variant: full cards never shrink below the readable floor; past it the graph switches to compact cards
@@ -463,7 +464,7 @@ export function AgentGraph({
     if (d) el.scrollBy({ left: d.dx, top: d.dy, behavior: 'smooth' });
   }, [selectedAgent, embedded]);
 
-  const onFold = useCallback((id: string) => setExpanded([...expanded].filter((x) => x !== id)), [expanded, setExpanded]);
+  const onFold = groups.fold;
 
   const running = Object.values(view.agents).filter((a) => a.id !== MAIN && a.status === 'running').length;
   const total = Object.keys(view.agents).length - 1;
@@ -511,7 +512,7 @@ export function AgentGraph({
             {showFinished ? 'hide finished' : 'show finished'}
           </button>
           {expanded.size > 0 && (
-            <button onClick={() => setExpanded([])} title="Fold every opened group of finished agents back into its chip">
+            <button onClick={groups.foldAll} title="Fold every opened group of finished agents back into its chip">
               <Icon name="fold" size="xs" />
               fold all
             </button>
@@ -563,7 +564,7 @@ export function AgentGraph({
                     if (embedded) return;
                     e.stopPropagation();
                     if (!showFinished) onToggleFinished();
-                    setExpanded([...expanded, n.collapsed!.parentId]);
+                    groups.open(n.collapsed!.parentId);
                   }}
                 >
                   <Icon name="done" size="xs" /> {n.collapsed.count} finished{embedded ? '' : ' · show'}

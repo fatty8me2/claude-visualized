@@ -26,36 +26,60 @@ export function useGraphPrefs(): [GraphPrefs, (patch: Partial<GraphPrefs>) => vo
   return [prefs, set];
 }
 
-/** Per session: which finished-agent groups the user opened. The newest 20 sessions are kept. */
-type Folds = Record<string, { expanded: string[]; at: number }>;
+/**
+ * Per session: groups of finished agents the user opened ("expanded") or folded away ("folded", even when the group is too small
+ * to fold by itself). The newest 20 sessions are kept.
+ */
+type Folds = Record<string, { expanded: string[]; folded: string[]; at: number }>;
 const folds = createPersisted<Folds>('cvis.graph.sessions.v1', {}, (raw) => {
   const out: Folds = {};
   if (raw && typeof raw === 'object')
-    for (const [k, v] of Object.entries(raw as Record<string, { expanded?: unknown; at?: unknown }>))
-      out[k] = { expanded: strList(v?.expanded, 200), at: typeof v?.at === 'number' ? v.at : 0 };
+    for (const [k, v] of Object.entries(raw as Record<string, { expanded?: unknown; folded?: unknown; at?: unknown }>))
+      out[k] = { expanded: strList(v?.expanded, 200), folded: strList(v?.folded, 200), at: typeof v?.at === 'number' ? v.at : 0 };
   return out;
 });
 const EMPTY: string[] = [];
 
-export function useExpandedGroups(sessionId: string): [ReadonlySet<string>, (next: string[]) => void] {
+export interface GroupFolds {
+  expanded: ReadonlySet<string>;
+  folded: ReadonlySet<string>;
+  /** show the finished children of `parentId` */
+  open: (parentId: string) => void;
+  /** put them back into a chip */
+  fold: (parentId: string) => void;
+  /** fold every opened group */
+  foldAll: () => void;
+}
+
+export function useGroupFolds(sessionId: string): GroupFolds {
   const [all, write] = folds.use();
-  const list = all[sessionId]?.expanded ?? EMPTY;
-  const set = useCallback(
-    (next: string[]) =>
-      write((cur) => {
-        const out: Folds = { ...cur, [sessionId]: { expanded: next, at: Date.now() } };
+  const cur = all[sessionId];
+  const expandedList = cur?.expanded ?? EMPTY;
+  const foldedList = cur?.folded ?? EMPTY;
+  const update = useCallback(
+    (fn: (e: string[], f: string[]) => { expanded: string[]; folded: string[] }) =>
+      write((all) => {
+        const prev = all[sessionId];
+        const next = fn(prev?.expanded ?? [], prev?.folded ?? []);
+        const out: Folds = { ...all, [sessionId]: { ...next, at: Date.now() } };
         const keys = Object.keys(out).sort((a, b) => out[b].at - out[a].at);
         for (const k of keys.slice(20)) delete out[k];
         return out;
       }),
     [write, sessionId],
   );
-  return [expandedSet(list), set];
+  return {
+    expanded: asSet(expandedList),
+    folded: asSet(foldedList),
+    open: useCallback((id: string) => update((e, f) => ({ expanded: [...e.filter((x) => x !== id), id], folded: f.filter((x) => x !== id) })), [update]),
+    fold: useCallback((id: string) => update((e, f) => ({ expanded: e.filter((x) => x !== id), folded: [...f.filter((x) => x !== id), id] })), [update]),
+    foldAll: useCallback(() => update((e, f) => ({ expanded: [], folded: [...new Set([...f, ...e])] })), [update]),
+  };
 }
 
 // one Set per list identity, so memo'd layout keys stay stable between renders
 const setCache = new WeakMap<string[], ReadonlySet<string>>();
-function expandedSet(list: string[]): ReadonlySet<string> {
+function asSet(list: string[]): ReadonlySet<string> {
   let s = setCache.get(list);
   if (!s) {
     s = new Set(list);

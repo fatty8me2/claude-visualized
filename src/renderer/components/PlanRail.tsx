@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { computeStepStatus, ORIGIN_LABEL, planProgress, resolvePlan, type ParsedPlan, type PlanOrigin, type StepStatus } from '@core/plan';
 import type { SessionView } from '@core/state';
 import { displayStatus, famClass } from '../util';
+import { Icon } from './Icon';
 
 // ---------- preferences (same pattern as layout.tsx: localStorage, never required) ----------
 
@@ -95,12 +96,13 @@ export function PlanToggle({ plan, prefs }: { plan: PlanModel; prefs: PlanPrefsA
       title="Show or hide the plan beside the graph"
       data-testid="plan-toggle"
     >
-      ▤ plan {plan.done}/{plan.total}
+      <Icon name="plan" size="xs" />
+      plan {plan.done}/{plan.total}
     </button>
   );
 }
 
-const GLYPH = { done: '✓', in_progress: '▸', pending: '○' } as const;
+const NODE_ICON = { done: 'done', in_progress: 'running', pending: null } as const;
 const STATE_LABEL = { done: 'done', in_progress: 'in progress', pending: 'pending' } as const;
 
 function ResizeEdge({ prefs }: { prefs: PlanPrefsApi }) {
@@ -193,7 +195,7 @@ export function PlanRail({
         title={`${step.text}\n\n${STATE_LABEL[st.status]}\n${evidence}`}
       >
         <span className="pr-node" aria-label={STATE_LABEL[st.status]}>
-          {GLYPH[st.status]}
+          {NODE_ICON[st.status] && <Icon name={NODE_ICON[st.status]!} size="xs" strokeWidth={3} />}
         </span>
         <div className="pr-body">
           <div className="pr-title">{step.title}</div>
@@ -245,11 +247,21 @@ export function PlanRail({
             {plan.done}/{plan.total} steps
           </span>
           <span className="pr-spacer" />
-          <button onClick={() => prefs.set((p) => ({ ...p, side: p.side === 'left' ? 'right' : 'left' }))} title="Move the plan to the other side">
-            ⇄
+          <button
+            className="btn-icon ghost"
+            onClick={() => prefs.set((p) => ({ ...p, side: p.side === 'left' ? 'right' : 'left' }))}
+            title="Move the plan to the other side"
+            aria-label="move the plan to the other side"
+          >
+            <Icon name="swap" size="xs" />
           </button>
-          <button onClick={() => prefs.set((p) => ({ ...p, open: false }))} title="Hide the plan (the ▤ plan button brings it back)">
-            ✕
+          <button
+            className="btn-icon ghost"
+            onClick={() => prefs.set((p) => ({ ...p, open: false }))}
+            title="Hide the plan (the plan button in the graph toolbar brings it back)"
+            aria-label="hide the plan"
+          >
+            <Icon name="close" size="xs" />
           </button>
         </div>
         <div className="pr-meter" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>

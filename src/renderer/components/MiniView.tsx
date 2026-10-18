@@ -8,6 +8,7 @@ import { CtxChip } from './ContextMeter';
 import { UsageMeters } from './UsageMeters';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
 import { agentName, clock, displayStatus, famClass } from '../util';
+import { Icon } from './Icon';
 
 export function MiniView() {
   const view = useLiveState();
@@ -30,16 +31,16 @@ export function MiniView() {
       <div className="mini-head">
         {view && <span className={`modebadge ${plan ? 'plan' : ''}`}>{plan ? 'PLAN' : 'BUILD'}</span>}
         <span className="t">{view?.title ?? 'waiting for a session…'}</span>
-        <button onClick={() => window.api.showMain()} title="Open main window">
-          ⤢
+        <button className="btn-icon ghost" onClick={() => window.api.showMain()} title="Open the main window" aria-label="open the main window">
+          <Icon name="openExternal" size="xs" />
         </button>
-        <button onClick={() => window.close()} title="Close mini view">
-          ×
+        <button className="btn-icon ghost" onClick={() => window.close()} title="Close the mini view" aria-label="close">
+          <Icon name="close" size="xs" />
         </button>
       </div>
       {!!inbox?.count && (
         <div className="mini-need" data-testid="mini-need" title="Open the inbox" onClick={() => void window.api.showInbox()}>
-          {'⚠'} {inbox.count} need you
+          <Icon name="waiting" size="xs" /> {inbox.count} need you
         </div>
       )}
       <div className="mini-usage">
@@ -72,7 +73,8 @@ export function MiniView() {
               })}
               {recentDone.map((a) => (
                 <span key={a.id} className={`mini-chip done ${famClass(a.model)}`} title={a.description}>
-                  <GoalBadge goal={agentGoal(a)} glyphOnly /> {isLocalModel(a.model) && <LocalTag title="local model" />} ✓ {agentName(a)}
+                  <GoalBadge goal={agentGoal(a)} glyphOnly /> {isLocalModel(a.model) && <LocalTag title="local model" />} <Icon name="done" size="xs" />{' '}
+                  {agentName(a)}
                   {a.description ? ` · ${a.description}` : ''}
                 </span>
               ))}
