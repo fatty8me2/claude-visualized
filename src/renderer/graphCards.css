@@ -1,0 +1,388 @@
+/* Agent cards in the graph: layout, typography, status looks and motion.
+   Motion is split in two: CSS here for looks that hold while a state lasts (sheen, shimmer, breathing border),
+   and the Web Animations API (cardFx.ts) for one-shots (spawn, glide, check, shake). Both honour prefers-reduced-motion. */
+
+.node {
+  --edge: color-mix(in srgb, var(--fam, var(--line-2)) 62%, var(--line-2));
+  position: absolute;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--fam, var(--line-2)) 6%, var(--panel)) 0, var(--panel) 52px);
+  padding: 9px 11px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: 1.4;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.7);
+  transition:
+    border-color 0.3s,
+    opacity 0.3s,
+    box-shadow 0.25s,
+    translate 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.node.node:hover {
+  translate: 0 -2px;
+  box-shadow:
+    0 10px 20px -10px rgba(0, 0, 0, 0.85),
+    0 0 0 1px color-mix(in srgb, var(--fam, var(--line-2)) 28%, transparent);
+}
+.node.node.sel {
+  outline: 2px solid var(--fam, var(--text-2));
+  outline-offset: 3px;
+  box-shadow:
+    0 12px 24px -10px rgba(0, 0, 0, 0.9),
+    0 0 22px -8px var(--fam, var(--text-2));
+}
+
+/* one-shot glow layer, driven by cardFx.ts (opacity only) */
+.node > .fx {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow:
+    inset 0 0 0 1px var(--fxc, var(--fam, var(--line-2))),
+    inset 0 0 26px -6px var(--fxc, var(--fam, var(--line-2)));
+}
+
+/* ---- states ---- */
+.node.running {
+  border-color: color-mix(in srgb, var(--fam) 80%, var(--line-2));
+  box-shadow:
+    0 2px 8px -4px rgba(0, 0, 0, 0.7),
+    0 0 16px -9px var(--fam);
+}
+/* the working sheen: a bright band travels along the top edge in the model colour (transform only, so it stays on the compositor) */
+.node.running::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 55%;
+  height: 2px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fam) 55%, #fff) 50%, transparent);
+  transform: translateX(-100%);
+  animation: sheen 2.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes sheen {
+  to {
+    transform: translateX(185%);
+  }
+}
+.node.waiting {
+  border-color: var(--warn);
+}
+/* needs the user: the border breathes (opacity of an inset ring) */
+.node.waiting::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px var(--warn),
+    inset 0 0 20px -4px var(--warn);
+  animation: breathe 2.6s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+.node.done,
+.node.idle-agent {
+  opacity: 0.72;
+}
+/* finishing: the card dims after the bar and check have played */
+.node.done {
+  transition:
+    border-color 0.3s,
+    opacity 0.9s ease 0.8s,
+    box-shadow 0.25s,
+    translate 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.node.done:hover,
+.node.idle-agent:hover {
+  opacity: 0.96;
+  transition-delay: 0s;
+}
+.node.error {
+  border-color: var(--err);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--err) 7%, var(--panel)) 0, var(--panel) 60px);
+}
+
+/* ---- header ---- */
+.node .row1 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+.node .name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.node .model {
+  color: var(--fam);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.node .model2 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+.node .status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.node .status .tick {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.node .desc {
+  color: var(--text-2);
+  font-size: 11.5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.8em;
+}
+
+/* ---- progress bar: no fake percentages. empty when idle, soft shimmer while working, full when finished ---- */
+.bar {
+  height: 5px;
+  background: color-mix(in srgb, var(--fam, var(--line-2)) 14%, #1f1a2a);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.bar.full > i {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--fam) 70%, transparent), var(--fam));
+  opacity: 0.85;
+}
+.bar.indet > i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 60%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fam) 85%, transparent) 50%, transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform;
+}
+.bar.quiet > i {
+  animation-duration: 5s;
+  opacity: 0.4;
+}
+@keyframes shimmer {
+  to {
+    transform: translateX(170%);
+  }
+}
+
+/* ---- activity ---- */
+.node .now {
+  font-size: 11.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.node .now .lbl,
+.node .now .dur {
+  color: var(--muted);
+}
+.node .now.finished,
+.node .now.idle,
+.node .now.quiet {
+  color: var(--text-2);
+}
+.node .now.blocked {
+  color: var(--warn);
+}
+.node .says {
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 1.45em;
+  font-size: 11px;
+}
+.node .tool {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.node .tool .tn {
+  color: var(--fam);
+}
+.node .meta {
+  color: var(--muted);
+  font-size: 10.5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 5px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+.node .meta > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.node .meta .spark {
+  flex-shrink: 0;
+}
+.spark {
+  display: block;
+}
+.spark rect {
+  fill: var(--fam);
+  opacity: 0.7;
+}
+
+/* ---- main agent: a header stripe in its model colour and a little more presence ---- */
+.node.main {
+  text-align: center;
+  border-width: 1px;
+  padding-top: 11px;
+  background:
+    linear-gradient(90deg, transparent, var(--fam) 20%, var(--fam) 80%, transparent) top / 100% 3px no-repeat,
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--fam) 13%, var(--panel)), var(--panel) 70%);
+  box-shadow:
+    0 4px 14px -6px rgba(0, 0, 0, 0.8),
+    0 0 26px -16px var(--fam);
+}
+.node.main.running {
+  box-shadow:
+    0 4px 14px -6px rgba(0, 0, 0, 0.8),
+    0 0 22px -9px var(--fam);
+}
+.node.main .row1 {
+  justify-content: center;
+  gap: 10px;
+}
+.node.main .name {
+  font-size: 14px;
+}
+.node.main .desc {
+  min-height: 0;
+}
+.node.main .now {
+  text-align: center;
+}
+.node.main .meta {
+  border-top-color: transparent;
+}
+
+/* ---- the "N finished" chip: finished cards fold into it, and fan back out when it is opened ---- */
+.node.collapsed {
+  border-style: dashed;
+  font-size: 11px;
+  white-space: nowrap;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  --fam: var(--line-2);
+  --edge: var(--line-2);
+  /* a stack of cards peeking out below */
+  box-shadow:
+    0 4px 0 -1px var(--panel),
+    0 4px 0 0 var(--line),
+    0 8px 0 -2px var(--panel),
+    0 8px 0 -1px var(--line);
+  overflow: visible;
+}
+.node.collapsed:hover {
+  color: var(--text-2);
+  border-color: var(--muted);
+}
+
+/* ---- agent card lit by hovering a plan step ---- */
+.node.node.hl {
+  box-shadow:
+    0 0 0 2px var(--fam, var(--opus)),
+    0 0 22px -2px var(--fam, var(--opus));
+  z-index: 2;
+}
+
+/* crossfaded text (status, the "now" line): see Fade in cardParts.tsx */
+.fade {
+  display: inline;
+}
+
+/* ---- many running agents: keep it cheap. the sheen and shimmer stand still ---- */
+.graph-canvas.calm .node.running::before {
+  animation: none;
+  transform: translateX(45%);
+  opacity: 0.7;
+}
+.graph-canvas.calm .bar.indet > i {
+  animation: none;
+  transform: translateX(35%);
+}
+.graph-canvas.calm .node.waiting::after {
+  animation-duration: 5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node,
+  .node.done {
+    transition: none;
+  }
+  .node:hover {
+    translate: none;
+  }
+  .node.running::before {
+    animation: none;
+    transform: translateX(45%);
+  }
+  .bar.indet > i {
+    animation: none;
+    transform: translateX(35%);
+  }
+  .node.waiting::after {
+    animation: none;
+    opacity: 0.6;
+  }
+}

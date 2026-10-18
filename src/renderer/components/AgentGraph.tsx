@@ -8,7 +8,9 @@ import { formatDuration, formatTokens, modeLabel, modelLabel } from '@core/summa
 import { CtxChip } from './ContextMeter';
 import { isLocalModel, LocalLinkLine } from './LocalBits';
 import { createClock, useClockKey, type Clock } from '../clockStore';
-import { agentName, displayStatus, famClass, STATUS_GLYPH, type DisplayStatus } from '../util';
+import { agentName, displayStatus, famClass, type DisplayStatus } from '../util';
+import { MotionTracker, playMoves } from '../cardFx';
+import { Fade, StatusLabel } from './cardParts';
 
 const LOCAL_ROWS_H = 30;
 
@@ -88,6 +90,7 @@ const NodeCard = memo(function NodeCard({
   kidsTotal,
   kidsRunning,
   clock,
+  motion,
   x,
   y,
   w,
@@ -101,6 +104,7 @@ const NodeCard = memo(function NodeCard({
   kidsTotal: number;
   kidsRunning: number;
   clock: Clock;
+  motion: MotionTracker;
   x: number;
   y: number;
   w: number;
@@ -117,6 +121,7 @@ const NodeCard = memo(function NodeCard({
   const plan = mode === 'plan';
   const goal = useMemo(() => agentGoal(a, plan), [a.toolCount, a.description, a.prompt, a.phase, a.agentType, a.kind, plan]); // eslint-disable-line react-hooks/exhaustive-deps
   // a finished card already says what it ended with; otherwise show the agent's own last sentence
+  const fxOn = motion.calm;
   const says = act.kind === 'finished' || act.kind === 'idle' ? '' : firstLine(a.lastText, 120);
   return (
     <div
@@ -125,6 +130,7 @@ const NodeCard = memo(function NodeCard({
       onClick={() => onSelect(a.id)}
       data-agent={a.id}
     >
+      <i className="fx" aria-hidden />
       <div className="row1">
         <span className="name">{isMain ? `${model} · main` : agentName(a)}</span>
         <GoalBadge goal={goal} />
@@ -132,9 +138,8 @@ const NodeCard = memo(function NodeCard({
       {isMain ? (
         <>
           <div className="model">{modeLabel(mode).short === 'PLAN' ? 'plan mode · reads, designs' : `building · ${modeLabel(mode).detail}`}</div>
-          <div className={`status ${st}`}>
-            {STATUS_GLYPH[st]}
-            {a.effort ? ` · effort ${a.effort}` : ''}
+          <div>
+            <StatusLabel st={st} extra={a.effort ? ` · effort ${a.effort}` : ''} enabled={fxOn} />
           </div>
         </>
       ) : (
@@ -144,14 +149,17 @@ const NodeCard = memo(function NodeCard({
             {a.phase ? ` · ${a.phase}` : ''}
             {a.background ? ' · bg' : ''}
           </span>
-          <span className={`status ${st}`}>{STATUS_GLYPH[st]}</span>
+          <StatusLabel st={st} enabled={fxOn} />
         </div>
       )}
       {isLocalModel(a.model) && <LocalLinkLine agent={a} />}
       <Bar status={st} />
       {!isMain && <div className="desc">{a.description || a.lastText || ''}</div>}
       <div className={`now ${act.kind}`} title={act.line} data-testid="now">
-        <span className="lbl">now:</span> {act.phrase}
+        <span className="lbl">now:</span>{' '}
+        <Fade k={`${act.kind}|${act.phrase}`} enabled={fxOn}>
+          {act.phrase}
+        </Fade>
         {dur && <span className="dur"> · {dur}</span>}
       </div>
       {!isMain && (
@@ -172,6 +180,8 @@ const NodeCard = memo(function NodeCard({
 
 /** The edges layer only changes with the layout, not with every card update. */
 const MANY_ACTIVE_EDGES = 16;
+/** above this many running agents the cards' running effects stand still */
+const MANY_RUNNING = 16;
 
 const Edges = memo(function Edges({ layout }: { layout: Layout }) {
   // the dash and dot animations repaint continuously: with many running agents, step the dashes and only travel dots on the first few edges
@@ -221,6 +231,8 @@ export function AgentGraph({
   compact?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [motion] = useState(() => new MotionTracker());
   const [wrapW, setWrapW] = useState(1000);
   const [wrapH, setWrapH] = useState(600);
   const [fit, setFit] = useState(true);
@@ -286,6 +298,13 @@ export function AgentGraph({
     : fit
       ? Math.max(0.45, Math.min(1, (wrapW - pad * 2) / Math.max(1, layout.width)))
       : 1;
+  // what changed since the last commit, seen from here: new cards, moved cards, status changes. Bulk changes (a session switch, loading
+  // hundreds of agents, replay scrubbing) plan nothing.
+  motion.plan(view.id, view.agents, layout);
+  useLayoutEffect(() => {
+    const moves = motion.take();
+    if (!compact && canvasRef.current) playMoves(canvasRef.current, moves);
+  }, [motion, view.id, view.agents, layout, compact]);
   const running = Object.values(view.agents).filter((a) => a.id !== MAIN && a.status === 'running').length;
   const total = Object.keys(view.agents).length - 1;
 
@@ -306,7 +325,8 @@ export function AgentGraph({
         </div>
       )}
       <div
-        className="graph-canvas"
+        ref={canvasRef}
+        className={`graph-canvas${running > MANY_RUNNING ? ' calm' : ''}`}
         onMouseOver={onHoverAgent ? (e) => onHoverAgent((e.target as HTMLElement).closest<HTMLElement>('[data-agent]')?.dataset.agent ?? null) : undefined}
         onMouseLeave={onHoverAgent ? () => onHoverAgent(null) : undefined}
         style={{ width: layout.width * scale + pad * 2, height: layout.height * scale + pad * 2 }}
@@ -329,6 +349,7 @@ export function AgentGraph({
                 <div
                   key={n.id}
                   className="node collapsed"
+                  data-chip={n.id}
                   style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
                   onClick={() => {
                     if (!showFinished) onToggleFinished();
@@ -349,6 +370,7 @@ export function AgentGraph({
                 kidsTotal={kidStats.get(a.id)?.total ?? 0}
                 kidsRunning={kidStats.get(a.id)?.running ?? 0}
                 clock={clock}
+                motion={motion}
                 x={n.x}
                 y={n.y}
                 w={n.w}

@@ -46,49 +46,10 @@
   --g: #7d7591;
 }
 
-.node .model2 {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: baseline;
-}
-.node .model2 .model {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-.node .now {
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.node .now .lbl,
 .ov-tool .lbl,
 .nowbox .lbl,
-.node .now .dur,
 .nowbox .dur {
   color: var(--muted);
-}
-.node .now.finished,
-.node .now.idle,
-.node .now.quiet {
-  color: var(--text-2);
-}
-.node .now.blocked {
-  color: var(--warn);
-}
-.node .says {
-  color: var(--faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-height: 1.45em;
-  font-size: 11.5px;
-}
-.node.main .now {
-  text-align: center;
 }
 .mini-main .goal {
   padding: 0 3px;
