@@ -66,6 +66,12 @@ describe('normalizer', () => {
     const e = normalizeLine('{"type":"brand-new"}', ctx);
     expect(e[0].k).toBe('unknown');
   });
+  it('unescapes the XML text of a task notification summary', () => {
+    const n = parseTaskNotification(
+      "<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n<summary>python - &lt;&lt;'EOF' &amp;&amp; done</summary>\n</task-notification>",
+    );
+    expect(n?.summary).toBe("python - <<'EOF' && done");
+  });
   it('parses task notifications only at the start of the text', () => {
     expect(parseTaskNotification('<task-notification>\n<task-id>abc</task-id>\n<status>completed</status>\n</task-notification>')).toEqual({
       taskId: 'abc',

@@ -88,12 +88,17 @@ export function usageFrom(u: Json | undefined): UsageNumbers | null {
 
 const NOTIFY_RE = /^\s*<task-notification>/;
 
+function unescapeXml(s: string | undefined): string | undefined {
+  return s?.replace(/&(lt|gt|quot|apos|#39|amp);/g, (_, e: string) => ({ lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'", amp: '&' })[e] ?? _);
+}
+
 export function parseTaskNotification(text: string): { taskId: string; status: string; summary?: string } | null {
   if (!NOTIFY_RE.test(text)) return null;
   const taskId = /<task-id>([^<]+)<\/task-id>/.exec(text)?.[1]?.trim();
   const status = /<status>([^<]+)<\/status>/.exec(text)?.[1]?.trim();
   if (!taskId || !status) return null;
-  const summary = /<summary>([^<]*)<\/summary>/.exec(text)?.[1]?.trim();
+  // the notification is XML, so its text arrives entity-escaped ("&lt;&lt;'EOF'")
+  const summary = unescapeXml(/<summary>([^<]*)<\/summary>/.exec(text)?.[1]?.trim());
   return { taskId, status, summary };
 }
 
