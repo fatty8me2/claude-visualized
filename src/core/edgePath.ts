@@ -28,8 +28,7 @@ export function roundedPath(sx: number, sy: number, ex: number, ey: number, ty: 
   );
 }
 
-export const edgePath = (g: EdgeGeom, reverse = false) =>
-  reverse ? roundedPath(g.x2, g.y2, g.x1, g.y1, g.ty) : roundedPath(g.x1, g.y1, g.x2, g.y2, g.ty);
+export const edgePath = (g: EdgeGeom, reverse = false) => (reverse ? roundedPath(g.x2, g.y2, g.x1, g.y1, g.ty) : roundedPath(g.x1, g.y1, g.x2, g.y2, g.ty));
 
 /** Approximate length (corners cut a little), for constant particle speed. */
 export const edgeLength = (g: EdgeGeom) => Math.abs(g.y2 - g.y1) + Math.abs(g.x2 - g.x1);

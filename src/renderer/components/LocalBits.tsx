@@ -2,14 +2,21 @@ import { classifyModel } from '@core/models';
 import { loadedText, localSummary } from '@core/localModels';
 import type { AgentNode } from '@core/state';
 import { useLocalLink, useLocalModels } from '../localStore';
+import { Icon } from './Icon';
 
 export const isLocalModel = (model: string | null | undefined) => classifyModel(model).provider === 'local';
 
 /** Small "⌂ local" tag: this agent runs on a local model (no Anthropic cost or limits). */
 export function LocalTag({ title }: { title?: string }) {
   return (
-    <span className="local-tag" data-testid="local-tag" title={title ?? 'Runs on a local model: no Anthropic cost, no 5-hour or weekly limits'}>
-      ⌂ local
+    <span
+      className="local-tag chip"
+      data-tone="local"
+      data-testid="local-tag"
+      title={title ?? 'Runs on a local model: no Anthropic cost, no 5-hour or weekly limits'}
+    >
+      <Icon name="local" size="xs" />
+      local
     </span>
   );
 }
@@ -42,7 +49,8 @@ export function LocalChip({ onOpen }: { onOpen: () => void }) {
     .join(' · ');
   return (
     <button className={`local-chip ${loaded ? 'active' : ''}`} data-testid="local-chip" onClick={onOpen} title={`${names}\nClick for the local models view`}>
-      ⌂ {loaded === 0 ? 'no model loaded' : `${loaded} model${loaded === 1 ? '' : 's'} loaded`}
+      <Icon name="local" size="xs" />
+      {loaded === 0 ? 'no model loaded' : `${loaded} model${loaded === 1 ? '' : 's'} loaded`}
     </button>
   );
 }

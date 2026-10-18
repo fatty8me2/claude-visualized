@@ -6,18 +6,14 @@
 }
 .graph-views {
   display: flex;
+  align-items: center;
   gap: 4px;
-  padding: 6px 10px 0;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--line);
   background: var(--bg-2);
 }
-.graph-views button {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  border-bottom-color: transparent;
-}
 
-.tl {
+.tlv {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -29,16 +25,16 @@
   font-size: 11px;
   user-select: none;
 }
-.tl.seekable .tl-body,
-.tl.seekable .tl-axis {
+.tlv.seekable .tl-body,
+.tlv.seekable .tl-axis {
   cursor: crosshair;
 }
-.tl:not(.seekable) .tl-body,
-.tl:not(.seekable) .tl-axis {
+.tlv:not(.seekable) .tl-body,
+.tlv:not(.seekable) .tl-axis {
   cursor: grab;
 }
-.tl.dragging,
-.tl.dragging * {
+.tlv.dragging,
+.tlv.dragging * {
   cursor: grabbing !important;
 }
 
@@ -100,7 +96,7 @@
   padding: 0 5px;
   border-radius: 0 0 4px 4px;
   background: var(--err);
-  color: #1a0d10;
+  color: var(--bg);
   font-weight: 700;
   font-size: 10px;
 }
@@ -151,13 +147,13 @@
   position: absolute;
   left: 0;
   right: 0;
-  border-bottom: 1px solid rgba(46, 40, 59, 0.35);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent);
 }
 .tl-row.sel {
-  background: rgba(180, 156, 255, 0.08);
+  background: var(--sel);
 }
 .tl-row.hl {
-  background: rgba(122, 167, 255, 0.1);
+  background: color-mix(in srgb, var(--run) 10%, transparent);
 }
 .tl-label {
   position: absolute;
@@ -180,7 +176,7 @@
   background: var(--panel);
 }
 .tl-row.sel .tl-label {
-  background: #1d1830;
+  background: color-mix(in srgb, var(--opus) 9%, var(--bg));
 }
 .tl-name {
   color: var(--text);
@@ -259,7 +255,7 @@
   top: 6px;
   height: 14px;
   pointer-events: none;
-  background: repeating-linear-gradient(135deg, rgba(14, 12, 20, 0.75) 0 3px, rgba(14, 12, 20, 0.2) 3px 6px);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bg) 75%, transparent) 0 3px, color-mix(in srgb, var(--bg) 20%, transparent) 3px 6px);
 }
 .tl-tick {
   position: absolute;
@@ -287,12 +283,12 @@
   max-width: 320px;
   padding: 6px 8px;
   border: 1px solid var(--line-2);
-  border-radius: 6px;
+  border-radius: var(--r-3);
   background: var(--panel-2);
   color: var(--text);
   white-space: pre-line;
   pointer-events: none;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-2);
 }
 
 @media (prefers-reduced-motion: no-preference) {

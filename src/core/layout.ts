@@ -40,9 +40,13 @@ export interface LayoutOptions {
   maxCols: number;
   /** collapse finished leaf children into one chip when a parent has more than this many */
   collapseAbove: number;
+  /** height of the "N finished" chip */
+  chipH: number;
   showFinished: boolean;
   /** parents whose finished children the user expanded */
   expanded?: ReadonlySet<string>;
+  /** parents the user folded: their finished children go into a chip even when the group is small */
+  folded?: ReadonlySet<string>;
 }
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
@@ -54,6 +58,21 @@ export const DEFAULT_LAYOUT: LayoutOptions = {
   gapY: 70,
   maxCols: 5,
   collapseAbove: 6,
+  chipH: 64,
+  showFinished: true,
+};
+
+/** Smaller cards for wide trees in a narrow panel (see core/graphZoom.ts: the graph switches to these instead of shrinking text). */
+export const COMPACT_LAYOUT: LayoutOptions = {
+  nodeW: 196,
+  nodeH: 60,
+  mainW: 264,
+  mainH: 64,
+  gapX: 16,
+  gapY: 46,
+  maxCols: 6,
+  collapseAbove: 6,
+  chipH: 40,
   showFinished: true,
 };
 
@@ -101,7 +120,9 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
     let collapsedBox: Box | null = null;
     // finished subtrees with nothing still running inside them
     const finishedLeaves = children.filter((c) => isFinished(c) && !hasLiveDescendant(c.id));
-    const crowded = children.length > opt.collapseAbove && finishedLeaves.length > 1 && !opt.expanded?.has(a.id);
+    const crowded =
+      !opt.expanded?.has(a.id) &&
+      ((children.length > opt.collapseAbove && finishedLeaves.length > 1) || (!!opt.folded?.has(a.id) && finishedLeaves.length > 0));
     if (!opt.showFinished || crowded) {
       if (finishedLeaves.length > 0) {
         const ids = new Set(finishedLeaves.map((c) => c.id));
@@ -110,13 +131,13 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
         collapsedBox = {
           id: `collapsed:${a.id}`,
           w: opt.nodeW,
-          h: 64,
+          h: opt.chipH,
           collapsed: { count: ids.size, ids: [...ids], parentId: a.id },
           children: [],
           grid: false,
           // sized up front: a zero-width chip gets placed on top of its neighbour
           sw: opt.nodeW,
-          sh: 64,
+          sh: opt.chipH,
         };
       }
     }

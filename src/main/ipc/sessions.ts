@@ -5,6 +5,8 @@ import type { IpcRegistrar } from './registry';
 
 /** webContents ids currently showing the overview page */
 const overviewWatchers = new Set<number>();
+/** webContents ids that already have a 'destroyed' listener */
+const hookedSenders = new Set<number>();
 
 /** Sessions: list, selection, live state, replay, overview and "open in Claude". */
 export const registerSessionsIpc: IpcRegistrar = ({ manager, updateConfig, peers }) => {
@@ -28,11 +30,16 @@ export const registerSessionsIpc: IpcRegistrar = ({ manager, updateConfig, peers
   ipcMain.handle('overview:watch', (e, on: boolean) => {
     const id = e.sender.id;
     if (on) {
+      // one 'destroyed' listener per window, however often the overview page is opened
+      if (!hookedSenders.has(id)) {
+        hookedSenders.add(id);
+        e.sender.once('destroyed', () => {
+          hookedSenders.delete(id);
+          overviewWatchers.delete(id);
+          manager.overviewViewers = overviewWatchers.size;
+        });
+      }
       overviewWatchers.add(id);
-      e.sender.once('destroyed', () => {
-        overviewWatchers.delete(id);
-        manager.overviewViewers = overviewWatchers.size;
-      });
       manager.markOverviewDirty();
     } else overviewWatchers.delete(id);
     manager.overviewViewers = overviewWatchers.size;
@@ -40,10 +47,8 @@ export const registerSessionsIpc: IpcRegistrar = ({ manager, updateConfig, peers
   ipcMain.handle('sessions:get', () => manager.getSummaries());
   ipcMain.handle('state:get', () => manager.snapshotState());
   ipcMain.handle('selected:get', () => manager.selected);
-  ipcMain.handle('session:select', (_e, id: string | null) => {
-    manager.select(id);
-    updateConfig({ followActive: false });
-  });
+  // selecting turns follow off; the manager emits 'follow' and index.ts saves it
+  ipcMain.handle('session:select', (_e, id: string | null) => manager.select(id));
   ipcMain.handle('follow:set', (_e, on: boolean) => {
     updateConfig({ followActive: on });
   });

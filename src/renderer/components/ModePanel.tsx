@@ -4,8 +4,8 @@ import { formatDuration, formatTokens, modeLabel, modelLabel } from '@core/summa
 import type { HookServerStatusView } from '@core/api';
 import { tokensByProvider } from '@core/localModels';
 import { isLocalModel, LocalTag } from './LocalBits';
-
-const TODO_GLYPH: Record<string, string> = { completed: '✓', in_progress: '▸', pending: '○' };
+import { estimateAgents, estimateTooltip, formatUSD } from '@core/pricing';
+import { Icon } from './Icon';
 
 export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: number; hookSrv: HookServerStatusView | null }) {
   const m = modeLabel(view.mode);
@@ -17,17 +17,28 @@ export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: numb
   const lt = split.local;
   const allLocal = split.localAgents > 0 && t.in + t.out + t.cacheRead + t.cacheWrite === 0;
   const hookFresh = view.lastHookAt && now - view.lastHookAt < 10 * 60_000;
+  const est = estimateAgents(view.agents);
+  const byModel = Object.entries(view.costByModel ?? {}).filter(([, v]) => v > 0);
+  const reportedTitle = [
+    'As reported by Claude Code in the transcript (cost-state); only written at certain points',
+    ...(byModel.length ? ['', 'by model:', ...byModel.map(([k, v]) => `  ${modelLabel(k)} $${v.toFixed(2)}`)] : []),
+  ].join('\n');
   return (
     <div className="modepanel" data-tour="mode">
-      <div className={`modebox ${plan ? 'plan' : 'build'}`}>
-        <div className="big">{plan ? 'PLAN MODE' : 'BUILD MODE'}</div>
-        <div className="detail">{m.detail}</div>
-        <div className="flip">
-          <span className={plan ? 'cur' : ''}>{plan ? '◆' : '◇'} plan</span>
-          <span className={plan ? '' : 'cur'}>{plan ? '◇' : '◆'} build</span>
+      <div
+        className={`modebox ${plan ? 'plan' : 'build'}`}
+        title={`${plan ? 'Plan mode: Claude reads and designs, nothing is changed.' : 'Build mode: Claude may edit files.'}\nIn Claude Code, shift+tab switches modes.`}
+      >
+        <span className="mode-ic">
+          <Icon name={plan ? 'plan' : 'edit'} size="md" />
+        </span>
+        <div className="mode-tx">
+          <div className="big">{plan ? 'PLAN MODE' : 'BUILD MODE'}</div>
+          <div className="detail">{plan ? 'reads and designs, no edits' : m.detail}</div>
         </div>
-        <div className="detail" style={{ color: 'var(--faint)', marginTop: 4 }}>
-          shift+tab to flip
+        <div className="flip" aria-hidden>
+          <span className={plan ? 'cur' : ''}>plan</span>
+          <span className={plan ? '' : 'cur'}>build</span>
         </div>
       </div>
 
@@ -49,7 +60,9 @@ export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: numb
             </div>
             {view.todos.map((td) => (
               <div key={td.id} className={`todo ${td.status}`}>
-                <span>{TODO_GLYPH[td.status] ?? '·'}</span>
+                <span className="tg">
+                  <Icon name={td.status === 'completed' ? 'done' : td.status === 'in_progress' ? 'running' : 'idle'} size="xs" />
+                </span>
                 <span className="tx">{td.text}</span>
               </div>
             ))}
@@ -85,10 +98,21 @@ export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: numb
           <span className="v">{formatTokens(t.cacheRead)}</span>
           <span className="k">cache write</span>
           <span className="v">{formatTokens(t.cacheWrite)}</span>
-          <span className="k">cost</span>
-          <span className="v" title="As reported by Claude Code in the transcript (cost-state); only written at certain points">
-            {allLocal ? 'n/a' : view.costUSD != null ? `$${view.costUSD.toFixed(2)}` : '—'}
-          </span>
+          <span className="k">{view.costUSD == null && est.usd > 0 && !allLocal ? 'cost est.' : 'cost'}</span>
+          {allLocal ? (
+            <span className="v">n/a</span>
+          ) : view.costUSD != null ? (
+            <span className="v" title={reportedTitle} data-testid="cost">
+              ${view.costUSD.toFixed(2)}
+            </span>
+          ) : est.usd > 0 ? (
+            <span className="v est" title={estimateTooltip(est)} data-testid="cost">
+              ~{formatUSD(est.usd)}
+              {est.unpriced.length ? '+' : ''}
+            </span>
+          ) : (
+            <span className="v">—</span>
+          )}
         </div>
       </div>
 

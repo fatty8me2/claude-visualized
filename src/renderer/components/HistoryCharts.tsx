@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Icon } from './Icon';
 import { niceTicks, type GroupRow } from '@core/history';
 import { formatTokens } from '@core/summarize';
 
@@ -111,7 +112,14 @@ export function FamilyLegend({ present }: { present: Set<string> }) {
       {FAMILIES.filter((f) => present.has(f)).map((f) => (
         <span key={f} data-family={f}>
           <i style={{ background: familyColor(f) }} />
-          {f === 'local' ? <span className="local-tag">⌂ local models</span> : FAMILY_LABEL[f]}
+          {f === 'local' ? (
+            <span className="local-tag chip" data-tone="local">
+              <Icon name="local" size="xs" />
+              local models
+            </span>
+          ) : (
+            FAMILY_LABEL[f]
+          )}
         </span>
       ))}
     </div>

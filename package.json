@@ -1,7 +1,7 @@
 {
   "name": "claude-visualized",
   "productName": "Claude Visualized",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Live desktop visualizer for Claude Code sessions, agents and subagents",
   "author": "fatty8me2",
   "license": "MIT",
@@ -26,8 +26,10 @@
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "lucide-react": "^1.59.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -1,24 +1,22 @@
 /* attention inbox: sidebar badge, the Inbox page and the mini view line */
 .nav-badge {
   display: inline-block;
-  min-width: 16px;
+  min-width: 17px;
   padding: 0 5px;
-  margin-left: 6px;
-  border-radius: 8px;
+  margin-left: auto;
+  border-radius: var(--r-pill);
   background: var(--err);
-  color: #1a0b10;
+  color: var(--bg);
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
   text-align: center;
 }
-.sidebar.collapsed .sidebar-head button {
-  position: relative;
-}
-.sidebar.collapsed .nav-badge {
+.sidebar-col .nav-badge {
   position: absolute;
-  top: -3px;
-  right: -4px;
+  top: -2px;
+  right: -3px;
   margin: 0;
   min-width: 14px;
   line-height: 14px;
@@ -28,24 +26,12 @@
 .inbox-page {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
-  padding: 18px 22px 40px;
+  padding: 16px var(--gutter) 40px;
 }
-.inbox-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.inbox-head h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-.inbox-head .sub {
-  color: var(--muted);
-  font-size: 11.5px;
-  flex: 1;
+.inbox-page > * {
+  max-width: 980px;
 }
 .inbox-group {
   margin-bottom: 18px;
@@ -54,11 +40,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--text-2);
-  font-size: 11.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .inbox-group-title .t {
   overflow: hidden;
@@ -70,12 +52,20 @@
   grid-template-columns: 26px 1fr auto;
   gap: 4px 10px;
   align-items: start;
-  padding: 9px 12px;
-  margin-bottom: 6px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-left: 3px solid var(--sev, var(--line-2));
-  border-radius: 6px;
+  border-radius: var(--r-3);
+  transition:
+    border-color var(--dur-1),
+    background-color var(--dur-1);
+}
+.inbox-item:hover {
+  background: color-mix(in srgb, var(--text) 2%, var(--panel));
+  border-color: var(--line-2);
+  border-left-color: var(--sev, var(--line-2));
 }
 .inbox-item.sev-critical {
   --sev: var(--err);
@@ -92,9 +82,13 @@
 }
 .inbox-item .ico {
   grid-row: 1 / span 2;
-  font-size: 16px;
-  line-height: 20px;
-  text-align: center;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-2);
+  color: var(--sev, var(--muted));
+  background: color-mix(in srgb, var(--sev, var(--muted)) 12%, transparent);
 }
 .inbox-item .ttl {
   display: flex;
@@ -110,13 +104,7 @@
   color: var(--muted);
   font-size: 11px;
 }
-.inbox-item .tag {
-  color: var(--ok);
-  font-size: 10.5px;
-  border: 1px solid color-mix(in srgb, var(--ok) 50%, transparent);
-  border-radius: 3px;
-  padding: 0 5px;
-}
+
 .inbox-item .time {
   color: var(--muted);
   font-size: 11px;
@@ -140,19 +128,21 @@
   margin-top: 4px;
 }
 .inbox-item .acts button {
-  font-size: 11px;
+  font-size: var(--fs-xs);
+  padding: 2px 9px;
 }
-.inbox-empty {
-  margin: 60px auto;
-  max-width: 360px;
+.inbox-page > .inbox-empty {
+  margin: 70px auto;
   text-align: center;
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.6;
 }
 .inbox-empty .big {
-  font-size: 30px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
 }
 
 .mini-need {

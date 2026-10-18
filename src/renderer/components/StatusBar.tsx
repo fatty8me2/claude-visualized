@@ -1,6 +1,7 @@
 import { MAIN, type SessionView } from '@core/state';
 import { formatTokens, modelLabel, toolLabel } from '@core/summarize';
 import type { HookServerStatusView } from '@core/api';
+import { estimateAgents, estimateTooltip, formatUSD } from '@core/pricing';
 import { displayStatus } from '../util';
 import { tokensByProvider } from '@core/localModels';
 
@@ -13,10 +14,12 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
   const t = split.claude;
   const lt = split.local;
   const hooksLive = view.lastHookAt && now - view.lastHookAt < 10 * 60_000;
+  const plan = view.mode === 'plan';
+  const est = view.costUSD == null ? estimateAgents(view.agents) : null;
   return (
     <div className="statusbar">
       <span>
-        mode <b className="hl">[{view.mode === 'plan' ? 'plan' : 'build'}]</b>
+        mode <b className={plan ? 'mode-plan' : 'mode-build'}>[{plan ? 'plan' : 'build'}]</b>
       </span>
       <span>
         subagents{' '}
@@ -24,7 +27,7 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
           [{running}/{subs.length}]
         </b>
       </span>
-      <span>
+      <span className="sb-grow">
         {modelLabel(main?.model).toLowerCase()}{' '}
         <b>
           [{st}
@@ -39,11 +42,15 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
           local tokens <b className="local-num">{formatTokens(lt.in + lt.out + lt.cacheRead + lt.cacheWrite)}</b>
         </span>
       )}
-      {view.costUSD != null && (
-        <span>
+      {view.costUSD != null ? (
+        <span title="As reported by Claude Code">
           cost <b>${view.costUSD.toFixed(2)}</b>
         </span>
-      )}
+      ) : est && est.usd > 0 ? (
+        <span title={estimateTooltip(est)}>
+          cost est. <b>~{formatUSD(est.usd)}</b>
+        </span>
+      ) : null}
       <span className="spacer" />
       {replaying && <span className="hl">● replay</span>}
       <span>

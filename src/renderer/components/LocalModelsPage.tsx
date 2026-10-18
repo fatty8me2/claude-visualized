@@ -6,7 +6,7 @@ import { formatTokens } from '@core/summarize';
 import { useNow, useOverview } from '../hooks';
 import { useLocalModels } from '../localStore';
 import { agentName, ago } from '../util';
-import { UsageMeters } from './UsageMeters';
+import { Icon } from './Icon';
 
 interface UsedBy {
   session: string;
@@ -46,7 +46,7 @@ function MemBar({ m }: { m: LocalModelInfo }) {
   );
 }
 
-function LoadedRow({ m, views, now }: { m: LocalModelInfo; views: SessionView[] | null; now: number }) {
+function LoadedRow({ m, views, now, onOpen }: { m: LocalModelInfo; views: SessionView[] | null; now: number; onOpen: (id: string) => void }) {
   const users = usedBy(m, views, now);
   const unload = unloadsIn(m.expiresAt, now);
   return (
@@ -77,17 +77,22 @@ function LoadedRow({ m, views, now }: { m: LocalModelInfo; views: SessionView[] 
       {users.length > 0 && (
         <div className="lm-used" data-testid="used-by">
           used by:{' '}
-          {users
-            .slice(0, 4)
-            .map((u) => `${u.session} / ${u.agent} (${ago(u.at, now)})`)
-            .join(' · ')}
+          {users.slice(0, 4).map((u, i) => (
+            <span key={`${u.sessionId}|${u.agent}`}>
+              {i > 0 && ' · '}
+              <button className="link" onClick={() => onOpen(u.sessionId)} title="Open this session">
+                {u.session} / {u.agent}
+              </button>{' '}
+              ({ago(u.at, now)})
+            </span>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-function ServerCard({ s, views, now }: { s: LocalServerStatus; views: SessionView[] | null; now: number }) {
+function ServerCard({ s, views, now, onOpen }: { s: LocalServerStatus; views: SessionView[] | null; now: number; onOpen: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const stats: [string, string][] = [];
   if (s.inFlight != null) stats.push(['requests in flight', String(s.inFlight)]);
@@ -119,12 +124,15 @@ function ServerCard({ s, views, now }: { s: LocalServerStatus; views: SessionVie
       {s.loaded.length === 0 ? (
         <div className="lm-faint">no model loaded in memory (the server loads one on the first request)</div>
       ) : (
-        s.loaded.map((m) => <LoadedRow key={m.id} m={m} views={views} now={now} />)
+        s.loaded.map((m) => <LoadedRow key={m.id} m={m} views={views} now={now} onOpen={onOpen} />)
       )}
       {s.installed.length > 0 && (
         <>
-          <h5 className="lm-toggle" onClick={() => setOpen(!open)} data-testid="installed-toggle">
-            {open ? '▾' : '▸'} installed · {s.installed.length}
+          <h5>
+            <button className="lm-toggle ghost" onClick={() => setOpen(!open)} data-testid="installed-toggle" aria-expanded={open}>
+              <Icon name={open ? 'chevronDown' : 'chevronRight'} size="xs" />
+              installed · {s.installed.length}
+            </button>
           </h5>
           {open && (
             <div className="lm-installed" data-testid="installed-list">
@@ -162,7 +170,11 @@ function Empty({ servers, onCheck, checking, onSettings }: { servers: LocalServe
           <b>LM Studio</b>: load a model, then start the local server from the Developer tab (127.0.0.1:1234).
         </li>
         <li>
-          <b>llama.cpp, vLLM, Jan, LocalAI</b>: add their address under <a onClick={onSettings}>settings, local models</a>.
+          <b>llama.cpp, vLLM, Jan, LocalAI</b>: add their address under{' '}
+          <button className="link" onClick={onSettings}>
+            settings, local models
+          </button>
+          .
         </li>
       </ul>
       <div className="lm-actions">
@@ -183,7 +195,7 @@ function Empty({ servers, onCheck, checking, onSettings }: { servers: LocalServe
   );
 }
 
-export function LocalModelsPage({ onOpenSession: _onOpenSession, onSettings }: { onOpenSession: (id: string) => void; onSettings: () => void }) {
+export function LocalModelsPage({ onOpenSession, onSettings }: { onOpenSession: (id: string) => void; onSettings: () => void }) {
   const { servers } = useLocalModels();
   const views = useOverview();
   const now = useNow(1000);
@@ -197,30 +209,36 @@ export function LocalModelsPage({ onOpenSession: _onOpenSession, onSettings }: {
     setTimeout(() => setChecking(false), 1200);
   };
   return (
-    <div className="overview localpage" data-testid="local-page">
-      <div className="topbar">
-        <div className="title">
-          LOCAL MODELS{' '}
-          <span className="proj">
-            · {up} server{up === 1 ? '' : 's'} up · {loaded} model{loaded === 1 ? '' : 's'} loaded
-          </span>
-        </div>
-        <UsageMeters />
+    <div className="page localpage" data-testid="local-page">
+      <div className="page-head">
+        <h2>
+          <Icon name="local" size="md" />
+          Local models
+        </h2>
+        <span className="sub">
+          {up} server{up === 1 ? '' : 's'} up · {loaded} model{loaded === 1 ? '' : 's'} loaded
+        </span>
         <div className="actions">
           <button onClick={check} disabled={checking} data-testid="local-refresh">
-            ⟳ check again
+            <Icon name="refresh" size="xs" />
+            check again
           </button>
-          <button onClick={onSettings}>⚙ settings</button>
+          <button onClick={onSettings}>
+            <Icon name="settings" size="xs" />
+            settings
+          </button>
         </div>
       </div>
       <div className="lm-body">
         <div className="lm-faint lm-privacy">Read-only status from the servers you configured; nothing from your sessions is sent to them.</div>
-        {up === 0 ? (
+        {servers.length === 0 ? (
+          <span className="loading">checking local servers…</span>
+        ) : up === 0 ? (
           <Empty servers={servers} onCheck={check} checking={checking} onSettings={onSettings} />
         ) : (
           <>
             {ups.map((s) => (
-              <ServerCard key={s.id} s={s} views={views} now={now} />
+              <ServerCard key={s.id} s={s} views={views} now={now} onOpen={onOpenSession} />
             ))}
             {others.length > 0 && (
               <div className="lm-others lm-faint">

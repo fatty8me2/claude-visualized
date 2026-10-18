@@ -16,7 +16,9 @@ export const HOOK_EVENTS = [
   'SubagentStart',
   'SubagentStop',
   'Stop',
+  'StopFailure',
   'PreCompact',
+  'PostModelSwitch',
   'SessionEnd',
 ] as const;
 

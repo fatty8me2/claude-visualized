@@ -14,8 +14,9 @@ export function useNow(intervalMs = 1000): number {
   return now;
 }
 
-export function useSessions(): SessionSummary[] {
-  const [s, set] = useState<SessionSummary[]>([]);
+/** The session list; null until the first answer arrives (so pages don't flash "no sessions"). */
+export function useSessions(): SessionSummary[] | null {
+  const [s, set] = useState<SessionSummary[] | null>(null);
   useEffect(() => {
     void window.api.getSessions().then(set);
     return window.api.onSessions((v) => set([...v]));
@@ -30,25 +31,37 @@ export function useLiveState(): SessionView | null {
     const dec = new ViewDecoder();
     let fetching = false;
     let alive = true;
+    let retry: ReturnType<typeof setTimeout> | null = null;
     const resync = () => {
       if (fetching) return;
       fetching = true;
-      void window.api.getState().then((v) => {
-        fetching = false;
-        if (!alive) return;
-        dec.adopt(v);
-        set(v);
-      });
+      window.api
+        .getState()
+        .then((v) => {
+          if (!alive) return;
+          dec.adopt(v);
+          set(v);
+        })
+        .catch((e) => {
+          console.error('getState failed', e);
+          if (alive) retry = setTimeout(resync, 1500);
+        })
+        .finally(() => {
+          fetching = false;
+        });
     };
     const off = window.api.onState((m) => {
       if (fetching) return;
       const v = dec.apply(m);
       if (v === undefined) resync();
-      else set(v);
+      // "no view" arrives between selecting a session and its first snapshot: keep the last one on screen meanwhile
+      // (App shows it with a loading strip, so the page doesn't unmount and lose its tabs and filters)
+      else if (v !== null) set(v);
     });
     resync();
     return () => {
       alive = false;
+      if (retry) clearTimeout(retry);
       off();
     };
   }, []);
@@ -71,15 +84,24 @@ export function useOverview(): SessionView[] | null {
     const dec = new OverviewDecoder();
     let fetching = false;
     let alive = true;
+    let retry: ReturnType<typeof setTimeout> | null = null;
     const resync = () => {
       if (fetching) return;
       fetching = true;
-      void window.api.getOverview().then((vs) => {
-        fetching = false;
-        if (!alive) return;
-        dec.adopt(vs);
-        set(vs);
-      });
+      window.api
+        .getOverview()
+        .then((vs) => {
+          if (!alive) return;
+          dec.adopt(vs);
+          set(vs);
+        })
+        .catch((e) => {
+          console.error('getOverview failed', e);
+          if (alive) retry = setTimeout(resync, 1500);
+        })
+        .finally(() => {
+          fetching = false;
+        });
     };
     resync();
     void window.api.watchOverview(true);
@@ -91,6 +113,7 @@ export function useOverview(): SessionView[] | null {
     });
     return () => {
       alive = false;
+      if (retry) clearTimeout(retry);
       off();
       void window.api.watchOverview(false);
     };

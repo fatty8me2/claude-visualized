@@ -11,13 +11,14 @@ export function displayStatus(a: AgentNode, now: number): DisplayStatus {
   return now - a.lastActivity > quietAfter ? 'quiet' : 'running';
 }
 
-export const STATUS_GLYPH: Record<DisplayStatus, string> = {
-  running: '◐ running',
-  quiet: '◌ quiet',
-  waiting: '⚠ needs you',
-  idle: '○ idle',
-  done: '✓ done',
-  error: '✗ failed',
+/** the status word shown next to its icon (see StatusText in components/cardParts.tsx) */
+export const STATUS_WORD: Record<DisplayStatus, string> = {
+  running: 'running',
+  quiet: 'quiet',
+  waiting: 'needs you',
+  idle: 'idle',
+  done: 'done',
+  error: 'failed',
 };
 
 export function famClass(model: string | null | undefined): string {
@@ -43,6 +44,5 @@ export function ago(ts: number, now: number): string {
 export function agentName(a: AgentNode | undefined): string {
   if (!a) return '?';
   if (a.kind === 'main') return 'main';
-  if (a.kind === 'workflow') return `⧉ ${a.agentType}`;
   return a.agentType || 'agent';
 }

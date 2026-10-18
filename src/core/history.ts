@@ -268,6 +268,10 @@ export interface HistoryKpis {
   tokens: TokenSums;
   costUsd: number;
   costSessions: number;
+  /** every token in the range at API list prices (see core/pricing.ts); 0 when nothing could be priced */
+  costEstimatedUsd: number;
+  /** models with tokens but no known list price */
+  costUnpriced: string[];
   sessions: number;
   agents: number;
   activeDays: number;

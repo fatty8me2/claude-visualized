@@ -37,7 +37,7 @@ export class MotionTracker {
   /** Should small text changes (status, the "now" line) animate right now? */
   calm = (): boolean => {
     return !!this.cur && !this.cur.plan.bulk;
-  }
+  };
 }
 
 function flash(card: Element, color: string | null, peak = 0.9, ms = 900) {
@@ -58,13 +58,11 @@ export function playMoves(root: HTMLElement, moves: Move[]) {
     if (!el || !el.animate) continue;
     switch (m.kind) {
       case 'spawn':
-        el.animate(
-          [
-            { transform: `translate(${m.dx}px, ${m.dy}px) scale(0.9)` },
-            { transform: 'translate(0, 0) scale(1)' },
-          ],
-          { duration: 640, easing: SPRING, fill: 'backwards' },
-        );
+        el.animate([{ transform: `translate(${m.dx}px, ${m.dy}px) scale(0.9)` }, { transform: 'translate(0, 0) scale(1)' }], {
+          duration: 640,
+          easing: SPRING,
+          fill: 'backwards',
+        });
         el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out', fill: 'backwards' });
         if (m.glow) flash(el, null, 0.95, 1100);
         break;

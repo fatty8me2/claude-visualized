@@ -20,6 +20,7 @@ import {
 import { agentName, clock, famClass } from '../util';
 import { GoalBadge } from './GoalBadge';
 import '../timeline.css';
+import { Icon } from './Icon';
 
 const ROW = 26;
 const LABEL_W = 210;
@@ -220,7 +221,7 @@ export function Timeline({ view, now, selectedAgent, onSelect, highlight, onHove
       if (!a) return null;
       const g = agentGoal(a, a.kind === 'main' && pm);
       const last = a.currentTool ?? a.recent[a.recent.length - 1];
-      const lines = [agentName(a), `${GOAL_INFO[g.goal].glyph} ${GOAL_INFO[g.goal].word}${a.description ? `: ${a.description.slice(0, 120)}` : ''}`];
+      const lines = [agentName(a), `${GOAL_INFO[g.goal].word}${a.description ? `: ${a.description.slice(0, 120)}` : ''}`];
       lines.push(
         `${formatDuration(barEnd(a, now) - a.startedAt)} · ${a.toolCount} tool call${a.toolCount === 1 ? '' : 's'}${a.errorCount ? ` · ${a.errorCount} failed` : ''}`,
       );
@@ -243,7 +244,7 @@ export function Timeline({ view, now, selectedAgent, onSelect, highlight, onHove
 
   return (
     <div
-      className={`tl ${replaying ? 'replaying' : ''} ${onSeekTime ? 'seekable' : ''}`}
+      className={`tlv ${replaying ? 'replaying' : ''} ${onSeekTime ? 'seekable' : ''}`}
       ref={rootRef}
       data-testid="timeline"
       onPointerDown={onPointerDown}
@@ -255,17 +256,21 @@ export function Timeline({ view, now, selectedAgent, onSelect, highlight, onHove
     >
       <div className="tl-tools">
         <button onClick={doFit} className={!follow && !manual ? 'on' : ''} title="Fit the whole session" data-testid="tl-fit">
-          ⤢ fit
+          <Icon name="fit" size="xs" />
+          fit
         </button>
         <button onClick={toggleFollow} className={follow ? 'on' : ''} title="Keep the right edge at now" data-testid="tl-follow">
-          {replaying ? '▶ follow replay' : '▶ follow now'}
+          <Icon name="play" size="xs" />
+          {replaying ? 'follow replay' : 'follow now'}
         </button>
-        <button onClick={() => zoomBy(1.6)} title="Zoom in (ctrl+wheel)">
-          +
-        </button>
-        <button onClick={() => zoomBy(1 / 1.6)} title="Zoom out (ctrl+wheel)">
-          −
-        </button>
+        <div className="seg">
+          <button onClick={() => zoomBy(1 / 1.6)} title="Zoom out (ctrl+wheel)" aria-label="zoom out">
+            <Icon name="zoomOut" size="xs" />
+          </button>
+          <button onClick={() => zoomBy(1.6)} title="Zoom in (ctrl+wheel)" aria-label="zoom in">
+            <Icon name="zoomIn" size="xs" />
+          </button>
+        </div>
         <span className="tl-hint">
           {formatDuration(range.t1 - range.t0)} visible · {lanes.length} lane{lanes.length === 1 ? '' : 's'} · ctrl+wheel zoom, drag or shift+wheel pan
           {onSeekTime ? ', click to seek' : ''}
@@ -335,7 +340,7 @@ export function Timeline({ view, now, selectedAgent, onSelect, highlight, onHove
                         toggleCollapsed(lane.id);
                       }}
                     >
-                      {collapsed.has(lane.id) ? '▸' : '▾'}
+                      <Icon name={collapsed.has(lane.id) ? 'chevronRight' : 'chevronDown'} size="xs" />
                     </button>
                   ) : null}
                   <GoalBadge goal={goal} glyphOnly />

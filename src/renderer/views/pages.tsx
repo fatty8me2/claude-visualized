@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { DevicesPage } from '../components/DevicesPage';
 import { InboxPage } from '../components/InboxPage';
 import { HistoryPage } from '../components/HistoryPage';
 import { LocalModelsPage } from '../components/LocalModelsPage';
 import { Overview } from '../components/Overview';
 import { SessionView, type SessionViewProps } from './SessionView';
+import { Icon, type IconName } from '../components/Icon';
 
 /**
  * Page registry: the pages that fill the area next to the sidebar.
@@ -28,12 +29,14 @@ export interface PageContext {
   activeOnly: boolean;
   /** props for the one-session view; null while no session is loaded */
   session: SessionViewProps | null;
+  /** whether any session exists; undefined until the first list arrives */
+  haveSessions: boolean | undefined;
 }
 
 export interface PageDef {
   id: PageId;
-  /** glyph shown alone in the collapsed sidebar and before the label in the expanded one */
-  icon: string;
+  /** icon shown alone in the collapsed sidebar and before the label in the expanded one */
+  icon: IconName;
   label: string;
   /** tooltip in the expanded sidebar */
   title: string;
@@ -44,28 +47,54 @@ export interface PageDef {
   render: (ctx: PageContext) => ReactNode;
 }
 
-function EmptySession({ selected, onWelcome }: { selected: string | null; onWelcome: () => void }) {
+function EmptySession({ selected, known, onWelcome }: { selected: string | null; known: boolean | undefined; onWelcome: () => void }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    if (!selected) return;
+    const t = setTimeout(() => setSlow(true), 10_000);
+    return () => clearTimeout(t);
+  }, [selected]);
+  // the first answers have not arrived yet: don't flash "no sessions" at someone who has hundreds
+  if (known === undefined || (!selected && known)) {
+    return (
+      <div className="empty-state">
+        <span className="loading">loading…</span>
+      </div>
+    );
+  }
+  if (selected) {
+    return (
+      <div className="empty-state">
+        {slow ? (
+          <div className="empty-card">
+            <Icon name="warn" size="lg" />
+            <div className="empty-title">This session could not be loaded</div>
+            <div>Its transcript may have been moved or deleted. Pick another session from the list.</div>
+          </div>
+        ) : (
+          <span className="loading">loading session…</span>
+        )}
+      </div>
+    );
+  }
   return (
-    <div className="empty">
-      {selected ? (
-        <div>loading session…</div>
-      ) : (
-        <div className="getting-started" data-testid="empty-state">
-          <div className="gs-title">No Claude Code sessions found yet</div>
-          <ol>
-            <li>
-              Install Claude Code: the <b>Code</b> tab in the Claude desktop app, or the <code>claude</code> command in a terminal.
-            </li>
-            <li>Start a session and ask Claude something. It will show up here within a second or two, and this page fills in by itself.</li>
-            <li>
-              Optional: run <code>claude /login</code> once so the usage meters work.
-            </li>
-          </ol>
-          <button className="primary" onClick={onWelcome}>
-            open the welcome guide
-          </button>
-        </div>
-      )}
+    <div className="empty-state">
+      <div className="getting-started" data-testid="empty-state">
+        <div className="gs-title">No Claude Code sessions found yet</div>
+        <ol>
+          <li>
+            Install Claude Code: the <b>Code</b> tab in the Claude desktop app, or the <code>claude</code> command in a terminal.
+          </li>
+          <li>Start a session and ask Claude something. It will show up here within a second or two, and this page fills in by itself.</li>
+          <li>
+            Optional: run <code>claude /login</code> once so the usage meters work.
+          </li>
+        </ol>
+        <button className="primary" onClick={onWelcome}>
+          open the welcome guide
+        </button>
+      </div>
     </div>
   );
 }
@@ -73,7 +102,7 @@ function EmptySession({ selected, onWelcome }: { selected: string | null; onWelc
 export const PAGES: readonly PageDef[] = [
   {
     id: 'overview',
-    icon: '▦',
+    icon: 'overview',
     label: 'all sessions',
     title: 'Every live session side by side',
     collapsedTitle: 'All sessions',
@@ -82,16 +111,17 @@ export const PAGES: readonly PageDef[] = [
   },
   {
     id: 'session',
-    icon: '◉',
+    icon: 'session',
     label: 'one session',
     title: 'One session in detail',
     collapsedTitle: 'One session',
     group: 'switch',
-    render: (ctx) => (ctx.session ? <SessionView {...ctx.session} /> : <EmptySession selected={ctx.selected} onWelcome={ctx.openWelcome} />),
+    render: (ctx) =>
+      ctx.session ? <SessionView {...ctx.session} /> : <EmptySession selected={ctx.selected} known={ctx.haveSessions} onWelcome={ctx.openWelcome} />,
   },
   {
     id: 'inbox',
-    icon: '!',
+    icon: 'inbox',
     label: 'inbox',
     title: 'Everything that needs you, across all sessions',
     collapsedTitle: 'Attention inbox',
@@ -101,7 +131,7 @@ export const PAGES: readonly PageDef[] = [
   },
   {
     id: 'local',
-    icon: '⌂',
+    icon: 'local',
     label: 'local models',
     title: 'Ollama, LM Studio and other local model servers',
     collapsedTitle: 'Local models (Ollama, LM Studio, ...)',
@@ -111,7 +141,7 @@ export const PAGES: readonly PageDef[] = [
   },
   {
     id: 'history',
-    icon: '▤',
+    icon: 'history',
     label: 'history',
     title: 'Usage, cost and search across every past session',
     collapsedTitle: 'History and search',
@@ -121,7 +151,7 @@ export const PAGES: readonly PageDef[] = [
   },
   {
     id: 'devices',
-    icon: '⇄',
+    icon: 'devices',
     label: 'devices',
     title: 'Share with your other computers, or watch theirs',
     collapsedTitle: 'Devices (share / pair)',

@@ -2,10 +2,28 @@
 // (cheap for 10k+ event transcripts) and returns it; callers that need a new identity copy it.
 
 import type { AgentEvent, UsageNumbers } from './events';
-import { ACTIVITY_CAP, LOG_CAP, MAIN, SEEN_TOOLS_CAP, USAGE_MSGS_CAP, newAgent, newSession, type AgentNode, type AttentionKind, type LogEntry, type LogKind, type SessionState } from './state';
+import {
+  ACTIVITY_CAP,
+  LOG_CAP,
+  MAIN,
+  SEEN_TOOLS_CAP,
+  USAGE_MSGS_CAP,
+  newAgent,
+  newSession,
+  type AgentNode,
+  type AttentionKind,
+  type LogEntry,
+  type LogKind,
+  type SessionState,
+} from './state';
 import { summarizeTool, toolLabel } from './summarize';
 import { toolCategory } from './goal';
 import { COMMANDS_CAP, FILES_CAP, PROMPT_CAP, RECENT_CAP } from './state';
+
+function firstLineOf(t: string, max: number): string {
+  const line = (t.split('\n').find((l) => l.trim()) ?? '').trim();
+  return line.length > max ? line.slice(0, max - 1) + '…' : line;
+}
 
 const FILE_TOOLS = new Set(['Read', 'Edit', 'MultiEdit', 'Write', 'NotebookEdit']);
 
@@ -251,13 +269,15 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       const ownerId = p?.agentId ?? s.internal.seenTools[e.toolUseId] ?? agentKey(e.ref.agentId);
       const a = s.agents[ownerId] ?? ensureAgent(s, e.ref.agentId, ts);
       const name = p?.name ?? e.name ?? '';
+      const rec = a.recent.find((r) => r.id === e.toolUseId);
+      // the hook and the transcript both report a failure; whichever carries the message fills it in
+      if (rec && !e.ok && e.error && !rec.error) rec.error = e.error;
       if (p) {
         delete s.internal.pending[e.toolUseId];
-        const rec = a.recent.find((r) => r.id === e.toolUseId);
         if (rec) rec.ok = e.ok;
         if (!e.ok) {
           a.errorCount++;
-          log(s, ts, a.id, 'tool-error', `${toolLabel(name)} failed`);
+          log(s, ts, a.id, 'tool-error', `${toolLabel(name)} failed${e.error ? `: ${firstLineOf(e.error, 140)}` : ''}`);
         }
         if (a.currentTool?.id === e.toolUseId) refreshCurrentTool(s, a);
         touch(s, a, ts);

@@ -5,6 +5,8 @@ import { GOAL_INFO } from '@core/goal';
 import { classifyModel } from '@core/models';
 import { formatTokens } from '@core/summarize';
 import { BarList, familyColor, FamilyLegend, Heatmap, TokenBars } from './HistoryCharts';
+import { estimateTooltip, formatUSD } from '@core/pricing';
+import { Icon } from './Icon';
 
 const RANGE_LABEL: Record<RangeKey, string> = { '7d': '7 days', '30d': '30 days', '90d': '90 days', all: 'all time' };
 const nf = (n: number) => n.toLocaleString('en-US');
@@ -183,154 +185,182 @@ export function HistoryPage({ onOpenSession }: { onOpenSession: (id: string) => 
   const empty = !!sum && !!k && k.sessions === 0 && k.tokens.messages === 0;
 
   return (
-    <div className="hist" data-testid="history-page">
-      <header className="hist-head">
-        <h2>History</h2>
-        <div className="hist-seg" role="group" aria-label="Range">
+    <div className="page" data-testid="history-page">
+      <header className="page-head hist-head">
+        <h2>
+          <Icon name="history" size="md" />
+          History
+        </h2>
+        <div className="seg" role="group" aria-label="Range">
           {RANGES.map((r) => (
             <button key={r} className={r === range ? 'on' : ''} onClick={() => setRange(r)} data-testid={`range-${r}`}>
               {r}
             </button>
           ))}
         </div>
-        <input
-          className="hist-search"
-          type="search"
-          placeholder="search every session: prompts, replies, tool calls…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          data-testid="history-search"
-          spellCheck={false}
-        />
-      </header>
-      <StatusLine s={status} onRebuild={() => void window.api.historyRebuild()} />
-
-      <SearchResults q={q} res={res} busy={searching} onOpen={onOpenSession} />
-
-      {err && <div className="hist-err">Could not read the history index: {err}</div>}
-      {!sum && !err && <div className="hist-empty">Reading the index…</div>}
-      {empty && (
-        <div className="hist-empty" data-testid="history-empty">
-          {indexing
-            ? 'Indexing your sessions for the first time. Numbers appear here as they are read.'
-            : `No sessions in the last ${RANGE_LABEL[range]}. Try a longer range.`}
+        <div className="field hist-search">
+          <Icon name="search" size="xs" />
+          <input
+            type="text"
+            placeholder="search every session: prompts, replies, tool calls…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && setQ('')}
+            data-testid="history-search"
+            spellCheck={false}
+          />
+          {q && (
+            <button className="field-clear" aria-label="Clear search" onClick={() => setQ('')}>
+              <Icon name="close" size="xs" />
+            </button>
+          )}
         </div>
-      )}
+      </header>
+      <div className="hist">
+        <StatusLine s={status} onRebuild={() => void window.api.historyRebuild()} />
 
-      {sum && k && !empty && (
-        <>
-          <div className="hist-kpis">
-            <Kpi
-              id="tokens"
-              label="tokens"
-              value={formatTokens(ioTokens(k.tokens))}
-              sub={`in ${formatTokens(k.tokens.tokensIn)} · out ${formatTokens(k.tokens.tokensOut)} · cache ${formatTokens(k.tokens.cacheRead + k.tokens.cacheWrite)}`}
-              title={`${nf(ioTokens(k.tokens))} input+output tokens, ${nf(k.tokens.cacheRead)} cache-read and ${nf(k.tokens.cacheWrite)} cache-write tokens, ${nf(k.tokens.messages)} messages`}
-            />
-            <Kpi
-              id="cost"
-              label="cost · reported"
-              value={k.costSessions > 0 ? formatUsd(k.costUsd) : 'n/a'}
-              sub={k.costSessions > 0 ? `from ${k.costSessions} of ${k.sessions} sessions` : 'no session reported a cost'}
-              title="Only sessions whose transcript contains a cost record count. Nothing is estimated."
-            />
-            <Kpi id="sessions" label="sessions" value={nf(k.sessions)} sub={`${nf(k.tokens.messages)} messages`} />
-            <Kpi id="agents" label="agents spawned" value={nf(k.agents)} sub="subagents and workflow agents" />
-            <Kpi id="days" label="active days" value={nf(k.activeDays)} sub={sum.fromDay ? `of ${RANGE_LABEL[range]}` : 'with any activity'} />
+        <SearchResults q={q} res={res} busy={searching} onOpen={onOpenSession} />
+
+        {err && <div className="hist-err">Could not read the history index: {err}</div>}
+        {!sum && !err && <div className="hist-empty">Reading the index…</div>}
+        {empty && (
+          <div className="hist-empty" data-testid="history-empty">
+            {indexing
+              ? 'Indexing your sessions for the first time. Numbers appear here as they are read.'
+              : `No sessions in the last ${RANGE_LABEL[range]}. Try a longer range.`}
           </div>
+        )}
 
-          <section className="hist-panel">
-            <div className="hist-panel-head">
-              <h4>tokens per {by} by model</h4>
-              <div className="hist-seg small">
-                <button className={by === 'day' ? 'on' : ''} onClick={() => setBy('day')}>
-                  day
-                </button>
-                <button className={by === 'week' ? 'on' : ''} onClick={() => setBy('week')}>
-                  week
-                </button>
-              </div>
-              <div className="hist-seg small" title="Cache reads are re-sent context and dwarf everything else, so they are off by default">
-                <button className={!withCache ? 'on' : ''} onClick={() => setWithCache(false)}>
-                  in + out
-                </button>
-                <button className={withCache ? 'on' : ''} onClick={() => setWithCache(true)} data-testid="with-cache">
-                  + cache
-                </button>
-              </div>
+        {sum && k && !empty && (
+          <>
+            <div className="hist-kpis">
+              <Kpi
+                id="tokens"
+                label="tokens"
+                value={formatTokens(ioTokens(k.tokens))}
+                sub={`in ${formatTokens(k.tokens.tokensIn)} · out ${formatTokens(k.tokens.tokensOut)} · cache ${formatTokens(k.tokens.cacheRead + k.tokens.cacheWrite)}`}
+                title={`${nf(ioTokens(k.tokens))} input+output tokens, ${nf(k.tokens.cacheRead)} cache-read and ${nf(k.tokens.cacheWrite)} cache-write tokens, ${nf(k.tokens.messages)} messages`}
+              />
+              {k.costSessions > 0 ? (
+                <Kpi
+                  id="cost"
+                  label="cost · reported"
+                  value={formatUsd(k.costUsd)}
+                  sub={`from ${k.costSessions} of ${k.sessions} sessions${k.costEstimatedUsd > 0 ? ` · all tokens ~${formatUSD(k.costEstimatedUsd)} at list prices` : ''}`}
+                  title={`The value counts only sessions whose transcript contains a cost record.\n\n${estimateTooltip({ usd: k.costEstimatedUsd, unpriced: k.costUnpriced })}`}
+                />
+              ) : (
+                <Kpi
+                  id="cost"
+                  label="cost · estimated"
+                  value={k.costEstimatedUsd > 0 ? `~${formatUSD(k.costEstimatedUsd)}` : 'n/a'}
+                  sub="no session reported a cost"
+                  title={estimateTooltip({ usd: k.costEstimatedUsd, unpriced: k.costUnpriced })}
+                />
+              )}
+              <Kpi id="sessions" label="sessions" value={nf(k.sessions)} sub={`${nf(k.tokens.messages)} messages`} />
+              <Kpi id="agents" label="agents spawned" value={nf(k.agents)} sub="subagents and workflow agents" />
+              <Kpi id="days" label="active days" value={nf(k.activeDays)} sub={sum.fromDay ? `of ${RANGE_LABEL[range]}` : 'with any activity'} />
             </div>
-            <TokenBars groups={sum.groups} by={by} all={withCache} />
-            <FamilyLegend present={present} />
-          </section>
 
-          <div className="hist-grid2">
             <section className="hist-panel">
-              <h4>by project · tokens in + out</h4>
-              <BarList
-                testId="history-projects"
-                color="var(--other)"
-                rows={sum.byProject
-                  .slice(0, 8)
-                  .map((g) => ({ key: g.key, label: g.label, value: ioTokens(g), title: `${nf(allTokens(g))} tokens incl. cache, ${g.messages} messages` }))}
-              />
+              <div className="hist-panel-head">
+                <h4>tokens per {by} by model</h4>
+                <div className="seg small">
+                  <button className={by === 'day' ? 'on' : ''} onClick={() => setBy('day')}>
+                    day
+                  </button>
+                  <button className={by === 'week' ? 'on' : ''} onClick={() => setBy('week')}>
+                    week
+                  </button>
+                </div>
+                <div className="seg small" title="Cache reads are re-sent context and dwarf everything else, so they are off by default">
+                  <button className={!withCache ? 'on' : ''} onClick={() => setWithCache(false)}>
+                    in + out
+                  </button>
+                  <button className={withCache ? 'on' : ''} onClick={() => setWithCache(true)} data-testid="with-cache">
+                    + cache
+                  </button>
+                </div>
+              </div>
+              <TokenBars groups={sum.groups} by={by} all={withCache} />
+              <FamilyLegend present={present} />
             </section>
-            <section className="hist-panel">
-              <h4>by model · tokens in + out</h4>
-              <BarList
-                testId="history-models"
-                rows={sum.byModel.slice(0, 8).map((g) => {
-                  const c = classifyModel(g.key);
-                  const fam = Object.keys(g.byFamily)[0] ?? 'other';
-                  return {
-                    key: g.key,
-                    label: (
-                      <>
-                        <span className="hist-trunc">{g.label}</span>
-                        {c.provider === 'local' && <span className="local-tag">⌂ local</span>}
-                      </>
-                    ),
-                    value: ioTokens(g),
-                    color: familyColor(fam),
-                    title: g.key,
-                  };
-                })}
-              />
-            </section>
-            <section className="hist-panel">
-              <h4>top tools · calls</h4>
-              <BarList
-                testId="history-tools"
-                color="var(--other)"
-                fmt={nf}
-                rows={sum.tools.map((t) => ({ key: t.tool, label: t.tool, value: t.count, title: t.tool }))}
-              />
-            </section>
-            <section className="hist-panel">
-              <h4>what the agents were doing · agents by goal</h4>
-              <BarList
-                testId="history-goals"
-                color="var(--other)"
-                fmt={nf}
-                rows={sum.goals.map((g) => ({
-                  key: g.goal,
-                  label: `${GOAL_INFO[g.goal].glyph} ${GOAL_INFO[g.goal].word}`,
-                  value: g.count,
-                  title: GOAL_INFO[g.goal].title,
-                }))}
-              />
-            </section>
-          </div>
 
-          <section className="hist-panel">
-            <h4>busiest hours · messages by weekday and hour</h4>
-            <Heatmap grid={sum.heat} />
-          </section>
-          <div className="hist-foot">
-            Built from your transcripts into a local index ({status?.engine ?? 'sqlite'} {status?.sqliteVersion}). Nothing leaves this computer and Claude's own
-            files are never changed.
-          </div>
-        </>
-      )}
+            <div className="hist-grid2">
+              <section className="hist-panel">
+                <h4>by project · tokens in + out</h4>
+                <BarList
+                  testId="history-projects"
+                  color="var(--other)"
+                  rows={sum.byProject
+                    .slice(0, 8)
+                    .map((g) => ({ key: g.key, label: g.label, value: ioTokens(g), title: `${nf(allTokens(g))} tokens incl. cache, ${g.messages} messages` }))}
+                />
+              </section>
+              <section className="hist-panel">
+                <h4>by model · tokens in + out</h4>
+                <BarList
+                  testId="history-models"
+                  rows={sum.byModel.slice(0, 8).map((g) => {
+                    const c = classifyModel(g.key);
+                    const fam = Object.keys(g.byFamily)[0] ?? 'other';
+                    return {
+                      key: g.key,
+                      label: (
+                        <>
+                          <span className="hist-trunc">{g.label}</span>
+                          {c.provider === 'local' && (
+                            <span className="local-tag chip" data-tone="local">
+                              <Icon name="local" size="xs" />
+                              local
+                            </span>
+                          )}
+                        </>
+                      ),
+                      value: ioTokens(g),
+                      color: familyColor(fam),
+                      title: g.key,
+                    };
+                  })}
+                />
+              </section>
+              <section className="hist-panel">
+                <h4>top tools · calls</h4>
+                <BarList
+                  testId="history-tools"
+                  color="var(--other)"
+                  fmt={nf}
+                  rows={sum.tools.map((t) => ({ key: t.tool, label: t.tool, value: t.count, title: t.tool }))}
+                />
+              </section>
+              <section className="hist-panel">
+                <h4>what the agents were doing · agents by goal</h4>
+                <BarList
+                  testId="history-goals"
+                  color="var(--other)"
+                  fmt={nf}
+                  rows={sum.goals.map((g) => ({
+                    key: g.goal,
+                    label: GOAL_INFO[g.goal].word,
+                    value: g.count,
+                    title: GOAL_INFO[g.goal].title,
+                  }))}
+                />
+              </section>
+            </div>
+
+            <section className="hist-panel">
+              <h4>busiest hours · messages by weekday and hour</h4>
+              <Heatmap grid={sum.heat} />
+            </section>
+            <div className="hist-foot">
+              Built from your transcripts into a local index ({status?.engine ?? 'sqlite'} {status?.sqliteVersion}). Nothing leaves this computer and Claude's
+              own files are never changed.
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

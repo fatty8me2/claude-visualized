@@ -161,7 +161,7 @@ async function refreshOnce(force: boolean): Promise<RefreshOutcome> {
       body = null;
     }
     if (!res.ok) {
-      lastRefreshProblem = `token server answered ${res.status}${body?.error ? ` (${typeof body.error === 'string' ? body.error : body.error.type ?? 'error'})` : ''}`;
+      lastRefreshProblem = `token server answered ${res.status}${body?.error ? ` (${typeof body.error === 'string' ? body.error : (body.error.type ?? 'error')})` : ''}`;
       return isDeadRefresh(res.status, body) ? 'dead' : 'failed';
     }
     lastRefreshProblem = null;

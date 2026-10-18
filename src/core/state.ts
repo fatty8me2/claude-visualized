@@ -19,6 +19,8 @@ export interface RecentTool {
   ts: number;
   /** null while the call is still running */
   ok: boolean | null;
+  /** what a failed call said (first ~300 chars) */
+  error?: string;
 }
 
 export const RECENT_CAP = 10;
@@ -264,6 +266,8 @@ export interface SessionSummary {
   size: number;
   live: boolean;
   entrypoint: string | null;
+  /** latest git branch seen in the transcript */
+  gitBranch?: string | null;
   running?: number;
   mode?: string;
   waiting?: boolean;

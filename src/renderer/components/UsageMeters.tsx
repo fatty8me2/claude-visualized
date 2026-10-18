@@ -59,7 +59,7 @@ function Meter({
     elapsed !== null ? `${Math.round(elapsed)}% of the window has elapsed` : null,
     `reading ${ago(w.at, now)}${w.source === 'transcript' ? ' (limit hit, from transcript)' : ''}`,
     ...(extra ?? []),
-    problem ? `⚠ ${problem}` : null,
+    problem ? `Problem: ${problem}` : null,
   ]
     .filter(Boolean)
     .join('\n');
@@ -71,7 +71,7 @@ function Meter({
         {elapsed !== null && <b style={{ left: `${elapsed}%` }} />}
       </span>
       <span className="m-pct">{pct}%</span>
-      {!compact && w.resetsAt && <span className="m-reset">↻ {untilText(w.resetsAt, now)}</span>}
+      {!compact && w.resetsAt && <span className="m-reset">resets {untilText(w.resetsAt, now)}</span>}
       {!compact && stale && <span className="m-reset">· {ago(w.at, now)}</span>}
     </div>
   );

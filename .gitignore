@@ -4,3 +4,4 @@ release/
 *.log
 tests/e2e/artifacts/
 .claude/worktrees/
+tests/e2e/artifacts-before/

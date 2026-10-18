@@ -2,12 +2,24 @@
    Colours: --fam is the child's model colour, --pfam the parent's. Lines are opaque (mixed into the background) so siblings that share
    a trunk do not double up where their paths overlap. */
 
-.pfam-opus { --pfam: var(--opus); }
-.pfam-sonnet { --pfam: var(--sonnet); }
-.pfam-haiku { --pfam: var(--haiku); }
-.pfam-fable { --pfam: var(--fable); }
-.pfam-local { --pfam: var(--local, var(--other)); }
-.pfam-other { --pfam: var(--other); }
+.pfam-opus {
+  --pfam: var(--opus);
+}
+.pfam-sonnet {
+  --pfam: var(--sonnet);
+}
+.pfam-haiku {
+  --pfam: var(--haiku);
+}
+.pfam-fable {
+  --pfam: var(--fable);
+}
+.pfam-local {
+  --pfam: var(--local, var(--other));
+}
+.pfam-other {
+  --pfam: var(--other);
+}
 
 .gf .gf-base,
 .gf .gf-flow {

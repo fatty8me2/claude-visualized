@@ -1,38 +1,20 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useDialogFocus } from '../state/dialogFocus';
 import type { SetupStatusView } from '@core/api';
 import { buildChecklist, LOGIN_COMMAND, type CheckItem } from '@core/onboarding';
 import type { HookInstallState } from '@core/hooksConfig';
 import { useUsage, useConfig } from '../hooks';
+import { CopyButton } from './CopyButton';
+import { Icon } from './Icon';
 
-const GLYPH = { ok: '✓', warn: '⚠', todo: '○' } as const;
-
-function CopyButton({ text }: { text: string }) {
-  const [done, setDone] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-    }
-    setDone(true);
-    setTimeout(() => setDone(false), 1800);
-  };
-  return (
-    <button data-testid="copy-login" onClick={() => void copy()}>
-      {done ? '✓ copied' : 'copy command'}
-    </button>
-  );
-}
+const CHECK_ICON = { ok: 'done', warn: 'warn', todo: 'idle' } as const;
 
 function CheckRow({ item, children }: { item: CheckItem; children?: React.ReactNode }) {
   return (
     <div className={`check ${item.status}`} data-check={item.id}>
-      <span className="glyph">{GLYPH[item.status]}</span>
+      <span className="glyph">
+        <Icon name={CHECK_ICON[item.status]} size="sm" />
+      </span>
       <div className="cbody">
         <div className="ttl">
           {item.title}
@@ -77,7 +59,7 @@ export function Welcome({ onTour, onSkip, onOpenSettings }: { onTour: () => void
 
   return (
     <div className="overlay welcome-overlay" data-testid="welcome">
-      <div className="dialog welcome">
+      <div className="dialog welcome panel-raised" role="dialog" aria-modal="true" aria-label="Welcome" ref={useDialogFocus(onSkip)}>
         <div className="w-brand">
           <b>◆</b> CLAUDE VISUALIZED
         </div>
@@ -98,7 +80,7 @@ export function Welcome({ onTour, onSkip, onOpenSettings }: { onTour: () => void
               <div className="fix">
                 <div className="cmdrow">
                   <code>{LOGIN_COMMAND}</code>
-                  <CopyButton text={LOGIN_COMMAND} />
+                  <CopyButton text={LOGIN_COMMAND} label="copy command" testId="copy-login" />
                 </div>
                 <div className="hint">
                   Open a terminal (Windows Terminal is recommended), paste the command with <b>Ctrl+Shift+V</b>, press Enter and follow the steps. This page
@@ -122,7 +104,7 @@ export function Welcome({ onTour, onSkip, onOpenSettings }: { onTour: () => void
           <button data-testid="skip-welcome" onClick={onSkip}>
             Skip
           </button>
-          <span className="note">You can reopen this any time with “? help”.</span>
+          <span className="note">You can reopen this any time with “help &amp; tour” at the bottom of the sidebar.</span>
         </div>
       </div>
     </div>
@@ -151,7 +133,7 @@ export const TOUR_STEPS: Step[] = [
   {
     target: 'graph',
     title: 'The agent graph',
-    text: 'Each card is an agent: the main one, and the helpers (subagents) it starts. A striped moving bar means it is working; solid means finished, red means it failed. Claude does not report a percentage, so none is invented. “ctx 46%” shows how full that agent’s memory (context window) is; near 100% Claude compacts it.',
+    text: 'Each card is an agent: the main one, and the helpers (subagents) it starts. A shimmering bar means it is working; solid means finished, red means it failed. Claude does not report a percentage, so none is invented. “ctx 46%” shows how full that agent’s memory (context window) is; near 100% Claude compacts it. Hold Ctrl and scroll to zoom, drag empty space to move around.',
     missing: 'Open a session and its agents appear here as cards, with a line from each helper back to the agent that started it.',
   },
   {
@@ -169,26 +151,26 @@ export const TOUR_STEPS: Step[] = [
   {
     target: 'usage',
     title: 'Usage meters',
-    text: 'Your 5-hour and weekly limits. Green is fine, yellow is getting there, red is nearly used up. The thin marker shows how far through the window you are. Click to refresh.',
-    missing: 'Open a session to see your 5-hour and weekly meters in the top bar.',
+    text: 'Your 5-hour and weekly limits, at the top of the window on every page. Green is fine, yellow is getting there, red is nearly used up. The thin marker shows how far through the window you are. Click to refresh.',
+    missing: 'Your 5-hour and weekly meters sit at the top of the window.',
   },
   {
     target: 'open-in-claude',
     title: 'Open in Claude',
-    text: 'Jumps to this exact session in the Claude desktop app, so you can reply or give permission. The ↗ next to each session in the list does the same.',
+    text: 'Jumps to this exact session in the Claude desktop app, so you can reply or give permission. The open button that appears when you point at a session in the list does the same.',
     missing: 'Open a session to get an “open in Claude” button that jumps to it in the Claude desktop app.',
   },
   {
     target: 'mini',
     title: 'Mini view',
-    text: 'A small window that stays on top of everything else and shows the mode and what the agents are doing. The tray icon menu has it too, and Ctrl+Alt+V (changeable in settings) opens it from anywhere.',
-    missing: 'Open a session to get the “mini” button: a small always-on-top window. The tray icon menu has it too.',
+    text: 'This button, at the top right, opens a small window that stays on top of everything else and shows the mode and what the agents are doing. The tray icon menu has it too, and Ctrl+Alt+V (changeable in settings) opens it from anywhere.',
+    missing: 'The mini view button at the top right opens a small always-on-top window. The tray icon menu has it too.',
   },
   {
     target: 'hooks',
-    title: 'Live hooks (optional)',
-    text: 'Hooks make Claude Code tell this app about events instantly and enable “needs your input” notifications. Without them the app is about a second behind. You choose when, and it shows a preview first.',
-    missing: 'Open a session to find the “hooks” button, where optional instant updates are set up.',
+    title: 'Hooks and settings',
+    text: 'The settings button (top right) is where you set up live hooks and app settings. Hooks make Claude Code tell this app about events instantly and enable “needs your input” notifications. Without them the app is about a second behind. You choose when, and it shows a preview first.',
+    missing: 'The settings button at the top right is where optional instant updates are set up.',
   },
 ];
 
@@ -295,10 +277,12 @@ export function Tour({ onDone }: { onDone: () => void }) {
         <div className="tc-text">{box ? step.text : (step.missing ?? step.text)}</div>
         <div className="tc-nav">
           <button onClick={back} disabled={i === 0} data-testid="tour-back">
-            ‹ back
+            <Icon name="chevronLeft" size="xs" />
+            back
           </button>
           <button className="primary" onClick={next} data-testid="tour-next">
-            {last ? 'done' : 'next ›'}
+            {last ? 'done' : 'next'}
+            {!last && <Icon name="chevronRight" size="xs" />}
           </button>
         </div>
       </div>

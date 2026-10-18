@@ -88,7 +88,10 @@ describe('graph flow (fixture data)', () => {
     await shot('1-before');
 
     const sub = path.join(home, 'projects', 'C--demo-app', SID, 'subagents');
-    fs.writeFileSync(path.join(sub, 'agent-a9.meta.json'), JSON.stringify({ agentType: 'Plan', description: 'design the docs update', toolUseId: 'toolu_new' }));
+    fs.writeFileSync(
+      path.join(sub, 'agent-a9.meta.json'),
+      JSON.stringify({ agentType: 'Plan', description: 'design the docs update', toolUseId: 'toolu_new' }),
+    );
     fs.writeFileSync(
       path.join(sub, 'agent-a9.jsonl'),
       JSON.stringify({

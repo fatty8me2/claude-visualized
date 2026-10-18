@@ -75,7 +75,10 @@ describe('oauth renewal against a fake token server', () => {
   const read = () => JSON.parse(fs.readFileSync(credFile(), 'utf8'));
 
   it('renews an expired login and writes it back, keeping other fields', async () => {
-    write({ keep: true, claudeAiOauth: { accessToken: 'stale', refreshToken: 'r1', expiresAt: Date.now() - 1000, scopes: ['user:inference'], subscriptionType: 'max' } });
+    write({
+      keep: true,
+      claudeAiOauth: { accessToken: 'stale', refreshToken: 'r1', expiresAt: Date.now() - 1000, scopes: ['user:inference'], subscriptionType: 'max' },
+    });
     expect(await refreshIfNeeded()).toBe('refreshed');
     const c = read();
     expect(c.keep).toBe(true);

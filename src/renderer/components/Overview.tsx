@@ -4,11 +4,13 @@ import { GOAL_INFO } from '@core/goal';
 import { agentGoal, agentInsight } from '@core/insight';
 import { formatTokens, modelLabel } from '@core/summarize';
 import { GoalBadge } from './GoalBadge';
+import { StatusText } from './cardParts';
 import { useNow, useOverview } from '../hooks';
-import { agentName, ago, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
+import { agentName, ago, clock, displayStatus, famClass } from '../util';
 import { AgentGraph } from './AgentGraph';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
-import { UsageMeters } from './UsageMeters';
+import { estimateAgents, estimateTooltip, formatUSD } from '@core/pricing';
+import { Icon } from './Icon';
 import { MachineChip } from './MachineChip';
 import { openInClaude } from '../state/toast';
 
@@ -30,11 +32,14 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
   const tokens = v.totals.in + v.totals.out + v.totals.cacheRead + v.totals.cacheWrite;
   const recent = v.log.filter((l) => l.kind !== 'text').slice(-2);
   const project = v.cwd?.split(/[\\/]/).filter(Boolean).pop() ?? '';
+  const est = v.costUSD == null ? estimateAgents(v.agents) : null;
   return (
     <section className={`ov-panel ${plan ? 'plan' : 'build'} ${st === 'waiting' ? 'waiting' : ''}`} data-session={v.id}>
       <header className="ov-head" onClick={() => onOpen(v.id)} title="Open this session">
         <span className="ov-num">{index + 1}</span>
-        <span className={`modebadge ${plan ? 'plan' : ''}`}>{plan ? 'PLAN' : 'BUILD'}</span>
+        <span className={`modebadge chip ${plan ? 'plan' : ''}`} data-tone={plan ? 'plan' : 'build'}>
+          {plan ? 'PLAN' : 'BUILD'}
+        </span>
         <div className="ov-titles">
           <div className="ov-title">
             {v.machine && (
@@ -52,14 +57,20 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
         </div>
         <div className="ov-stats">
           <span className={`status ${st} ${famClass(main?.model)}`}>
-            <b style={{ color: 'var(--fam)' }}>{modelLabel(main?.model)}</b> {isLocalModel(main?.model) && <LocalTag />} {STATUS_GLYPH[st]}
+            <b style={{ color: 'var(--fam)' }}>{modelLabel(main?.model)}</b> {isLocalModel(main?.model) && <LocalTag />} <StatusText st={st} />
           </span>
           <span className="ov-sub">
             <CtxChip agent={main} />
             {main && main.contextTokens > 0 ? ' · ' : ''}
             agents {running}/{subs.length}
-            {localAgents > 0 && !isLocalModel(main?.model) ? ` · ⌂ ${localAgents} local` : ''} · {formatTokens(tokens)} tok
-            {v.costUSD != null ? ` · $${v.costUSD.toFixed(2)}` : ''}
+            {localAgents > 0 && !isLocalModel(main?.model) ? ` · ${localAgents} local` : ''} · {formatTokens(tokens)} tok
+            {v.costUSD != null ? (
+              ` · $${v.costUSD.toFixed(2)}`
+            ) : est && est.usd > 0 ? (
+              <span title={estimateTooltip(est)}> · est. ~{formatUSD(est.usd)}</span>
+            ) : (
+              ''
+            )}
           </span>
         </div>
         <button
@@ -70,7 +81,8 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
             void openInClaude(v.id);
           }}
         >
-          ↗ Claude
+          <Icon name="openExternal" size="xs" />
+          Claude
         </button>
       </header>
       {main && (
@@ -83,14 +95,14 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
               {subs
                 .filter((a) => a.status === 'running')
                 .slice(0, 3)
-                .map((a) => `${GOAL_INFO[agentGoal(a).goal].glyph} ${agentName(a)}: ${agentInsight(v.agents, a, now).activity.phrase}`)
+                .map((a) => `${GOAL_INFO[agentGoal(a).goal].word} ${agentName(a)}: ${agentInsight(v.agents, a, now).activity.phrase}`)
                 .join('  ·  ')}
             </span>
           )}
         </div>
       )}
       <div className="ov-graph">
-        <AgentGraph view={v} now={now} selectedAgent={null} onSelect={() => onOpen(v.id)} showFinished={!activeOnly} onToggleFinished={() => {}} compact />
+        <AgentGraph view={v} now={now} selectedAgent={null} onSelect={() => onOpen(v.id)} showFinished={!activeOnly} onToggleFinished={() => {}} embedded />
       </div>
       <footer className="ov-log">
         {recent.length === 0 && <div className="empty-note">no activity yet</div>}
@@ -111,28 +123,36 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
 export function Overview({ onOpen, onLocal, activeOnly = false }: { onOpen: (id: string) => void; onLocal: () => void; activeOnly?: boolean }) {
   const views = useOverview();
   const now = useNow(1000);
-  if (!views) return <div className="empty">loading sessions…</div>;
+  if (!views)
+    return (
+      <div className="empty-state">
+        <span className="loading">loading sessions…</span>
+      </div>
+    );
   const n = views.length;
   const cols = columnsFor(n);
   const rows = Math.max(1, Math.ceil(n / cols));
   const running = views.reduce((k, v) => k + Object.values(v.agents).filter((a) => a.kind === 'agent' && a.status === 'running').length, 0);
   return (
     <div className="overview">
-      <div className="topbar">
-        <div className="title">
-          ALL SESSIONS{' '}
-          <span className="proj">
-            · {n} live · {running} subagents running · click a panel to open it
-          </span>
+      <div className="page-head">
+        <h2>
+          <Icon name="overview" size="md" />
+          All sessions
+        </h2>
+        <span className="sub">
+          {n} live · {running} subagent{running === 1 ? '' : 's'} running · click a panel to open it
+        </span>
+        <div className="actions">
+          <LocalChip onOpen={onLocal} />
         </div>
-        <UsageMeters />
-        <LocalChip onOpen={onLocal} />
       </div>
       {n === 0 ? (
-        <div className="empty">
-          <div>
-            <div style={{ fontSize: 15, color: 'var(--text)', marginBottom: 8 }}>No live sessions right now</div>
-            <div>Sessions show up here as soon as Claude Code starts working in them.</div>
+        <div className="empty-state">
+          <div className="empty-card">
+            <Icon name="overview" size="lg" />
+            <div className="empty-title">No live sessions right now</div>
+            <div>Sessions show up here side by side as soon as Claude Code starts working in them.</div>
           </div>
         </div>
       ) : (

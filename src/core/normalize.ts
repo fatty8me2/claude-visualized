@@ -219,7 +219,8 @@ export function normalizeLine(line: string, ctx: LineContext, fallbackTs = 0): A
     } else if (Array.isArray(content)) {
       for (const b of content as Json[]) {
         if (b?.type === 'tool_result' && str(b.tool_use_id)) {
-          ev({ k: 'tool.end', toolUseId: b.tool_use_id, ok: !b.is_error, result: compactResult(o.toolUseResult) });
+          const error = b.is_error ? (errorText(b.content) ?? (typeof o.toolUseResult === 'string' ? errorText(o.toolUseResult) : undefined)) : undefined;
+          ev({ k: 'tool.end', toolUseId: b.tool_use_id, ok: !b.is_error, result: compactResult(o.toolUseResult), ...(error ? { error } : {}) });
         } else if (b?.type === 'text' && str(b.text) && !o.isMeta && !o.isCompactSummary) {
           const n = parseTaskNotification(b.text);
           if (n) ev({ k: 'task.notification', ...n });
@@ -263,6 +264,27 @@ export function normalizeLine(line: string, ctx: LineContext, fallbackTs = 0): A
   }
   if (msg.stop_reason === 'end_turn') ev({ k: 'turn.end' });
   return out;
+}
+
+const ERROR_CAP = 300;
+/** terminal colour codes (ESC [ ... letter) in shell output */
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`, 'g');
+
+/** A failed tool call's message: the text of a tool_result's content (string or text blocks), ANSI codes removed, clipped. */
+export function errorText(content: unknown): string | undefined {
+  let t = '';
+  if (typeof content === 'string') t = content;
+  else if (Array.isArray(content)) {
+    for (const b of content as Json[]) {
+      if (b?.type === 'text' && typeof b.text === 'string') t += (t ? '\n' : '') + b.text;
+      if (t.length >= ERROR_CAP) break;
+    }
+  }
+  t = t
+    .replace(ANSI, '')
+    .replace(/<\/?tool_use_error>/g, '')
+    .trim();
+  return t ? t.slice(0, ERROR_CAP) : undefined;
 }
 
 /** Keep tool inputs small: they are summarized, never shown in full. */
@@ -376,7 +398,10 @@ export function normalizeHook(p: Json, now: number): AgentEvent[] {
       if (str(p.tool_use_id)) ev({ k: 'tool.end', toolUseId: p.tool_use_id, ok: true, durationMs: num(p.duration_ms) || undefined, name: str(p.tool_name) });
       break;
     case 'PostToolUseFailure':
-      if (str(p.tool_use_id)) ev({ k: 'tool.end', toolUseId: p.tool_use_id, ok: false, name: str(p.tool_name) });
+      if (str(p.tool_use_id)) {
+        const error = errorText(p.error) ?? errorText((p.tool_response as Json | undefined)?.error);
+        ev({ k: 'tool.end', toolUseId: p.tool_use_id, ok: false, name: str(p.tool_name), ...(error ? { error } : {}) });
+      }
       break;
     case 'SubagentStart':
       if (agentId) ev({ k: 'agent.spawn', spawn: { childId: agentId, agentType: str(p.agent_type) } }, { sessionId, agentId: null });

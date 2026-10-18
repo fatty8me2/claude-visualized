@@ -159,7 +159,11 @@
   letter-spacing: 0.02em;
   flex-shrink: 0;
 }
-.node .status .tick {
+.status .st-running {
+  animation: spin 2.4s linear infinite;
+}
+.status .tick,
+.tick {
   width: 11px;
   height: 11px;
   fill: none;
@@ -181,7 +185,7 @@
 /* ---- progress bar: no fake percentages. empty when idle, soft shimmer while working, full when finished ---- */
 .bar {
   height: 5px;
-  background: color-mix(in srgb, var(--fam, var(--line-2)) 14%, #1f1a2a);
+  background: color-mix(in srgb, var(--fam, var(--line-2)) 14%, var(--track));
   border-radius: 3px;
   overflow: hidden;
   position: relative;
@@ -361,6 +365,9 @@
   animation: none;
   transform: translateX(35%);
 }
+.graph-canvas.calm .status .st-running {
+  animation: none;
+}
 .graph-canvas.calm .node.waiting::after {
   animation-duration: 5s;
 }
@@ -370,8 +377,11 @@
   .node.done {
     transition: none;
   }
-  .node:hover {
+  .node.node:hover {
     translate: none;
+  }
+  .status .st-running {
+    animation: none;
   }
   .node.running::before {
     animation: none;
@@ -385,4 +395,68 @@
     animation: none;
     opacity: 0.6;
   }
+}
+
+/* ---- compact cards: wide trees in a narrow panel switch to these instead of shrinking the text ---- */
+.node.compact {
+  padding: 7px 9px 6px;
+  gap: 3px;
+  justify-content: center;
+}
+.node.compact .row1 {
+  justify-content: flex-start;
+  gap: 6px;
+}
+.node.compact .name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+}
+.node.compact .row1 .status {
+  font-size: 10px;
+}
+.node.compact .now {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.node.compact .now .lbl {
+  color: var(--fam);
+}
+.node.compact .now .sep {
+  color: var(--faint);
+}
+.node.main.compact {
+  text-align: left;
+}
+.node.main.compact .row1 {
+  justify-content: flex-start;
+}
+.node.main.compact .now {
+  text-align: left;
+}
+.node.collapsed .icon {
+  margin-right: 4px;
+}
+
+/* subagent headline and its kind line */
+.node .model .kind {
+  color: var(--muted);
+  font-weight: 400;
+}
+.node .fold {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--muted);
+}
+.node .fold:hover {
+  color: var(--text);
+}
+.node .status {
+  white-space: nowrap;
+}
+.status .st-icon {
+  width: 11px;
+  height: 11px;
+  vertical-align: -1px;
 }

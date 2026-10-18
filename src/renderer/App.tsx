@@ -13,10 +13,13 @@ import { useOpenSettings } from './state/openSettings';
 import { usePage } from './state/page';
 import { useSessionUi } from './state/sessionUi';
 import { PAGES } from './views/pages';
+import { TitleBar } from './components/TitleBar';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 /** App shell: owns the app-level state, draws the sidebar and routes to the current page (see views/pages.tsx). */
 export function App() {
-  const sessions = useSessions();
+  const sessionList = useSessions();
+  const sessions = sessionList ?? [];
   const selected = useSelected();
   const live = useLiveState();
   const config = useConfig();
@@ -71,15 +74,18 @@ export function App() {
     if (replay && replay.sessionId !== selected) stop();
   }, [selected]);
 
-  const view = replay ? replay.view : live && live.id === selected ? live : null;
+  // while a newly selected session loads, keep showing the previous one (with a loading strip) instead of an empty page
+  const view = replay ? replay.view : selected && live ? live : null;
+  const loadingOther = !replay && !!view && view.id !== selected;
   const now = replay ? replay.now : wallNow;
   const current = PAGES.find((p) => p.id === page) ?? PAGES[0];
 
   return (
     <div className={`app sidebar-${layout.sidebar.side}`}>
+      <TitleBar page={current.label} icon={current.icon} onSettings={() => setShowSettings(true)} onLocal={() => setPage('local')} />
       <div className="sidebar-wrap" data-flip="sidebar" style={collapsed ? undefined : { width: layout.sidebar.width }}>
         <SessionList
-          sessions={sessions}
+          sessions={sessionList}
           selected={selected}
           now={wallNow}
           follow={config?.followActive ?? true}
@@ -97,30 +103,30 @@ export function App() {
         />
         {!collapsed && <SidebarResizeHandle api={layoutApi} />}
       </div>
-      {current.render({
-        selected,
-        openSession,
-        showAgent,
-        setPage,
-        openSettings: () => setShowSettings(true),
-        openWelcome,
-        activeOnly,
-        session: view
-          ? {
-              view,
-              summary: sessions.find((s) => s.id === selected),
-              now,
-              replay: replayApi,
-              hookSrv,
-              activeOnly,
-              onActiveOnly: setActiveOnly,
-              onSettings: () => setShowSettings(true),
-              onLocal: () => setPage('local'),
-              layoutApi,
-              ui,
-            }
-          : null,
-      })}
+      <ErrorBoundary key={current.id} label={current.label}>
+        {current.render({
+          selected,
+          haveSessions: sessionList ? sessionList.length > 0 : undefined,
+          openSession,
+          showAgent,
+          setPage,
+          openSettings: () => setShowSettings(true),
+          openWelcome,
+          activeOnly,
+          session: view
+            ? {
+                view,
+                summary: sessions.find((s) => s.id === view.id),
+                now,
+                replay: replayApi,
+                hookSrv,
+                layoutApi,
+                ui,
+                loading: loadingOther ? (sessions.find((s) => s.id === selected)?.title ?? 'session') : null,
+              }
+            : null,
+        })}
+      </ErrorBoundary>
       <UpdatePill updates={updates} />
       {toasts.length > 0 && (
         <div className="toasts" role="status">

@@ -230,19 +230,37 @@ export class SessionManager extends EventEmitter {
   }
 
   select(id: string | null, manual = true) {
-    if (manual) this.followActive = false;
+    if (manual && this.followActive) {
+      this.followActive = false;
+      // the tray, notifications and the sidebar all select through here: keep the saved setting in step
+      this.emit('follow', false);
+    }
     this.selectedId = id;
     this.remote?.setSelected(id && isRemoteId(id) ? id : null);
     if (id && !isRemoteId(id)) {
       const w = this.ensureWatcher(id);
       if (w) void w.poll().then(() => this.markDirty());
+      else {
+        // older than the newest sessions the index lists (e.g. a History search hit): find its file
+        void this.indexer.locate(id).then((f) => {
+          if (!f || this.selectedId !== id) return;
+          void this.ensureWatcher(id, f)
+            ?.poll()
+            .then(() => this.markDirty());
+        });
+      }
     }
     this.markDirty();
     this.emit('selected', id);
   }
 
   setFollow(on: boolean) {
+    if (this.followActive === on) {
+      if (on) this.autoSelect();
+      return;
+    }
     this.followActive = on;
+    this.emit('follow', on);
     if (on) this.autoSelect();
   }
 
@@ -273,6 +291,8 @@ export class SessionManager extends EventEmitter {
     const keep = new Set([...live.map((s) => s.id), this.selectedId, ...this.recentHookSessions(), ...this.retained.keys()]);
     for (const id of [...this.watchers.keys()]) if (!keep.has(id)) this.watchers.delete(id);
     if (this.followActive) this.autoSelect();
+    // not following (e.g. after a restart): still show something rather than an empty page
+    else if (!this.selectedId && this.summaries[0]) this.select(this.summaries[0].id, false);
     this.emitSessions();
     this.overviewDirty = true;
     this.ovVersion++;
@@ -406,7 +426,7 @@ export class SessionManager extends EventEmitter {
 
   /** Full sorted event list for replay of any session. */
   async replayEvents(id: string) {
-    const f = this.summaries.find((s) => s.id === id)?.file ?? this.watchers.get(id)?.mainFile;
+    const f = this.summaries.find((s) => s.id === id)?.file ?? this.watchers.get(id)?.mainFile ?? (await this.indexer.locate(id));
     if (!f) return [];
     return new SessionWatcher(id, f, loadBacklogInWorker).collectAllEvents();
   }
