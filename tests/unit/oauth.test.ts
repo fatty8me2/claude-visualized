@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyRefresh, CLAUDE_CODE_CLIENT_ID, needsRefresh, refreshRequestBody } from '@core/oauth';
-import { refreshIfNeeded } from '../../src/main/oauthRefresh';
+import { lastRefreshProblem, refreshIfNeeded, resetRefreshBackoff } from '../../src/main/oauthRefresh';
 
 const NOW = 1_800_000_000_000;
 
@@ -46,6 +46,7 @@ describe('oauth renewal against a fake token server', () => {
   let seen: Record<string, unknown>[];
 
   beforeEach(async () => {
+    resetRefreshBackoff();
     home = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-oauth-'));
     process.env.CLAUDE_VIS_HOME = home;
     seen = [];
@@ -96,6 +97,16 @@ describe('oauth renewal against a fake token server', () => {
     reply = { status: 400, body: { error: 'invalid_grant' } };
     expect(await refreshIfNeeded()).toBe('dead');
     expect(read()).toEqual(before);
+  });
+
+  it('records why a renewal failed and backs off instead of retrying immediately', async () => {
+    write({ claudeAiOauth: { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() - 1 } });
+    reply = { status: 429, body: { error: { type: 'rate_limit_error' } } };
+    expect(await refreshIfNeeded()).toBe('failed');
+    expect(lastRefreshProblem).toBe('token server answered 429 (rate_limit_error)');
+    reply = { status: 200, body: { access_token: 'x', expires_in: 100 } };
+    expect(await refreshIfNeeded()).toBe('failed'); // still backing off
+    expect(seen).toHaveLength(1);
   });
 
   it('backs off while another renewal holds the lock', async () => {

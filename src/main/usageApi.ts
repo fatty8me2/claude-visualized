@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { refreshIfNeeded } from './oauthRefresh';
+import { lastRefreshProblem, refreshIfNeeded } from './oauthRefresh';
 import { claudeHome } from './paths';
 
 /**
@@ -59,7 +59,7 @@ export async function fetchUsage(retried = false): Promise<UsageApiResult> {
   if (!login) return { ok: false, state: 'no-login', message: 'No Claude Code login found. Run `claude` once and sign in (claude /login).' };
   if (login.expiresAt && login.expiresAt < Date.now()) {
     const transient = renewal === 'failed' || renewal === 'busy';
-    return { ok: false, state: transient ? 'error' : 'expired', message: transient ? 'Could not renew the Claude Code login just now; will retry.' : DEAD_LOGIN };
+    return { ok: false, state: transient ? 'error' : 'expired', message: transient ? `Could not renew the Claude Code login just now${lastRefreshProblem ? ` (${lastRefreshProblem})` : ''}; will retry.` : DEAD_LOGIN };
   }
   try {
     const res = await fetch(USAGE_URL, {

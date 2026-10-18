@@ -13,6 +13,9 @@ import { claudeHome } from './paths';
  * other field. A dead refresh token is reported, never "fixed" by clearing anything.
  */
 
+/** why the last renewal failed (status / error code only, never token material), for the UI and diagnosis */
+export let lastRefreshProblem: string | null = null;
+
 export type RefreshOutcome = 'fresh' | 'refreshed' | 'dead' | 'failed' | 'no-login' | 'busy';
 
 interface Store {
@@ -97,7 +100,30 @@ function tokenUrl(): string {
 }
 
 /** Renew the saved login if it is (nearly) expired, or always when `force` (the usage API rejected it). */
+/** after a failed renewal, wait before hammering the token server again: 2, 4, 8 … up to 30 minutes */
+let failures = 0;
+let retryAfter = 0;
+
 export async function refreshIfNeeded(force = false): Promise<RefreshOutcome> {
+  if (Date.now() < retryAfter) return 'failed';
+  const out = await refreshOnce(force);
+  if (out === 'failed') {
+    failures++;
+    retryAfter = Date.now() + Math.min(30, 2 ** failures) * 60_000;
+  } else if (out !== 'busy') {
+    failures = 0;
+    retryAfter = 0;
+  }
+  return out;
+}
+
+/** test helper: forget the backoff */
+export function resetRefreshBackoff() {
+  failures = 0;
+  retryAfter = 0;
+}
+
+async function refreshOnce(force: boolean): Promise<RefreshOutcome> {
   const store = await activeStore();
   const first = await store.read();
   if (first === null) return 'no-login';
@@ -124,7 +150,8 @@ export async function refreshIfNeeded(force = false): Promise<RefreshOutcome> {
         body: JSON.stringify(refreshRequestBody(oauthOf(cur)!)),
         signal: AbortSignal.timeout(20_000),
       });
-    } catch {
+    } catch (e) {
+      lastRefreshProblem = `token server unreachable: ${(e as Error).message}`;
       return 'failed';
     }
     let body: Record<string, any> | null = null;
@@ -133,7 +160,11 @@ export async function refreshIfNeeded(force = false): Promise<RefreshOutcome> {
     } catch {
       body = null;
     }
-    if (!res.ok) return isDeadRefresh(res.status, body) ? 'dead' : 'failed';
+    if (!res.ok) {
+      lastRefreshProblem = `token server answered ${res.status}${body?.error ? ` (${typeof body.error === 'string' ? body.error : body.error.type ?? 'error'})` : ''}`;
+      return isDeadRefresh(res.status, body) ? 'dead' : 'failed';
+    }
+    lastRefreshProblem = null;
 
     const next = applyRefresh(cur, body ?? {}, Date.now());
     // last check: if the CLI wrote in the meantime, keep its copy
