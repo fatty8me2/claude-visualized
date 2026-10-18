@@ -506,7 +506,7 @@ export function extractDelta(sessionId: string, fileAgentId: string | null, line
   return d;
 }
 
-/** "C--Users-fatty-Desktop-junkerberg" -> "junkerberg" when no cwd is known. */
+/** "C--Users-me-Desktop-my-app" -> "my-app" when no cwd is known. */
 export function projectName(cwd: string | null, dirName: string): string {
   if (cwd) {
     const parts = cwd.split(/[\\/]/).filter(Boolean);

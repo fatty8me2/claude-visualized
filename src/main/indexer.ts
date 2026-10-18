@@ -32,7 +32,7 @@ async function readRange(file: string, start: number, len: number): Promise<stri
   }
 }
 
-/** "C--Users-fatty-Desktop-junkerberg" -> "junkerberg" when no cwd is known */
+/** "C--Users-me-Desktop-my-app" -> "my-app" when no cwd is known */
 function projectName(cwd: string | null, dirName: string): string {
   if (cwd) {
     const parts = cwd.split(/[\\/]/).filter(Boolean);

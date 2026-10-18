@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { SessionWatcher, type BacklogLoader, type BacklogSnapshot } from '../../src/main/watcher';
 
 const root = path.join(process.env.CLAUDE_VIS_HOME ?? path.join(os.homedir(), '.claude'), 'projects');
-const BIG = process.env.BENCH_SESSION ?? '02d785f3-40f3-4031-9659-a2a414e7dc1b';
+const BIG = process.env.BENCH_SESSION ?? '';
 
 function findSession(id: string): string | null {
   if (!fs.existsSync(root)) return null;
@@ -64,7 +64,7 @@ async function measure(label: string, make: () => SessionWatcher) {
   return { w, total, maxMs, maxDrift };
 }
 
-const file = findSession(BIG);
+const file = BIG ? findSession(BIG) : null;
 
 describe.skipIf(!process.env.REAL_DATA || !file || !workerFile)('big session load responsiveness', () => {
   it('worker load keeps the loop responsive and folds to the same state as the sync path', async () => {

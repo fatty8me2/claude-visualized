@@ -12,7 +12,7 @@ writing 30 tool calls every 500 ms for 20 s (`PERF_SECONDS`). It runs three scen
 | --- | --- |
 | `synthetic-live` | default view: finished agents collapsed (42 cards), live appends |
 | `synthetic-live-expanded` | the user clicked "N finished": all 301 cards on screen, live appends |
-| `real-idle` (needs `PERF_REAL=1`) | the biggest real session on this machine, `02d785f3-40f3-4031-9659-a2a414e7dc1b` (292 agents, read-only), selected and left open |
+| `real-idle` (needs `PERF_REAL=1`) | your biggest real session (set `PERF_SESSION=<session id>`) (292 agents, read-only), selected and left open |
 
 ```
 npx electron-vite build

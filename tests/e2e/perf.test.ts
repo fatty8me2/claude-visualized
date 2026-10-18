@@ -13,7 +13,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const ART = path.join(ROOT, 'tests/e2e/artifacts');
 const PORT = Number(process.env.E2E_PORT ?? 47915);
 const LABEL = process.env.PERF_LABEL ?? 'run';
-const REAL_SID = '02d785f3-40f3-4031-9659-a2a414e7dc1b';
+const REAL_SID = process.env.PERF_SESSION ?? '';
 const APPEND_SECONDS = Number(process.env.PERF_SECONDS ?? 20);
 
 interface Result {
@@ -200,7 +200,7 @@ describe.skipIf(!process.env.PERF)('performance', () => {
     }, 180_000);
   }
 
-  it.skipIf(!process.env.PERF_REAL)('real biggest session (read-only)', { timeout: 180_000 }, async () => {
+  it.skipIf(!process.env.PERF_REAL || !REAL_SID)('real biggest session (read-only)', { timeout: 180_000 }, async () => {
     const { app, page, userData } = await launch({});
     try {
       await scenario('real-idle', page, app, REAL_SID, async () => {
