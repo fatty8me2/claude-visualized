@@ -88,12 +88,12 @@ describe('app smoke (fixture data)', () => {
     expect(await drawer.getByTestId('commands').innerText()).toContain('npm test');
     await page.screenshot({ path: path.join(ART, 'agent-drawer.png') });
     // the open drawer can cover other cards when the plan rail narrows the graph
-    await drawer.getByRole('button', { name: '×' }).click();
+    await drawer.getByRole('button', { name: 'close' }).click();
     await page.locator('[data-agent="a1"]').click();
     await drawer.waitFor();
     expect(await drawer.getByTestId('task').innerText()).toBe('find it');
     expect(await drawer.getByTestId('files').count()).toBe(0);
-    await drawer.getByRole('button', { name: '×' }).click();
+    await drawer.getByRole('button', { name: 'close' }).click();
     await drawer.waitFor({ state: 'detached' });
   });
 
@@ -211,7 +211,7 @@ describe('app smoke (fixture data)', () => {
     await main.click({ position: { x: box.width / 2, y: box.height / 2 } });
     const drawer = page.getByTestId('drawer');
     await drawer.waitFor();
-    await drawer.getByRole('button', { name: '×' }).click();
+    await drawer.getByRole('button', { name: 'close' }).click();
     await drawer.waitFor({ state: 'detached' });
 
     // zoom with ctrl+wheel changes the axis; fit restores it
@@ -238,7 +238,7 @@ describe('app smoke (fixture data)', () => {
       .first()
       .click();
     await page.locator('.replaybar').waitFor();
-    await page.getByRole('button', { name: '❚❚' }).click();
+    await page.getByRole('button', { name: 'pause' }).click();
     await page.getByTestId('timeline').waitFor();
     expect(await page.locator('.tl-nowtag').innerText()).toBe('replay');
     const slider = page.locator('.replaybar input[type=range]');
@@ -278,8 +278,8 @@ describe('app smoke (fixture data)', () => {
         rate_limits: { five_hour: { used_percentage: 23.5, resets_at: resets }, seven_day: { used_percentage: 87, resets_at: resets + 3 * 86400 } },
       }),
     });
-    await page.locator('.topbar .meter.ok .m-pct', { hasText: '24%' }).waitFor({ timeout: 5000 });
-    expect(await page.locator('.topbar .meter.hot .m-pct').innerText()).toBe('87%');
+    await page.locator('.titlebar .meter.ok .m-pct', { hasText: '24%' }).waitFor({ timeout: 5000 });
+    expect(await page.locator('.titlebar .meter.hot .m-pct').innerText()).toBe('87%');
     await post({ session_id: SID, hook_event_name: 'PermissionRequest', tool_name: 'Bash' });
     await page.locator('[data-agent="main"].waiting').waitFor({ timeout: 5000 });
     await page.screenshot({ path: path.join(ART, 'fixture-live.png') });
@@ -390,13 +390,21 @@ describe('app smoke (fixture data)', () => {
     await page.getByRole('button', { name: 'done' }).click();
   });
 
-  it('"active only" hides recent sessions and finished agents', async () => {
+  it('"live sessions only" hides recent sessions but leaves the graph alone', async () => {
     expect(await page.locator('[data-agent="a1"]').count()).toBe(1); // a finished agent
     await page.getByTestId('active-only').click();
+    await page.locator('.group-label', { hasText: 'recent' }).waitFor({ state: 'detached' });
+    expect(await page.locator('[data-agent="a1"]').count()).toBe(1);
+    await page.getByTestId('active-only').click();
+    await page.locator('.group-label', { hasText: 'recent' }).waitFor();
+  });
+
+  it('"hide finished" folds finished agents in the graph only', async () => {
+    await page.getByRole('button', { name: 'hide finished' }).click();
     await page.locator('.node.collapsed').first().waitFor();
     expect(await page.locator('[data-agent="a1"]').count()).toBe(0);
-    expect(await page.locator('.group-label', { hasText: 'recent' }).count()).toBe(0);
-    await page.getByTestId('active-only').click();
+    expect(await page.locator('.group-label', { hasText: 'recent' }).count()).toBe(1);
+    await page.getByRole('button', { name: 'show finished' }).click();
     await page.locator('[data-agent="a1"]').waitFor();
   });
 
@@ -535,7 +543,7 @@ describe('local models (fake Ollama, qwen + llama fixture session)', () => {
     // mode panel: local tokens apart from Claude's
     expect((await page.getByTestId('local-tokens').innerText()).toLowerCase()).toContain('local tokens');
     // top-bar chip
-    expect((await page.getByTestId('local-chip').innerText()).trim()).toBe('⌂ 1 model loaded');
+    expect((await page.getByTestId('local-chip').innerText()).trim()).toBe('1 model loaded');
     await page.waitForTimeout(500);
     await main.screenshot({ path: path.join(ART, 'local-agent-card.png') });
     await page.screenshot({ path: path.join(ART, 'local-session.png') });

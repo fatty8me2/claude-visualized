@@ -127,15 +127,21 @@ let usageTimer: NodeJS.Timeout | null = null;
 /** Poll the plan usage API; on failure keep the last numbers but say why they may be stale. */
 async function pollUsageApi() {
   if (usageTimer) clearTimeout(usageTimer);
-  const r = await fetchUsage();
   let delay = USAGE_POLL_MS;
-  if (r.ok) setUsage(applyUsageApi(usage, r.body, Date.now()));
-  else {
-    setUsage({ ...usage, api: { state: r.state, message: r.message, at: Date.now() } });
-    if (r.retryAfterMs) delay = Math.max(delay, r.retryAfterMs);
-    else if (r.state !== 'error') delay = 60_000; // pick up a fresh `claude /login` quickly
+  try {
+    const r = await fetchUsage();
+    if (r.ok) setUsage(applyUsageApi(usage, r.body, Date.now()));
+    else {
+      setUsage({ ...usage, api: { state: r.state, message: r.message, at: Date.now() } });
+      if (r.retryAfterMs) delay = Math.max(delay, r.retryAfterMs);
+      else if (r.state !== 'error') delay = 60_000; // pick up a fresh `claude /login` quickly
+    }
+  } catch (e) {
+    // a throw (unreadable login file, failed renewal write) must not stop polling; the message never contains token material
+    setUsage({ ...usage, api: { state: 'error', message: `Usage check failed: ${(e as Error).message}`, at: Date.now() } });
+  } finally {
+    usageTimer = setTimeout(() => void pollUsageApi(), delay);
   }
-  usageTimer = setTimeout(() => void pollUsageApi(), delay);
 }
 
 function setUsage(next: UsageView) {
@@ -223,6 +229,20 @@ function reveal(win: BrowserWindow) {
   else win.show();
 }
 
+/**
+ * No application menu in packaged Windows/Linux builds: Electron's default one is hidden but still live, so Ctrl+R reloaded the
+ * renderer and wiped its state. macOS keeps the standard app/edit/window menus (copy/paste and Cmd+Q live there). Dev builds keep
+ * DevTools and reload.
+ */
+function installAppMenu() {
+  const dev: Electron.MenuItemConstructorOptions[] = app.isPackaged ? [] : [{ label: 'Dev', submenu: [{ role: 'toggleDevTools' }, { role: 'reload' }] }];
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }, ...dev]));
+  } else {
+    Menu.setApplicationMenu(dev.length ? Menu.buildFromTemplate(dev) : null);
+  }
+}
+
 function createMain() {
   mainWin = new BrowserWindow({
     width: 1440,
@@ -234,6 +254,11 @@ function createMain() {
     // packaged builds carry the icon in the executable / app bundle
     icon: app.isPackaged ? undefined : path.join(__dirname, '../../build/icon.png'),
     autoHideMenuBar: true,
+    // the renderer draws its own title bar (TitleBar.tsx); the OS keeps the window buttons
+    titleBarStyle: 'hidden',
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 12, y: 12 } }
+      : { titleBarOverlay: { color: '#14111c', symbolColor: '#b3abc4', height: 38 } }),
     show: false,
     webPreferences: webPrefs(false),
     ...backgroundOpts(),
@@ -555,6 +580,7 @@ if (!app.requestSingleInstanceLock()) {
     if (shouldShowOnSecondInstance(argv)) showMain();
   });
   app.whenReady().then(() => {
+    installAppMenu();
     if (process.platform === 'win32') app.setAppUserModelId('com.fatty8me2.claudevisualized');
     config = loadConfig();
     if (process.env.CLAUDE_VIS_PORT) config.port = Number(process.env.CLAUDE_VIS_PORT);
@@ -617,6 +643,9 @@ if (!app.requestSingleInstanceLock()) {
     manager.on('state', (v) => broadcast('state', v));
     manager.on('overview', (v) => broadcast('overview', v));
     manager.on('selected', (id) => broadcast('selected', id));
+    manager.on('follow', (on: boolean) => {
+      if (config.followActive !== on) updateConfig({ followActive: on });
+    });
     manager.on('notify', notify);
     manager.on('quota', (q) => setUsage(applyQuota(usage, q, Date.now())));
     loadUsage();

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { SessionView } from '@core/state';
 import { AgentGraph } from '../components/AgentGraph';
 import { Timeline } from '../components/Timeline';
+import type { IconName } from '../components/Icon';
 
 /**
  * Registry of the views that can fill the session page's "graph" panel (the agent graph, and later e.g. a timeline).
@@ -29,6 +30,7 @@ export interface GraphViewContext {
 export interface GraphViewDef {
   id: string;
   label: string;
+  icon: IconName;
   render: (ctx: GraphViewContext) => ReactNode;
 }
 
@@ -36,6 +38,7 @@ export const GRAPH_VIEWS: readonly GraphViewDef[] = [
   {
     id: 'graph',
     label: 'graph',
+    icon: 'agent',
     render: (c) => (
       <AgentGraph
         view={c.view}
@@ -53,6 +56,7 @@ export const GRAPH_VIEWS: readonly GraphViewDef[] = [
   {
     id: 'timeline',
     label: 'timeline',
+    icon: 'replay',
     render: (c) => (
       <Timeline
         view={c.view}

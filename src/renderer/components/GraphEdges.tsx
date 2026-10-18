@@ -50,15 +50,12 @@ export const GraphEdges = memo(function GraphEdges({
   layout,
   meta,
   focus,
-  scale,
   resetKey,
 }: {
   layout: Layout;
   meta: ReadonlyMap<string, EdgeMeta>;
   /** agents the pointer (or the plan rail) is on: their incoming edge and the path up to the root light up */
   focus?: ReadonlySet<string>;
-  /** the graph's CSS scale, so the draw-in stroke matches the crisp (non-scaling) one */
-  scale: number;
   /** changes when a different session is shown: forget previous statuses */
   resetKey: string;
 }) {
@@ -123,12 +120,8 @@ export const GraphEdges = memo(function GraphEdges({
   // many running agents: one fade-less particle per edge, no breathing
   const calm = running > MAX_PARTICLE_EDGES;
   return (
-    <svg
-      className={`edges gf${calm ? ' calm' : ''}`}
-      width={layout.width}
-      height={layout.height}
-      style={{ ['--gf-s' as string]: scale }}
-    >
+    // --gf-s (the graph's CSS scale, so the draw-in stroke matches the crisp non-scaling one) is inherited from the scaled container
+    <svg className={`edges gf${calm ? ' calm' : ''}`} width={layout.width} height={layout.height}>
       {layout.edges.map((e) => {
         const m = meta.get(e.to);
         const st = m?.st ?? 'idle';
@@ -152,14 +145,7 @@ export const GraphEdges = memo(function GraphEdges({
               </linearGradient>
             )}
             <path className="gf-base" d={e.d} pathLength={f?.kind === 'spawn' ? 1 : undefined} />
-            {flow && (
-              <path
-                className="gf-flow"
-                d={e.d}
-                pathLength={f?.kind === 'spawn' ? 1 : undefined}
-                style={grad ? { stroke: `url(#${id})` } : undefined}
-              />
-            )}
+            {flow && <path className="gf-flow" d={e.d} pathLength={f?.kind === 'spawn' ? 1 : undefined} style={grad ? { stroke: `url(#${id})` } : undefined} />}
             {st === 'running' && particles.has(e.to) && (
               <g className="gf-particles">
                 {(calm ? [0] : [0, 1]).map((i) => (

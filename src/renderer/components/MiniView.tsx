@@ -2,11 +2,12 @@ import { MAIN } from '@core/state';
 import { agentGoal, agentInsight } from '@core/insight';
 import { modelLabel } from '@core/summarize';
 import { GoalBadge } from './GoalBadge';
+import { StatusText } from './cardParts';
 import { useInbox, useLiveState, useNow } from '../hooks';
 import { CtxChip } from './ContextMeter';
 import { UsageMeters } from './UsageMeters';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
-import { agentName, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
+import { agentName, clock, displayStatus, famClass } from '../util';
 
 export function MiniView() {
   const view = useLiveState();
@@ -50,7 +51,9 @@ export function MiniView() {
           <div className={`mini-main ${famClass(main.model)}`}>
             <b style={{ color: 'var(--fam)' }}>{modelLabel(main.model)}</b>
             {isLocalModel(main.model) && <LocalTag />}
-            <span className={`status ${st}`}>{STATUS_GLYPH[st]}</span>
+            <span className={`status ${st}`}>
+              <StatusText st={st} />
+            </span>
             <CtxChip agent={main} />
             <GoalBadge goal={agentGoal(main, plan)} glyphOnly />
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }} data-testid="mini-now">

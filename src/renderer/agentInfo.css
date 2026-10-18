@@ -1,49 +1,56 @@
 /* agent goal badge, "now:" line and the detail drawer (loaded after theme.css) */
 .goal {
   --g: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   color: var(--g);
-  border: 1px solid color-mix(in srgb, var(--g) 55%, transparent);
-  background: color-mix(in srgb, var(--g) 12%, transparent);
-  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--g) 50%, transparent);
+  background: color-mix(in srgb, var(--g) 11%, transparent);
+  border-radius: var(--r-1);
   padding: 0 5px;
-  font-size: 10.5px;
-  line-height: 1.5;
+  font-size: var(--fs-2xs);
+  line-height: 1.6;
   white-space: nowrap;
   flex-shrink: 0;
+}
+.goal .icon {
+  width: 11px;
+  height: 11px;
 }
 .goal.c-low {
   border-style: dashed;
   opacity: 0.85;
 }
 .g-search {
-  --g: #5fc7d9;
+  --g: var(--goal-search);
 }
 .g-research {
-  --g: #e08ad0;
+  --g: var(--goal-research);
 }
 .g-plan {
-  --g: #f2c45a;
+  --g: var(--goal-plan);
 }
 .g-build {
-  --g: #6fd08c;
+  --g: var(--goal-build);
 }
 .g-test {
-  --g: #f0925f;
+  --g: var(--goal-test);
 }
 .g-review {
-  --g: #8fb5ff;
+  --g: var(--goal-review);
 }
 .g-debug {
-  --g: #ff6b7a;
+  --g: var(--goal-debug);
 }
 .g-docs {
-  --g: #b5c98a;
+  --g: var(--goal-docs);
 }
 .g-workflow {
-  --g: #a79fbd;
+  --g: var(--goal-workflow);
 }
 .g-general {
-  --g: #7d7591;
+  --g: var(--goal-general);
 }
 
 .ov-tool .lbl,
@@ -72,11 +79,7 @@
   flex: 1;
 }
 .drawer h4 {
-  margin: 0 0 3px;
-  font-size: 10.5px;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  margin: 0 0 4px;
 }
 .drawer section {
   min-width: 0;
@@ -93,8 +96,8 @@
   border: 1px solid var(--line-2);
   border-left: 3px solid var(--fam, var(--line-2));
   background: var(--panel-2);
-  padding: 4px 8px;
-  border-radius: 3px;
+  padding: 5px 9px;
+  border-radius: var(--r-2);
 }
 .drawer .task {
   color: var(--text-2);
@@ -194,4 +197,118 @@
 .drawer .mixrow .mc {
   text-align: right;
   color: var(--muted);
+}
+
+/* drawer additions: title, sub-agents, copy buttons, failed-call output, actions */
+.drawer h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+}
+.drawer h4 .copy-btn {
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+}
+.drawer .dtitle {
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.4;
+  margin-top: -2px;
+}
+.drawer .kids {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.drawer .kid {
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 3px 6px;
+  border: 0;
+  background-color: transparent;
+  text-align: left;
+  min-width: 0;
+}
+.drawer .kid:hover {
+  background-color: var(--hover);
+}
+.drawer .kid .status {
+  flex: none;
+  width: 86px;
+  font-size: var(--fs-2xs);
+}
+.drawer .kid .kn {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  min-width: 0;
+}
+.drawer .more {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  padding: 2px 6px;
+}
+.drawer .tl.has-err {
+  cursor: pointer;
+}
+.drawer .tl.has-err:hover .tx {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--err) 50%, transparent);
+}
+.drawer .tl-err {
+  margin: 2px 0 4px 62px;
+  padding: 4px 8px;
+  border-left: 2px solid var(--err);
+  background: color-mix(in srgb, var(--err) 7%, transparent);
+  color: color-mix(in srgb, var(--err) 35%, var(--text));
+  font-size: var(--fs-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 7.5em;
+  overflow-y: auto;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.drawer .cmds div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.drawer .cmds .cx {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drawer .cmds .copy-btn {
+  width: 20px;
+  height: 20px;
+  opacity: 0;
+  color: var(--muted);
+}
+.drawer .cmds div:hover .copy-btn,
+.drawer .cmds .copy-btn:focus-visible {
+  opacity: 1;
+}
+.drawer .tl .ok .icon,
+.drawer .tl .ic .icon {
+  vertical-align: -1px;
+}
+.drawer .mixrow .mn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.drawer-acts {
+  display: flex;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.drawer-acts button {
+  flex: 1;
 }

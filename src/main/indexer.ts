@@ -17,6 +17,8 @@ interface Cached {
   titleRank: number;
   cwd: string | null;
   entrypoint: string | null;
+  /** latest git branch seen in the head/tail lines */
+  gitBranch: string | null;
   /** newest timestamp on any transcript line seen; file mtimes lie (the desktop app appends untimestamped bookkeeping) */
   lastTs: number;
 }
@@ -97,11 +99,36 @@ export class SessionIndexer {
         size: f.size,
         live: now - activity < LIVE_MS,
         entrypoint: meta.entrypoint,
+        gitBranch: meta.gitBranch,
         desktopId: desk?.localId ?? null,
         archived: desk?.archived ?? false,
       });
     }
     return out.sort((a, b) => b.mtime - a.mtime);
+  }
+
+  /**
+   * Find a session's transcript by id, also beyond the newest MAX_SESSIONS that scan() lists
+   * (a History search hit can point at an old session).
+   */
+  async locate(id: string): Promise<string | null> {
+    if (!/^[A-Za-z0-9_-]+$/.test(id)) return null;
+    const root = projectsDir();
+    let projects: string[];
+    try {
+      projects = await fs.readdir(root);
+    } catch {
+      return null;
+    }
+    for (const p of projects) {
+      const file = path.join(root, p, `${id}.jsonl`);
+      try {
+        if ((await fs.stat(file)).isFile()) return file;
+      } catch {
+        /* not in this project */
+      }
+    }
+    return null;
   }
 
   private async meta(file: string, id: string, mtime: number, size: number): Promise<Cached | null> {
@@ -114,6 +141,7 @@ export class SessionIndexer {
       titleRank: c?.titleRank ?? 0,
       cwd: c?.cwd ?? null,
       entrypoint: c?.entrypoint ?? null,
+      gitBranch: c?.gitBranch ?? null,
       lastTs: c?.lastTs ?? 0,
     };
     try {
@@ -135,6 +163,8 @@ export class SessionIndexer {
         }
         if (!next.cwd && typeof o.cwd === 'string') next.cwd = o.cwd;
         if (!next.entrypoint && typeof o.entrypoint === 'string') next.entrypoint = o.entrypoint;
+        // the tail is read after the head, so the newest branch wins
+        if (typeof o.gitBranch === 'string' && o.gitBranch) next.gitBranch = o.gitBranch;
         if (o.type === 'custom-title' && typeof o.customTitle === 'string') {
           next.title = o.customTitle;
           next.titleRank = 3;

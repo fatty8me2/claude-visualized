@@ -243,7 +243,7 @@ export function Timeline({ view, now, selectedAgent, onSelect, highlight, onHove
 
   return (
     <div
-      className={`tl ${replaying ? 'replaying' : ''} ${onSeekTime ? 'seekable' : ''}`}
+      className={`tlv ${replaying ? 'replaying' : ''} ${onSeekTime ? 'seekable' : ''}`}
       ref={rootRef}
       data-testid="timeline"
       onPointerDown={onPointerDown}

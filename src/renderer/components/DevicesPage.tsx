@@ -237,7 +237,12 @@ export function DevicesPage() {
     void window.api.setDiscovering(true);
     return () => void window.api.setDiscovering(false);
   }, []);
-  if (!p) return <div className="empty">loading…</div>;
+  if (!p)
+    return (
+      <div className="empty-state">
+        <span className="loading">loading…</span>
+      </div>
+    );
   const hosts = p.devices.filter((d) => d.role === 'host');
   const viewers = p.devices.filter((d) => d.role === 'viewer');
   return (

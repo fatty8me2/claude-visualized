@@ -1,24 +1,22 @@
 /* attention inbox: sidebar badge, the Inbox page and the mini view line */
 .nav-badge {
   display: inline-block;
-  min-width: 16px;
+  min-width: 17px;
   padding: 0 5px;
-  margin-left: 6px;
-  border-radius: 8px;
+  margin-left: auto;
+  border-radius: var(--r-pill);
   background: var(--err);
-  color: #1a0b10;
+  color: var(--bg);
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
   text-align: center;
 }
-.sidebar.collapsed .sidebar-head button {
-  position: relative;
-}
-.sidebar.collapsed .nav-badge {
+.sidebar-col .nav-badge {
   position: absolute;
-  top: -3px;
-  right: -4px;
+  top: -2px;
+  right: -3px;
   margin: 0;
   min-width: 14px;
   line-height: 14px;

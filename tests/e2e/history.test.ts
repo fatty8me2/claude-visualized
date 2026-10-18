@@ -88,7 +88,7 @@ describe('history page (fixture data)', () => {
     expect(await page.getByTestId('history-projects').innerText()).toContain('other');
     const models = await page.getByTestId('history-models').innerText();
     expect(models).toContain('Opus 5.5');
-    expect(models).toMatch(/Qwen2\.5 Coder 32B\s*⌂ local/);
+    expect(models).toMatch(/Qwen2\.5 Coder 32B\s*local/);
     expect(await page.getByTestId('history-tools').innerText()).toContain('Bash');
     expect(await page.getByTestId('history-goals').innerText()).toContain('search');
     await page.getByTestId('with-cache').click();

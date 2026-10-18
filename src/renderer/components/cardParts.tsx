@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { reducedMotion } from '../cardFx';
-import { STATUS_GLYPH, type DisplayStatus } from '../util';
+import { STATUS_WORD, type DisplayStatus } from '../util';
+import { Icon } from './Icon';
 
 /**
  * Text that fades (and settles 3px) when `k` changes, instead of snapping. The first render and changes that `enabled()` rejects
@@ -33,18 +34,25 @@ export function StatusLabel({ st, extra, enabled }: { st: DisplayStatus; extra?:
   return (
     <span className={`status ${st}`}>
       <Fade k={st} enabled={enabled}>
-        {st === 'done' ? (
-          <>
-            <svg className="tick" viewBox="0 0 12 12" aria-hidden>
-              <path d="M2.2 6.4 4.9 9 9.8 3.2" />
-            </svg>{' '}
-            done
-          </>
-        ) : (
-          STATUS_GLYPH[st]
-        )}
+        <StatusText st={st} />
         {extra}
       </Fade>
     </span>
+  );
+}
+
+/** Icon + word for a display status. "done" draws its check as a stroked path so cardFx can animate it. */
+export function StatusText({ st }: { st: DisplayStatus }) {
+  return (
+    <>
+      {st === 'done' ? (
+        <svg className="tick" viewBox="0 0 12 12" aria-hidden>
+          <path d="M2.2 6.4 4.9 9 9.8 3.2" />
+        </svg>
+      ) : (
+        <Icon name={st} size="xs" className={`st-icon st-${st}`} />
+      )}{' '}
+      {STATUS_WORD[st]}
+    </>
   );
 }

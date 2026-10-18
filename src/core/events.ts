@@ -45,7 +45,15 @@ export type AgentEvent = Base &
     | { k: 'model'; model: string; effort?: string }
     | { k: 'prompt'; text: string }
     | { k: 'tool.start'; toolUseId: string; name: string; input: unknown }
-    | { k: 'tool.end'; toolUseId: string; ok: boolean; result?: unknown; durationMs?: number; name?: string }
+    | {
+        k: 'tool.end';
+        toolUseId: string;
+        ok: boolean;
+        result?: unknown;
+        durationMs?: number;
+        name?: string;
+        /** first ~300 chars of a failed call's output */ error?: string;
+      }
     | { k: 'usage'; msgId: string; usage: UsageNumbers }
     | { k: 'agent.spawn'; spawn: SpawnInfo }
     | {

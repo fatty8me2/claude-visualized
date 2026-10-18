@@ -133,7 +133,7 @@ describe('agent card motion (fixture data)', () => {
     await page.getByTestId('drawer').waitFor();
     await page.waitForTimeout(350);
     await shot('selected');
-    await page.getByTestId('drawer').getByRole('button', { name: '×' }).click();
+    await page.getByTestId('drawer').getByRole('button', { name: 'close' }).click();
     await page.mouse.move(5, 5);
   });
 

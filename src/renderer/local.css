@@ -7,17 +7,10 @@
 }
 
 .local-tag {
-  display: inline-block;
-  color: var(--local);
-  border: 1px solid color-mix(in srgb, var(--local) 55%, transparent);
-  background: color-mix(in srgb, var(--local) 12%, transparent);
-  border-radius: 3px;
-  padding: 0 5px;
-  font-size: 10px;
-  line-height: 1.5;
-  white-space: nowrap;
-  font-weight: 400;
   flex-shrink: 0;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .local-num {
   color: var(--local);
@@ -97,16 +90,6 @@
   margin: 0 8px 4px;
   padding: 1px 6px;
   font-size: 10px;
-}
-
-/* sidebar entry */
-.local-nav {
-  width: 100%;
-  color: var(--local);
-}
-.local-nav.on {
-  border-color: var(--local);
-  background: color-mix(in srgb, var(--local) 12%, transparent);
 }
 
 /* page */

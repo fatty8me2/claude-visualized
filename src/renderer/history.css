@@ -39,7 +39,7 @@
   border-radius: 0 4px 4px 0;
 }
 .hist-seg button.on {
-  background: #2a2240;
+  background: var(--accent-soft);
   position: relative;
 }
 .hist-seg.small button {
@@ -202,7 +202,7 @@
   padding: 6px 9px;
   font-size: 11px;
   min-width: 150px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-2);
 }
 .hist-tip i {
   display: inline-block;

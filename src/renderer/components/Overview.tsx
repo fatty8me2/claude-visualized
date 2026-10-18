@@ -4,8 +4,9 @@ import { GOAL_INFO } from '@core/goal';
 import { agentGoal, agentInsight } from '@core/insight';
 import { formatTokens, modelLabel } from '@core/summarize';
 import { GoalBadge } from './GoalBadge';
+import { StatusText } from './cardParts';
 import { useNow, useOverview } from '../hooks';
-import { agentName, ago, clock, displayStatus, famClass, STATUS_GLYPH } from '../util';
+import { agentName, ago, clock, displayStatus, famClass } from '../util';
 import { AgentGraph } from './AgentGraph';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
 import { UsageMeters } from './UsageMeters';
@@ -52,7 +53,7 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
         </div>
         <div className="ov-stats">
           <span className={`status ${st} ${famClass(main?.model)}`}>
-            <b style={{ color: 'var(--fam)' }}>{modelLabel(main?.model)}</b> {isLocalModel(main?.model) && <LocalTag />} {STATUS_GLYPH[st]}
+            <b style={{ color: 'var(--fam)' }}>{modelLabel(main?.model)}</b> {isLocalModel(main?.model) && <LocalTag />} <StatusText st={st} />
           </span>
           <span className="ov-sub">
             <CtxChip agent={main} />
@@ -90,7 +91,7 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
         </div>
       )}
       <div className="ov-graph">
-        <AgentGraph view={v} now={now} selectedAgent={null} onSelect={() => onOpen(v.id)} showFinished={!activeOnly} onToggleFinished={() => {}} compact />
+        <AgentGraph view={v} now={now} selectedAgent={null} onSelect={() => onOpen(v.id)} showFinished={!activeOnly} onToggleFinished={() => {}} embedded />
       </div>
       <footer className="ov-log">
         {recent.length === 0 && <div className="empty-note">no activity yet</div>}
@@ -111,7 +112,12 @@ function Panel({ v, index, now, onOpen, activeOnly }: { v: SessionView; index: n
 export function Overview({ onOpen, onLocal, activeOnly = false }: { onOpen: (id: string) => void; onLocal: () => void; activeOnly?: boolean }) {
   const views = useOverview();
   const now = useNow(1000);
-  if (!views) return <div className="empty">loading sessions…</div>;
+  if (!views)
+    return (
+      <div className="empty-state">
+        <span className="loading">loading sessions…</span>
+      </div>
+    );
   const n = views.length;
   const cols = columnsFor(n);
   const rows = Math.max(1, Math.ceil(n / cols));
@@ -129,7 +135,7 @@ export function Overview({ onOpen, onLocal, activeOnly = false }: { onOpen: (id:
         <LocalChip onOpen={onLocal} />
       </div>
       {n === 0 ? (
-        <div className="empty">
+        <div className="empty-state">
           <div>
             <div style={{ fontSize: 15, color: 'var(--text)', marginBottom: 8 }}>No live sessions right now</div>
             <div>Sessions show up here as soon as Claude Code starts working in them.</div>

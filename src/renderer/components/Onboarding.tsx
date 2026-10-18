@@ -3,31 +3,9 @@ import type { SetupStatusView } from '@core/api';
 import { buildChecklist, LOGIN_COMMAND, type CheckItem } from '@core/onboarding';
 import type { HookInstallState } from '@core/hooksConfig';
 import { useUsage, useConfig } from '../hooks';
+import { CopyButton } from './CopyButton';
 
 const GLYPH = { ok: '✓', warn: '⚠', todo: '○' } as const;
-
-function CopyButton({ text }: { text: string }) {
-  const [done, setDone] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-    }
-    setDone(true);
-    setTimeout(() => setDone(false), 1800);
-  };
-  return (
-    <button data-testid="copy-login" onClick={() => void copy()}>
-      {done ? '✓ copied' : 'copy command'}
-    </button>
-  );
-}
 
 function CheckRow({ item, children }: { item: CheckItem; children?: React.ReactNode }) {
   return (
@@ -98,7 +76,7 @@ export function Welcome({ onTour, onSkip, onOpenSettings }: { onTour: () => void
               <div className="fix">
                 <div className="cmdrow">
                   <code>{LOGIN_COMMAND}</code>
-                  <CopyButton text={LOGIN_COMMAND} />
+                  <CopyButton text={LOGIN_COMMAND} label="copy command" testId="copy-login" />
                 </div>
                 <div className="hint">
                   Open a terminal (Windows Terminal is recommended), paste the command with <b>Ctrl+Shift+V</b>, press Enter and follow the steps. This page

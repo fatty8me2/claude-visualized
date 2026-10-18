@@ -40,6 +40,8 @@ export interface LayoutOptions {
   maxCols: number;
   /** collapse finished leaf children into one chip when a parent has more than this many */
   collapseAbove: number;
+  /** height of the "N finished" chip */
+  chipH: number;
   showFinished: boolean;
   /** parents whose finished children the user expanded */
   expanded?: ReadonlySet<string>;
@@ -54,6 +56,21 @@ export const DEFAULT_LAYOUT: LayoutOptions = {
   gapY: 70,
   maxCols: 5,
   collapseAbove: 6,
+  chipH: 64,
+  showFinished: true,
+};
+
+/** Smaller cards for wide trees in a narrow panel (see core/graphZoom.ts: the graph switches to these instead of shrinking text). */
+export const COMPACT_LAYOUT: LayoutOptions = {
+  nodeW: 196,
+  nodeH: 60,
+  mainW: 264,
+  mainH: 64,
+  gapX: 16,
+  gapY: 46,
+  maxCols: 6,
+  collapseAbove: 6,
+  chipH: 40,
   showFinished: true,
 };
 
@@ -110,13 +127,13 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
         collapsedBox = {
           id: `collapsed:${a.id}`,
           w: opt.nodeW,
-          h: 64,
+          h: opt.chipH,
           collapsed: { count: ids.size, ids: [...ids], parentId: a.id },
           children: [],
           grid: false,
           // sized up front: a zero-width chip gets placed on top of its neighbour
           sw: opt.nodeW,
-          sh: 64,
+          sh: opt.chipH,
         };
       }
     }

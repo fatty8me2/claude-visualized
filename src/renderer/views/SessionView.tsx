@@ -3,12 +3,13 @@ import type { HookServerStatusView } from '@core/api';
 import { modelFamily, modelLabel } from '@core/summarize';
 import type { SessionSummary, SessionView as CoreSessionView } from '@core/state';
 import { AgentDrawer } from '../components/AgentDrawer';
-import { LocalChip, LocalTag } from '../components/LocalBits';
+import { LocalTag } from '../components/LocalBits';
 import { LogPanel } from '../components/LogPanel';
 import { ModePanel } from '../components/ModePanel';
 import { PlanRail, PlanToggle, usePlanModel, usePlanRailPrefs } from '../components/PlanRail';
 import { StatusBar } from '../components/StatusBar';
-import { UsageMeters } from '../components/UsageMeters';
+import { Icon } from '../components/Icon';
+import { useGraphPrefs } from '../state/graphPrefs';
 import { LayoutToolbar, PanelGrid, type LayoutApi } from '../layout';
 import type { useReplay } from '../replay';
 import type { SessionUi } from '../state/sessionUi';
@@ -57,34 +58,21 @@ export interface SessionViewProps {
   now: number;
   replay: ReturnType<typeof useReplay>;
   hookSrv: HookServerStatusView | null;
-  activeOnly: boolean;
-  onActiveOnly: (on: boolean) => void;
-  onSettings: () => void;
-  onLocal: () => void;
   layoutApi: LayoutApi;
   ui: SessionUi;
+  /** title of the newly selected session while it loads (this view still shows the previous one); null when current */
+  loading: string | null;
 }
 
 /** The one-session page: topbar, model legend, replay bar, the panel grid (mode / graph / log) and the status bar. */
-export function SessionView({
-  view,
-  summary,
-  now,
-  replay: replayApi,
-  hookSrv,
-  activeOnly,
-  onActiveOnly,
-  onSettings,
-  onLocal,
-  layoutApi,
-  ui,
-}: SessionViewProps) {
+export function SessionView({ view, summary, now, replay: replayApi, hookSrv, layoutApi, ui, loading }: SessionViewProps) {
   const { replay, start, stop, goto, setPlaying, setSpeed } = replayApi;
   const { layout } = layoutApi;
   const { agentSel, setAgentSel, logAgent, setLogAgent, hlAgents, setHlAgents, hoverAgent, setHoverAgent, editingLayout, setEditingLayout } = ui;
   const planPrefs = usePlanRailPrefs();
   const plan = usePlanModel(view);
   const [graphViewId, setGraphViewId] = useState(GRAPH_VIEWS[0].id);
+  const [graphPrefs, setGraphPrefs] = useGraphPrefs();
   const eventTimes = useMemo(() => replay?.events.map((e) => e.ts), [replay?.events]);
   const graphView = GRAPH_VIEWS.find((g) => g.id === graphViewId) ?? GRAPH_VIEWS[0];
 
@@ -97,10 +85,17 @@ export function SessionView({
               <MachineChip machine={view.machine} offline={summary?.offlineSince != null} />{' '}
             </>
           )}
-          {view.title ?? 'untitled session'} <span className="proj">· {summary?.project ?? view.cwd?.split(/[\\/]/).pop() ?? ''}</span>
+          <span className="tt">{view.title ?? 'untitled session'}</span>
+          <span className="proj">
+            {summary?.project ?? view.cwd?.split(/[\\/]/).pop() ?? ''}
+            {view.gitBranch ? (
+              <>
+                {' '}
+                <Icon name="branch" size="xs" /> {view.gitBranch}
+              </>
+            ) : null}
+          </span>
         </div>
-        <UsageMeters />
-        <LocalChip onOpen={onLocal} />
         <div className="actions">
           <button
             data-tour="open-in-claude"
@@ -108,33 +103,36 @@ export function SessionView({
             onClick={() => void openInClaude(view.id)}
             title={view.machine ? `This session is running on ${view.machine}` : 'Open this session in the Claude desktop app'}
           >
-            ↗ open in Claude
+            <Icon name="openExternal" size="xs" />
+            open in Claude
           </button>
           {replay ? (
             <button className="on" onClick={stop}>
-              ■ back to live
+              <Icon name="live" size="xs" />
+              back to live
             </button>
           ) : view.machine ? null : (
             <button onClick={() => void start(view.id)} title="Replay this session from the start">
-              ⟲ replay
+              <Icon name="replay" size="xs" />
+              replay
             </button>
           )}
-          <button data-tour="mini" onClick={() => void window.api.toggleMini()} title="Small always-on-top window">
-            ▣ mini
-          </button>
-          <button data-tour="hooks" onClick={onSettings} title="Hooks and settings">
-            ⚙ hooks
-          </button>
           <button
             className={editingLayout ? 'on' : ''}
             onClick={() => setEditingLayout(!editingLayout)}
             title="Rearrange and resize the panels"
             data-testid="layout-toggle"
           >
-            ⧉ layout
+            <Icon name="layout" size="xs" />
+            layout
           </button>
         </div>
       </div>
+      {loading && (
+        <div className="loading-strip" data-testid="loading-strip" aria-busy>
+          <span className="loading">loading {loading}…</span>
+        </div>
+      )}
       {editingLayout && <LayoutToolbar api={layoutApi} onDone={() => setEditingLayout(false)} />}
       {!layout.hidden.legend && (
         <div data-flip="legend">
@@ -143,12 +141,21 @@ export function SessionView({
       )}
       {replay && (
         <div className="replaybar">
-          <button onClick={() => setPlaying(!replay.playing)}>{replay.playing ? '❚❚' : '▶'}</button>
-          {[1, 8, 32, 128].map((sp) => (
-            <button key={sp} className={replay.speed === sp ? 'on' : ''} onClick={() => setSpeed(sp)}>
-              {sp}×
-            </button>
-          ))}
+          <button
+            className="btn-icon"
+            onClick={() => setPlaying(!replay.playing)}
+            aria-label={replay.playing ? 'pause' : 'play'}
+            title={replay.playing ? 'Pause' : 'Play'}
+          >
+            <Icon name={replay.playing ? 'pause' : 'play'} />
+          </button>
+          <div className="seg">
+            {[1, 8, 32, 128].map((sp) => (
+              <button key={sp} className={replay.speed === sp ? 'on' : ''} onClick={() => setSpeed(sp)} title={`${sp}× speed`}>
+                {sp}×
+              </button>
+            ))}
+          </div>
           <input type="range" min={0} max={replay.events.length} value={replay.idx} onChange={(e) => goto(Number(e.target.value))} />
           <span className="rt">
             {clock(replay.now)} · {replay.idx}/{replay.events.length}
@@ -165,11 +172,14 @@ export function SessionView({
               <div className="graph-main">
                 {GRAPH_VIEWS.length > 1 && (
                   <div className="graph-views">
-                    {GRAPH_VIEWS.map((g) => (
-                      <button key={g.id} className={g.id === graphView.id ? 'on' : ''} onClick={() => setGraphViewId(g.id)}>
-                        {g.label}
-                      </button>
-                    ))}
+                    <div className="seg">
+                      {GRAPH_VIEWS.map((g) => (
+                        <button key={g.id} className={g.id === graphView.id ? 'on' : ''} onClick={() => setGraphViewId(g.id)}>
+                          <Icon name={g.icon} size="xs" />
+                          {g.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {graphView.render({
@@ -177,15 +187,27 @@ export function SessionView({
                   now,
                   selectedAgent: agentSel,
                   onSelectAgent: setAgentSel,
-                  showFinished: !activeOnly,
-                  onToggleFinished: () => onActiveOnly(!activeOnly),
+                  showFinished: !graphPrefs.hideFinished,
+                  onToggleFinished: () => setGraphPrefs({ hideFinished: !graphPrefs.hideFinished }),
                   highlight: hlAgents,
                   onHoverAgent: plan ? setHoverAgent : undefined,
                   replaying: !!replay,
                   onSeekTime: eventTimes ? (ts) => goto(eventIndexAt(eventTimes, ts)) : undefined,
                   extraTools: plan ? <PlanToggle plan={plan} prefs={planPrefs} /> : undefined,
                 })}
-                {agentSel && <AgentDrawer view={view} id={agentSel} now={now} onClose={() => setAgentSel(null)} onFilterLog={setLogAgent} />}
+                {agentSel && (
+                  <AgentDrawer
+                    view={view}
+                    id={agentSel}
+                    now={now}
+                    onClose={() => setAgentSel(null)}
+                    onFilterLog={setLogAgent}
+                    onSelect={setAgentSel}
+                    onShowInTimeline={
+                      GRAPH_VIEWS.some((g) => g.id === 'timeline') && graphView.id !== 'timeline' ? () => setGraphViewId('timeline') : undefined
+                    }
+                  />
+                )}
               </div>
               {plan && planPrefs.prefs.open && (
                 <PlanRail
