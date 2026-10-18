@@ -2,10 +2,11 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type React
 import { describeActivity, firstLine } from '@core/activity';
 import { agentGoal } from '@core/insight';
 import { GoalBadge } from './GoalBadge';
-import { DEFAULT_LAYOUT, layoutAgents, type Layout } from '@core/layout';
+import { DEFAULT_LAYOUT, layoutAgents } from '@core/layout';
 import { MAIN, type AgentNode, type SessionView } from '@core/state';
-import { formatDuration, formatTokens, modeLabel, modelLabel } from '@core/summarize';
+import { formatDuration, formatTokens, modeLabel, modelFamily, modelLabel } from '@core/summarize';
 import { CtxChip } from './ContextMeter';
+import { GraphEdges, type EdgeMeta } from './GraphEdges';
 import { isLocalModel, LocalLinkLine } from './LocalBits';
 import { createClock, useClockKey, type Clock } from '../clockStore';
 import { agentName, displayStatus, famClass, STATUS_GLYPH, type DisplayStatus } from '../util';
@@ -170,29 +171,6 @@ const NodeCard = memo(function NodeCard({
   );
 });
 
-/** The edges layer only changes with the layout, not with every card update. */
-const MANY_ACTIVE_EDGES = 16;
-
-const Edges = memo(function Edges({ layout }: { layout: Layout }) {
-  // the dash and dot animations repaint continuously: with many running agents, step the dashes and only travel dots on the first few edges
-  const active = layout.edges.reduce((n, e) => n + (e.active ? 1 : 0), 0);
-  let dots = 0;
-  return (
-    <svg className={`edges${active > MANY_ACTIVE_EDGES ? ' calm' : ''}`} width={layout.width} height={layout.height}>
-      {layout.edges.map((e) => (
-        <g key={`${e.from}>${e.to}`}>
-          <path className={`edge ${e.active ? 'active' : ''}`} d={e.d} id={`p-${e.to}`} />
-          {e.active && dots++ < MANY_ACTIVE_EDGES && (
-            <circle r={3.2} className="edge-dot">
-              <animateMotion dur="1.8s" repeatCount="indefinite" path={e.d} />
-            </circle>
-          )}
-        </g>
-      ))}
-    </svg>
-  );
-});
-
 export function AgentGraph({
   view,
   now,
@@ -225,6 +203,7 @@ export function AgentGraph({
   const [wrapH, setWrapH] = useState(600);
   const [fit, setFit] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [hoverId, setHoverId] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
@@ -280,6 +259,29 @@ export function AgentGraph({
     clock.notify();
   }, [clock, now]);
 
+  // what the edge layer shows per agent; the same Map object is reused until something it draws changes
+  const metaRef = useRef<{ key: string; map: Map<string, EdgeMeta> }>({ key: '', map: new Map() });
+  const edgeMeta = useMemo(() => {
+    let key = '';
+    const map = new Map<string, EdgeMeta>();
+    for (const a of Object.values(view.agents)) {
+      const st = displayStatus(a, now);
+      const fam = modelFamily(a.model);
+      map.set(a.id, { st, fam, started: a.startedAt });
+      key += `${a.id}|${st}|${fam}|${a.startedAt}
+`;
+    }
+    if (metaRef.current.key === key) return metaRef.current.map;
+    metaRef.current = { key, map };
+    return map;
+  }, [view.agents, now]);
+  const focus = useMemo(() => {
+    if (!hoverId) return highlight;
+    const s = new Set(highlight);
+    s.add(hoverId);
+    return s;
+  }, [highlight, hoverId]);
+
   const pad = compact ? 14 : 36;
   const scale = compact
     ? Math.max(0.28, Math.min(1, (wrapW - pad * 2) / Math.max(1, layout.width), (wrapH - pad * 2) / Math.max(1, layout.height)))
@@ -307,8 +309,15 @@ export function AgentGraph({
       )}
       <div
         className="graph-canvas"
-        onMouseOver={onHoverAgent ? (e) => onHoverAgent((e.target as HTMLElement).closest<HTMLElement>('[data-agent]')?.dataset.agent ?? null) : undefined}
-        onMouseLeave={onHoverAgent ? () => onHoverAgent(null) : undefined}
+        onMouseOver={(e) => {
+          const id = (e.target as HTMLElement).closest<HTMLElement>('[data-agent]')?.dataset.agent ?? null;
+          setHoverId(id);
+          onHoverAgent?.(id);
+        }}
+        onMouseLeave={() => {
+          setHoverId(null);
+          onHoverAgent?.(null);
+        }}
         style={{ width: layout.width * scale + pad * 2, height: layout.height * scale + pad * 2 }}
       >
         <div
@@ -322,7 +331,7 @@ export function AgentGraph({
             transformOrigin: 'top left',
           }}
         >
-          <Edges layout={layout} />
+          <GraphEdges layout={layout} meta={edgeMeta} focus={focus} scale={scale} resetKey={view.id} />
           {layout.nodes.map((n) => {
             if (n.collapsed) {
               return (
