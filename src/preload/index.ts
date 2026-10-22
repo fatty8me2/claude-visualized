@@ -63,6 +63,7 @@ const api: VisApi = {
   clearInbox: () => ipcRenderer.invoke('inbox:clear'),
   showInbox: () => ipcRenderer.invoke('inbox:show'),
   onNavigate: (cb) => on('ui:navigate', cb),
+  onFullscreen: (cb) => on<boolean>('window:fullscreen', cb),
   getUpdates: () => ipcRenderer.invoke('updates:state'),
   checkForUpdates: () => ipcRenderer.invoke('updates:check'),
   downloadUpdate: () => ipcRenderer.invoke('updates:download'),

@@ -646,6 +646,12 @@ textarea:focus-visible {
 html[data-platform='darwin'] .tb-inner {
   padding-left: 84px;
 }
+/* fullscreen: no caption buttons or traffic lights to keep clear of */
+html.is-fullscreen .tb-inner {
+  left: 0;
+  width: 100%;
+  padding-left: 12px;
+}
 .titlebar :is(button, .usage, input, a) {
   -webkit-app-region: no-drag;
 }

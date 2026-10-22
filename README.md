@@ -196,6 +196,7 @@ Settings (the settings button at the top right, section **App**) and the tray me
   already owns the shortcut you get an error and the previous hotkey stays active.
 - **Tray menu**: *Mini view (hotkey)*, *Open settings*, and the start-at-login checkbox, next to *Show window*,
   *Follow active session* and *Quit*.
+- **Full screen**: **F11** toggles full screen for the main window (Ctrl+Cmd+F on macOS). Press F11 again to leave.
 
 A second launch of the app focuses the running window; a second launch with `--hidden` (what the login item uses) does not.
 Set `CLAUDE_VIS_NO_SYSTEM_INTEGRATION=1` to skip login-item and global-hotkey registration (the e2e tests do).

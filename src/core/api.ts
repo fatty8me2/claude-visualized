@@ -216,6 +216,8 @@ export interface VisApi {
   showInbox(): Promise<void>;
   /** the main process asks the window to show a page (tray menu, notification) */
   onNavigate(cb: (page: string) => void): () => void;
+  /** the main window entered or left fullscreen (F11, Ctrl+Cmd+F); the renderer adds the `is-fullscreen` class to <html> */
+  onFullscreen(cb: (on: boolean) => void): () => void;
   /** auto-update state (see core/updates.ts) */
   getUpdates(): Promise<UpdateView>;
   checkForUpdates(): Promise<UpdateView>;

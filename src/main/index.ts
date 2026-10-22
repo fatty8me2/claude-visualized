@@ -265,7 +265,12 @@ function reveal(win: BrowserWindow) {
 function installAppMenu() {
   const dev: Electron.MenuItemConstructorOptions[] = app.isPackaged ? [] : [{ label: 'Dev', submenu: [{ role: 'toggleDevTools' }, { role: 'reload' }] }];
   if (process.platform === 'darwin') {
-    Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }, ...dev]));
+    // togglefullscreen keeps Ctrl+Cmd+F on the Window menu (F11 is handled by the main window's before-input-event, see createMain)
+    const windowMenu: Electron.MenuItemConstructorOptions = {
+      label: 'Window',
+      submenu: [{ role: 'minimize' }, { role: 'zoom' }, { role: 'togglefullscreen' }, { type: 'separator' }, { role: 'front' }],
+    };
+    Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, windowMenu, ...dev]));
   } else {
     Menu.setApplicationMenu(dev.length ? Menu.buildFromTemplate(dev) : null);
   }
@@ -303,6 +308,15 @@ function createMain() {
     }
   });
   mainWin.on('closed', () => (mainWin = null));
+  // F11 toggles fullscreen whatever has focus in the page. Escape is left alone: dialogs own it.
+  const win = mainWin;
+  win.webContents.on('before-input-event', (e, input) => {
+    if (input.type !== 'keyDown' || input.key !== 'F11' || input.control || input.shift || input.alt || input.meta) return;
+    e.preventDefault();
+    if (!win.isDestroyed()) win.setFullScreen(!win.isFullScreen());
+  });
+  win.on('enter-full-screen', () => !win.isDestroyed() && win.webContents.send('window:fullscreen', true));
+  win.on('leave-full-screen', () => !win.isDestroyed() && win.webContents.send('window:fullscreen', false));
   mainWin.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) void shell.openExternal(url);
     return { action: 'deny' };

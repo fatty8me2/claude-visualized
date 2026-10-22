@@ -24,6 +24,8 @@ import { startSyncBridge } from './state/syncBridge';
 
 // lets CSS adapt to the window chrome (macOS traffic lights vs the Windows caption buttons)
 document.documentElement.dataset.platform = window.api.platform;
+// fullscreen (F11): the title bar drops the caption-button and macOS traffic-light space (theme.css)
+window.api.onFullscreen((on) => document.documentElement.classList.toggle('is-fullscreen', on));
 
 // settings sync: mirrors the allowlisted preferences to the main process (the mini window shares localStorage and needs none of this)
 if (!window.api.isMini) startSyncBridge();
