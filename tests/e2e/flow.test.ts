@@ -58,13 +58,12 @@ describe('graph flow (fixture data)', () => {
     await page.locator('[data-agent="a1"]').waitFor({ timeout: 20_000 });
     await page.waitForTimeout(1500);
     // opening the session played nothing
-    expect(await page.locator('.gf-spawn, .gf-ret, .gf-pulse').count()).toBe(0);
+    expect(await page.locator('.gf-fxs, .gf-fxr').count()).toBe(0);
     // every non-main card has an incoming edge, ending exactly at the card's top centre
     const geo = await page.evaluate(() => {
       const canvas = document.querySelector('.graph-canvas > div')!.getBoundingClientRect();
       const out: number[] = [];
-      for (const g of document.querySelectorAll('svg.gf .gf-edge')) {
-        const base = g.querySelector('.gf-base') as SVGPathElement;
+      for (const base of document.querySelectorAll<SVGPathElement>('svg.gf .gf-base')) {
         const len = base.getTotalLength();
         const end = base.getPointAtLength(len);
         const m = base.getScreenCTM()!;
@@ -104,12 +103,12 @@ describe('graph flow (fixture data)', () => {
       }) + '\n',
     );
     // the edge starts drawing the moment the agent shows up
-    await page.waitForFunction(() => document.querySelector('.gf-spawn'), undefined, { timeout: 10_000, polling: 16 });
+    await page.waitForFunction(() => document.querySelector('.gf-fxs'), undefined, { timeout: 10_000, polling: 16 });
     await page.waitForTimeout(150);
     await shot('2-spawn');
     await page.waitForTimeout(1600);
     await shot('3-running');
-    expect(await page.locator('.gf-running .gf-particles').count()).toBeGreaterThan(0);
+    expect(await page.locator('.gf-pk').count()).toBeGreaterThan(0);
 
     // finish it: a task notification in the main transcript
     const notif = '<task-notification>\n<task-id>a9</task-id>\n<status>completed</status>\n<summary>Agent "x" finished</summary>\n</task-notification>';
@@ -120,12 +119,12 @@ describe('graph flow (fixture data)', () => {
         JSON.stringify({ type: 'user', isSidechain: false, sessionId: SID, timestamp: ts(), message: { role: 'user', content: notif } }) +
         '\n',
     );
-    await page.waitForFunction(() => document.querySelector('.gf-ret'), undefined, { timeout: 10_000, polling: 16 });
+    await page.waitForFunction(() => document.querySelector('.gf-fxr'), undefined, { timeout: 10_000, polling: 16 });
     await page.waitForTimeout(300);
     await shot('4-return');
-    await page.waitForTimeout(2200);
+    await page.waitForTimeout(2600);
     await shot('5-settled');
-    expect(await page.locator('.gf-ret, .gf-pulse').count()).toBe(0);
+    expect(await page.locator('.gf-fxs, .gf-fxr').count()).toBe(0);
     expect(await page.locator('[data-agent="a9"] .status').innerText()).toContain('done');
 
     // hovering a card lights its path to the root

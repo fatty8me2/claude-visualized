@@ -1,6 +1,7 @@
-/* Connectors between agents: a calm tree of rounded lines, with work visibly flowing down running branches (see GraphEdges.tsx).
-   Colours: --fam is the child's model colour, --pfam the parent's. Lines are opaque (mixed into the background) so siblings that share
-   a trunk do not double up where their paths overlap. */
+/* Connectors between agents, drawn as a control-room conduit network (see GraphEdges.tsx). From the bottom up:
+   casing (dark trench) -> base line (always readable) -> shared glow layers (one blur filter per state) -> core (parent-to-child gradient)
+   -> focus layer -> junction hubs -> comet packets -> one-off spawn/return effects -> sockets.
+   --fam is the child's model colour, --pfam the parent's. Everything animated uses transform, opacity or stroke-dashoffset. */
 
 .pfam-opus {
   --pfam: var(--opus);
@@ -21,57 +22,85 @@
   --pfam: var(--other);
 }
 
-.gf .gf-base,
-.gf .gf-flow {
+.gf {
+  --gf-ink: color-mix(in srgb, var(--fam, var(--other)) 55%, white);
+  overflow: visible;
+}
+.gf .gf-l {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
-}
-.gf .gf-base {
-  stroke: color-mix(in srgb, var(--line-2) 70%, var(--bg));
-  stroke-width: 1.5px;
-  transition: stroke 0.7s ease;
-}
-.gf .gf-flow {
-  stroke-width: 2px;
-}
-.gf .gf-s0 {
-  stop-color: color-mix(in srgb, var(--pfam) 55%, var(--bg));
-}
-.gf .gf-s1 {
-  stop-color: color-mix(in srgb, var(--fam) 90%, white);
+  transition: opacity 0.2s ease;
 }
 
-/* running: the track is tinted and the gradient lights it up from parent colour to child colour */
-.gf .gf-running .gf-base {
-  stroke: color-mix(in srgb, var(--fam) 30%, var(--bg));
+/* ---- casing and base: readable on their own, whatever the state ---- */
+.gf .gf-casing {
+  stroke: rgba(3, 2, 8, 0.92);
+  stroke-width: 6px;
 }
-/* finished: calm, dim, solid */
-.gf .gf-done .gf-base {
-  stroke: color-mix(in srgb, var(--fam) 34%, var(--bg));
+.gf .gf-base {
+  stroke: color-mix(in srgb, var(--other) 58%, var(--bg));
+  stroke-width: 2px;
+  transition:
+    stroke 0.7s ease,
+    opacity 0.2s ease;
 }
-/* idle and quiet: barely there */
-.gf .gf-idle .gf-base,
-.gf .gf-quiet .gf-base {
-  stroke: color-mix(in srgb, var(--line-2) 45%, var(--bg));
-  stroke-width: 1.2px;
+.gf .gf-quiet {
+  stroke: color-mix(in srgb, var(--other) 46%, var(--bg));
 }
-.gf .gf-error .gf-base {
-  stroke: color-mix(in srgb, var(--err) 42%, var(--bg));
-  stroke-dasharray: 3px 6px;
+.gf .gf-done {
+  stroke: color-mix(in srgb, var(--fam) 66%, var(--bg));
 }
-/* needs you: amber, slowly breathing */
-.gf .gf-waiting .gf-base {
-  stroke: color-mix(in srgb, var(--warn) 28%, var(--bg));
+.gf .gf-running {
+  stroke: color-mix(in srgb, var(--fam) 45%, var(--bg));
 }
-.gf .gf-waiting .gf-flow {
+.gf .gf-waiting {
+  stroke: color-mix(in srgb, var(--warn) 50%, var(--bg));
+}
+.gf .gf-error {
+  stroke: color-mix(in srgb, var(--err) 88%, var(--bg));
+  stroke-dasharray: 7px 5px;
+}
+
+/* ---- energy conduit: glow layer (shared filter), then the core ---- */
+.gf .gf-glow {
+  stroke-width: 6px;
+  opacity: 0.5;
+}
+.gf .gf-core {
+  stroke-width: 2.6px;
+}
+.gf .gf-s0 {
+  stop-color: color-mix(in srgb, var(--pfam) 94%, white);
+}
+.gf .gf-s1 {
+  stop-color: color-mix(in srgb, var(--pfam) 35%, var(--fam));
+}
+.gf .gf-s2 {
+  stop-color: color-mix(in srgb, var(--fam) 90%, white);
+}
+.gf.calm .gf-glows {
+  display: none;
+}
+
+/* needs you: an amber conduit that breathes, with a beacon pulse travelling down it */
+.gf .gf-wglow {
   stroke: var(--warn);
+  stroke-width: 6px;
+  opacity: 0.8;
+}
+.gf .gf-core.gf-wait {
+  stroke: color-mix(in srgb, var(--warn) 90%, white);
+  stroke-width: 2.4px;
+  animation: gf-breathe-core 3.4s ease-in-out infinite;
+}
+.gf .gf-wglows {
   animation: gf-breathe 3.4s ease-in-out infinite;
 }
-.gf.calm .gf-waiting .gf-flow {
+.gf.calm .gf-core.gf-wait {
   animation: none;
-  opacity: 0.7;
+  opacity: 0.8;
 }
 @keyframes gf-breathe {
   0%,
@@ -79,51 +108,99 @@
     opacity: 0.25;
   }
   50% {
-    opacity: 0.95;
+    opacity: 1;
+  }
+}
+@keyframes gf-breathe-core {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
-/* result going home: the gradient lets go while the pulse travels up */
-.gf .gf-ret .gf-flow {
-  animation: gf-settle 0.9s ease-out forwards;
+/* ---- cooling after a result: the conduit lets go of its colour ---- */
+.gf .gf-cool {
+  animation: gf-cool 1.7s cubic-bezier(0.3, 0.1, 0.6, 1) both;
 }
-.gf .gf-ret.gf-error .gf-flow {
+@keyframes gf-cool {
+  0% {
+    opacity: 1;
+    stroke-width: 3.4px;
+  }
+  100% {
+    opacity: 0;
+    stroke-width: 2px;
+  }
+}
+/* failure: a red glitch across the line, which then settles to the red dashed base */
+.gf .gf-core.gf-glitch,
+.gf .gf-glow.gf-glitch {
   stroke: var(--err);
+  stroke-width: 3.2px;
+  animation: gf-glitch 0.85s steps(1) both;
 }
-@keyframes gf-settle {
-  from {
+.gf .gf-glow.gf-glitch {
+  stroke-width: 8px;
+}
+@keyframes gf-glitch {
+  0% {
+    transform: translate(0, 0);
     opacity: 1;
   }
-  to {
+  8% {
+    transform: translate(-3px, 0);
+    stroke-dasharray: 9px 4px;
+  }
+  16% {
+    transform: translate(4px, 1px);
+    stroke-dasharray: none;
+  }
+  24% {
+    transform: translate(-2px, -1px);
+    opacity: 0.4;
+  }
+  32% {
+    transform: translate(3px, 0);
+    opacity: 1;
+    stroke-dasharray: 3px 5px;
+  }
+  44% {
+    transform: translate(0, 0);
+    stroke-dasharray: none;
+  }
+  56% {
+    opacity: 0.35;
+  }
+  64% {
+    opacity: 1;
+    transform: translate(-2px, 0);
+  }
+  74% {
+    transform: translate(0, 0);
+    opacity: 0.7;
+  }
+  100% {
     opacity: 0;
+    transform: translate(0, 0);
   }
 }
 
-/* spawn: the edge draws itself from the parent. Dashes under non-scaling-stroke are measured on screen, so this uses the scaled stroke
-   (width compensated by --gf-s) and a normalised path length. */
-.gf .gf-spawn .gf-base,
-.gf .gf-spawn .gf-flow {
-  vector-effect: none;
-  stroke-width: calc(1.6px / var(--gf-s, 1));
-  stroke-dasharray: 1 1;
-  animation: gf-draw 0.5s cubic-bezier(0.25, 0.7, 0.3, 1) both;
+/* ---- spawn: the line fades up behind the arc ---- */
+.gf .gf-base.gf-spawn {
+  animation: gf-rise 0.5s ease-out both;
 }
-@keyframes gf-draw {
+.gf .gf-glow.gf-spawn,
+.gf .gf-core.gf-spawn {
+  animation: gf-rise 0.6s ease-out 0.35s both;
+}
+.gf .gf-packets > .gf-spawn {
+  animation: gf-rise 0.8s ease-in 0.8s both;
+}
+@keyframes gf-rise {
   from {
-    stroke-dashoffset: 1;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-.gf .gf-spawn .gf-particles {
-  animation: gf-fade 0.9s ease-in both;
-}
-@keyframes gf-fade {
-  from {
-    opacity: 0;
-  }
-  60% {
     opacity: 0;
   }
   to {
@@ -131,37 +208,27 @@
   }
 }
 
-/* particles */
-.gf-halo {
-  fill: var(--fam);
-  opacity: 0.22;
+/* ---- focus: the ancestry path lights up, the rest steps back ---- */
+.gf.focusing .gf-l:not(.hot),
+.gf.focusing .gf-sock:not(.hot),
+.gf.focusing .gf-hub:not(.hot) {
+  opacity: 0.26;
 }
-.gf-spark {
-  fill: color-mix(in srgb, var(--fam) 35%, white);
+.gf-hotlayer {
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.5));
 }
-.gf-pulse .gf-halo {
-  fill: color-mix(in srgb, var(--pfam) 50%, var(--fam));
-  opacity: 0.32;
-}
-.gf-pulse .gf-core {
-  fill: color-mix(in srgb, var(--fam) 25%, white);
-}
-.gf-pulse.err .gf-halo {
-  fill: var(--err);
-  opacity: 0.4;
-}
-.gf-pulse.err .gf-core {
-  fill: color-mix(in srgb, var(--err) 60%, white);
-}
-
-/* hovering a card: its incoming edge and the way up to the root */
 .gf-hot {
   fill: none;
-  stroke: color-mix(in srgb, var(--fam) 85%, white);
-  stroke-width: 2.4px;
+  stroke: color-mix(in srgb, var(--fam) 50%, white);
+  stroke-width: 3px;
   stroke-linecap: round;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
   animation: gf-fade-in 0.18s ease-out both;
+}
+.gf-hot.gf-hot-error {
+  stroke: color-mix(in srgb, var(--err) 80%, white);
+  stroke-dasharray: 7px 5px;
 }
 @keyframes gf-fade-in {
   from {
@@ -172,31 +239,299 @@
   }
 }
 
+/* ---- comet packets: a tapered trail of stacked dashes sharing one head ---- */
+.gf .gf-pk path,
+.gf .gf-fxs path,
+.gf .gf-fxr path {
+  vector-effect: none;
+  stroke-linecap: butt;
+}
+.gf .gf-pk {
+  opacity: 0.62;
+  transition: opacity 0.35s ease;
+}
+.gf .gf-pk.gf-tool {
+  opacity: 1;
+}
+.gf .pk-glow {
+  stroke: var(--fam);
+  stroke-width: calc(11px / var(--gf-s, 1));
+  opacity: 0.2;
+}
+.gf .pk-trail {
+  stroke: color-mix(in srgb, var(--fam) 80%, white);
+  stroke-width: calc(3.2px / var(--gf-s, 1));
+  opacity: 0.5;
+}
+.gf .pk-mid {
+  stroke: color-mix(in srgb, var(--fam) 55%, white);
+  stroke-width: calc(4.2px / var(--gf-s, 1));
+  opacity: 0.85;
+}
+.gf .pk-head {
+  stroke: color-mix(in srgb, var(--fam) 25%, white);
+  stroke-width: calc(5px / var(--gf-s, 1));
+}
+.gf .pk-tip {
+  stroke: #fff;
+  stroke-width: calc(6.4px / var(--gf-s, 1));
+}
+.gf .gf-tool .pk-glow {
+  stroke-width: calc(15px / var(--gf-s, 1));
+  opacity: 0.3;
+}
+.gf .gf-tool .pk-head {
+  stroke-width: calc(6px / var(--gf-s, 1));
+}
+.gf .gf-wait .pk-glow,
+.gf .gf-wait .pk-trail,
+.gf .gf-wait .pk-mid,
+.gf .gf-wait .pk-head {
+  stroke: color-mix(in srgb, var(--warn) 80%, white 10%);
+}
+.gf .gf-beacon {
+  opacity: 0.95;
+}
+.gf .gf-beacon .pk-glow {
+  stroke-width: calc(16px / var(--gf-s, 1));
+  opacity: 0.32;
+}
+.gf .gf-beacon .pk-mid {
+  stroke-width: calc(5px / var(--gf-s, 1));
+}
+
+/* ---- junction hubs ---- */
+.gf .gf-hub-dot {
+  fill: var(--bg);
+  stroke: color-mix(in srgb, var(--other) 70%, var(--bg));
+  stroke-width: 1.6px;
+  vector-effect: non-scaling-stroke;
+}
+.gf .gf-hub-halo {
+  fill: var(--fam);
+  opacity: 0;
+}
+.gf .gf-hub.on .gf-hub-dot {
+  fill: color-mix(in srgb, var(--fam) 40%, var(--bg));
+  stroke: var(--gf-ink);
+}
+.gf .gf-hub.on .gf-hub-halo {
+  opacity: 0.28;
+}
+.gf .gf-hub.wait .gf-hub-dot {
+  stroke: var(--warn);
+}
+.gf .gf-flash {
+  fill: color-mix(in srgb, var(--fam) 35%, white);
+}
+
+/* ---- sockets: ports where a line meets a card ---- */
+.gf .gf-sock-ring {
+  fill: var(--bg);
+  stroke: color-mix(in srgb, var(--other) 72%, var(--bg));
+  stroke-width: 1.6px;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 0.5s ease;
+}
+.gf .gf-sock-halo {
+  fill: var(--fam);
+  opacity: 0;
+}
+.gf .gf-sock-done .gf-sock-ring {
+  stroke: color-mix(in srgb, var(--fam) 75%, var(--bg));
+}
+.gf .gf-sock-running .gf-sock-ring {
+  stroke: var(--gf-ink);
+  fill: color-mix(in srgb, var(--fam) 35%, var(--bg));
+}
+.gf .gf-sock-running .gf-sock-halo {
+  opacity: 0.35;
+  animation: gf-sock 1.8s ease-in-out infinite;
+}
+.gf .gf-sock-waiting .gf-sock-ring {
+  stroke: var(--warn);
+}
+.gf .gf-sock-waiting .gf-sock-halo {
+  fill: var(--warn);
+  opacity: 0.3;
+  animation: gf-sock 3.4s ease-in-out infinite;
+}
+.gf .gf-sock-error .gf-sock-ring {
+  stroke: var(--err);
+}
+.gf.calm .gf-sock-halo {
+  animation: none;
+}
+@keyframes gf-sock {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ---- spawn arc ---- */
+.gf .fx-arc-halo {
+  stroke: var(--fam);
+  stroke-width: calc(10px / var(--gf-s, 1));
+  opacity: 0.4;
+}
+.gf .fx-arc-core {
+  stroke: color-mix(in srgb, var(--pfam) 30%, var(--gf-ink));
+  stroke-width: calc(3px / var(--gf-s, 1));
+}
+.gf .fx-spark-halo {
+  stroke: color-mix(in srgb, var(--fam) 60%, white);
+  stroke-width: calc(12px / var(--gf-s, 1));
+  opacity: 0.7;
+}
+.gf .fx-spark {
+  stroke: #fff;
+  stroke-width: calc(5px / var(--gf-s, 1));
+}
+.gf .fx-flash {
+  fill: #fff;
+  opacity: 0;
+  animation: gf-flash 0.5s ease-out forwards;
+}
+.gf .fx-burst {
+  fill: color-mix(in srgb, var(--fam) 30%, white);
+  opacity: 0;
+  animation: gf-burst 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes gf-draw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes gf-head {
+  from {
+    stroke-dashoffset: var(--l);
+  }
+  to {
+    stroke-dashoffset: calc(var(--l) - 100);
+  }
+}
+@keyframes gf-arcout {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes gf-flick {
+  0% {
+    opacity: 1;
+  }
+  15% {
+    opacity: 0.5;
+  }
+  27% {
+    opacity: 1;
+  }
+  43% {
+    opacity: 0.35;
+  }
+  55% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes gf-flash {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3);
+  }
+}
+@keyframes gf-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(0.2);
+  }
+}
+
+/* ---- return surge and ripple ---- */
+.gf .fx-surge-halo {
+  stroke: var(--fam);
+  stroke-width: calc(14px / var(--gf-s, 1));
+  opacity: 0.4;
+}
+.gf .fx-surge {
+  stroke: color-mix(in srgb, var(--fam) 45%, white);
+  stroke-width: calc(6px / var(--gf-s, 1));
+}
+.gf .fx-surge-head {
+  stroke: #fff;
+  stroke-width: calc(8px / var(--gf-s, 1));
+}
+.gf .gf-fxr.err .fx-surge-halo {
+  stroke: var(--err);
+}
+.gf .gf-fxr.err .fx-surge {
+  stroke: color-mix(in srgb, var(--err) 70%, white);
+}
+.gf .fx-ripple {
+  fill: none;
+  stroke: var(--gf-ink);
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  animation: gf-ripple 0.8s cubic-bezier(0.15, 0.6, 0.3, 1) forwards;
+}
+.gf .fx-ripple2 {
+  stroke-width: 1.2px;
+}
+.gf .gf-fxr.err .fx-ripple {
+  stroke: var(--err);
+}
+@keyframes gf-ripple {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(5);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .gf .gf-l,
   .gf .gf-base {
     transition: none;
   }
-  .gf .gf-spawn .gf-base,
-  .gf .gf-spawn .gf-flow {
-    vector-effect: non-scaling-stroke;
-    stroke-width: 1.6px;
-    stroke-dasharray: none;
-    animation: none;
-  }
-  .gf .gf-waiting .gf-flow {
-    animation: none;
-    opacity: 0.8;
-  }
-  .gf .gf-ret .gf-flow {
-    animation: none;
-  }
-  .gf .gf-spawn .gf-particles {
-    animation: none;
-  }
-  .gf-particles,
-  .gf-pulse {
+  .gf .gf-anim,
+  .gf .gf-fxl {
     display: none;
   }
+  .gf .gf-wglows,
+  .gf .gf-core.gf-wait,
+  .gf .gf-sock-halo {
+    animation: none;
+  }
+  .gf .gf-wglows {
+    opacity: 0.6;
+  }
+  .gf .gf-base.gf-spawn,
+  .gf .gf-glow.gf-spawn,
+  .gf .gf-core.gf-spawn,
+  .gf .gf-cool,
   .gf-hot {
     animation: none;
   }
