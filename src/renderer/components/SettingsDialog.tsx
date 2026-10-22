@@ -4,6 +4,7 @@ import { useDialogFocus } from '../state/dialogFocus';
 import { LocalModelsSettings } from './LocalModelsSettings';
 import { UpdatesSettings } from './UpdatesSettings';
 import type { AppConfigView, HookPreviewView, HookServerStatusView, HookStateView, SystemInfoView } from '@core/api';
+import '../dialogs.css';
 
 const STATE_TEXT: Record<string, [string, string]> = {
   installed: ['installed', 'ok'],
@@ -32,6 +33,14 @@ export function SettingsDialog({
   const [sys, setSys] = useState<SystemInfoView | null>(null);
   const [hotkey, setHotkey] = useState(config.miniHotkey);
   const [hotkeyMsg, setHotkeyMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // closing plays the scale+fade out first, then really closes (Escape, the close button and a click on the scrim all come here)
+  const [closing, setClosing] = useState(false);
+  const close = () => {
+    if (closing) return;
+    setClosing(true);
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    window.setTimeout(onClose, reduce ? 0 : 160);
+  };
 
   useEffect(() => {
     void window.api.getSystemInfo().then(setSys);
@@ -72,11 +81,19 @@ export function SettingsDialog({
   const st = hs ? STATE_TEXT[hs.state] : null;
 
   return (
-    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="dialog panel-raised" role="dialog" aria-modal="true" aria-labelledby="settings-title" ref={useDialogFocus(onClose)}>
+    <div className={`overlay dlg-overlay ${closing ? 'closing' : ''}`} onClick={(e) => e.target === e.currentTarget && close()}>
+      <div
+        className={`dialog panel-raised dlg ${closing ? 'closing' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        ref={useDialogFocus(close)}
+      >
         <div className="row dialog-head">
-          <h3 id="settings-title">Live hooks &amp; settings</h3>
-          <button className="btn-icon ghost" onClick={onClose} aria-label="close" title="Close (Esc)">
+          <h3 id="settings-title" className="dlg-title">
+            Live hooks &amp; settings
+          </h3>
+          <button className="btn-icon ghost" onClick={close} aria-label="close" title="Close (Esc)">
             <Icon name="close" />
           </button>
         </div>
@@ -158,7 +175,7 @@ export function SettingsDialog({
         )}
         {result && <p style={{ color: result.startsWith('Done') ? 'var(--ok)' : 'var(--err)' }}>{result}</p>}
 
-        <h3 style={{ marginTop: 8 }}>App</h3>
+        <h3 className="dlg-sec">App</h3>
         <label className="chk">
           <input type="checkbox" checked={config.notifyAttention} onChange={(e) => set({ notifyAttention: e.target.checked })} />
           Notify me when a session needs input (permission prompts — needs hooks)

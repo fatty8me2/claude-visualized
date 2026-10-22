@@ -6,6 +6,7 @@ import type { HookInstallState } from '@core/hooksConfig';
 import { useUsage, useConfig } from '../hooks';
 import { CopyButton } from './CopyButton';
 import { Icon } from './Icon';
+import '../dialogs.css';
 
 const CHECK_ICON = { ok: 'done', warn: 'warn', todo: 'idle' } as const;
 
@@ -59,7 +60,7 @@ export function Welcome({ onTour, onSkip, onOpenSettings }: { onTour: () => void
 
   return (
     <div className="overlay welcome-overlay" data-testid="welcome">
-      <div className="dialog welcome panel-raised" role="dialog" aria-modal="true" aria-label="Welcome" ref={useDialogFocus(onSkip)}>
+      <div className="dialog dlg welcome panel-raised" role="dialog" aria-modal="true" aria-label="Welcome" ref={useDialogFocus(onSkip)}>
         <div className="w-brand">
           <b>◆</b> CLAUDE VISUALIZED
         </div>
@@ -273,8 +274,11 @@ export function Tour({ onDone }: { onDone: () => void }) {
             skip
           </button>
         </div>
-        <div className="tc-title">{step.title}</div>
-        <div className="tc-text">{box ? step.text : (step.missing ?? step.text)}</div>
+        {/* keyed by step: the text eases in fresh on every step */}
+        <div className="tc-step" key={i}>
+          <div className="tc-title">{step.title}</div>
+          <div className="tc-text">{box ? step.text : (step.missing ?? step.text)}</div>
+        </div>
         <div className="tc-nav">
           <button onClick={back} disabled={i === 0} data-testid="tour-back">
             <Icon name="chevronLeft" size="xs" />
