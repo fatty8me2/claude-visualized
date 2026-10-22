@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { diffEdgeFx } from '@core/edgeFx';
-import { edgeLength, edgePath, trunkY } from '@core/edgePath';
+import { edgeLength, edgePath, trunkY, treeGeom, geomFromPoints } from '@core/edgePath';
 
 const m = (o: Record<string, string>) => new Map(Object.entries(o));
 
@@ -24,16 +24,21 @@ describe('diffEdgeFx', () => {
 });
 
 describe('edgePath', () => {
-  const g = { x1: 100, y1: 0, x2: 40, y2: 100, ty: 50 };
+  const g = treeGeom(100, 0, 40, 100, 50);
   it('is straight when aligned and rounded otherwise', () => {
-    expect(edgePath({ ...g, x2: 100 })).toBe('M 100 0 L 100 100');
+    expect(edgePath(treeGeom(100, 0, 100, 100, 50))).toBe('M 100 0 L 100 100');
     expect(edgePath(g)).toContain('Q');
     expect(edgePath(g, true).startsWith('M 40 100')).toBe(true);
-    expect(edgePath(g, true).endsWith('V 0')).toBe(true);
+    expect(edgePath(g, true).endsWith('L 100 0')).toBe(true);
   });
   it('length and trunk', () => {
     expect(edgeLength(g)).toBe(160);
     expect(trunkY(0, 70)).toBe(35);
     expect(trunkY(0, 500)).toBe(464);
+  });
+  it('routes through any orthogonal polyline and drops collinear points', () => {
+    const r = geomFromPoints([[0, 0], [0, 40], [0, 60], [80, 60], [80, 120]]);
+    expect(r.pts).toEqual([[0, 0], [0, 60], [80, 60], [80, 120]]);
+    expect(edgeLength(r)).toBe(200);
   });
 });

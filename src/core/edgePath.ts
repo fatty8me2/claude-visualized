@@ -1,37 +1,96 @@
-// Connector geometry for the agent graph: a shared trunk from the parent, then a branch to each child, with rounded corners.
+// Connector geometry for the agent graph. A connector is an orthogonal polyline from the parent's bottom centre
+// to the child's top centre (pts), drawn with rounded corners. Layout decides the route (e.g. through the gutters
+// between cards); everything that draws or animates edges only reads pts / the path helpers below.
+
+export type Pt = [number, number];
 
 export interface EdgeGeom {
-  /** parent bottom centre */
+  /** orthogonal route, parent bottom centre first, child top centre last */
+  pts: Pt[];
+  /** parent bottom centre (= pts[0]) */
   x1: number;
   y1: number;
-  /** child top centre */
+  /** child top centre (= last pt) */
   x2: number;
   y2: number;
-  /** y of the horizontal run, shared by siblings in a row */
-  ty: number;
 }
 
 const f = (n: number) => Math.round(n * 100) / 100;
 export const CORNER_R = 10;
 
-/** Orthogonal path from (sx,sy) to (ex,ey) whose horizontal run is at ty. Works in both directions (child -> parent for result pulses). */
-export function roundedPath(sx: number, sy: number, ex: number, ey: number, ty: number, r = CORNER_R): string {
-  const dx = ex - sx;
-  const v = Math.sign(ey - sy) || 1;
-  if (Math.abs(dx) < 1) return `M ${f(sx)} ${f(sy)} L ${f(ex)} ${f(ey)}`;
-  const h = Math.sign(dx);
-  const rr = Math.min(r, Math.abs(dx) / 2, Math.abs(ty - sy), Math.abs(ey - ty));
-  if (rr < 1) return `M ${f(sx)} ${f(sy)} L ${f(sx)} ${f(ty)} L ${f(ex)} ${f(ty)} L ${f(ex)} ${f(ey)}`;
-  return (
-    `M ${f(sx)} ${f(sy)} V ${f(ty - v * rr)} Q ${f(sx)} ${f(ty)} ${f(sx + h * rr)} ${f(ty)} ` +
-    `H ${f(ex - h * rr)} Q ${f(ex)} ${f(ty)} ${f(ex)} ${f(ty + v * rr)} V ${f(ey)}`
-  );
+export function geomFromPoints(pts: Pt[]): EdgeGeom {
+  const clean = dedupe(pts);
+  const a = clean[0];
+  const b = clean[clean.length - 1];
+  return { pts: clean, x1: a[0], y1: a[1], x2: b[0], y2: b[1] };
 }
 
-export const edgePath = (g: EdgeGeom, reverse = false) => (reverse ? roundedPath(g.x2, g.y2, g.x1, g.y1, g.ty) : roundedPath(g.x1, g.y1, g.x2, g.y2, g.ty));
+/** drop repeated and collinear middle points so corners are real corners */
+function dedupe(pts: Pt[]): Pt[] {
+  const out: Pt[] = [];
+  for (const p of pts) {
+    const last = out[out.length - 1];
+    if (last && Math.abs(last[0] - p[0]) < 0.01 && Math.abs(last[1] - p[1]) < 0.01) continue;
+    out.push(p);
+  }
+  for (let i = out.length - 2; i >= 1; i--) {
+    const [a, b, c] = [out[i - 1], out[i], out[i + 1]];
+    const sameX = Math.abs(a[0] - b[0]) < 0.01 && Math.abs(b[0] - c[0]) < 0.01;
+    const sameY = Math.abs(a[1] - b[1]) < 0.01 && Math.abs(b[1] - c[1]) < 0.01;
+    if (sameX || sameY) out.splice(i, 1);
+  }
+  return out;
+}
 
-/** Approximate length (corners cut a little), for constant particle speed. */
-export const edgeLength = (g: EdgeGeom) => Math.abs(g.y2 - g.y1) + Math.abs(g.x2 - g.x1);
+/** SVG path through orthogonal points with quadratic rounded corners (radius shrinks on short segments). */
+export function roundedPolyline(pts: Pt[], r = CORNER_R): string {
+  if (pts.length < 2) return '';
+  let d = `M ${f(pts[0][0])} ${f(pts[0][1])}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i - 1];
+    const [cx, cy] = pts[i];
+    const [nx, ny] = pts[i + 1];
+    const inLen = Math.hypot(cx - px, cy - py);
+    const outLen = Math.hypot(nx - cx, ny - cy);
+    const rr = Math.min(r, inLen / 2, outLen / 2);
+    if (rr < 1) {
+      d += ` L ${f(cx)} ${f(cy)}`;
+      continue;
+    }
+    const ax = cx - ((cx - px) / inLen) * rr;
+    const ay = cy - ((cy - py) / inLen) * rr;
+    const bx = cx + ((nx - cx) / outLen) * rr;
+    const by = cy + ((ny - cy) / outLen) * rr;
+    d += ` L ${f(ax)} ${f(ay)} Q ${f(cx)} ${f(cy)} ${f(bx)} ${f(by)}`;
+  }
+  const last = pts[pts.length - 1];
+  return d + ` L ${f(last[0])} ${f(last[1])}`;
+}
+
+/** Classic tree connector: down from the parent, across at height ty, down into the child. */
+export function treeGeom(sx: number, sy: number, ex: number, ey: number, ty: number): EdgeGeom {
+  return geomFromPoints([
+    [sx, sy],
+    [sx, ty],
+    [ex, ty],
+    [ex, ey],
+  ]);
+}
+
+/** Kept for callers that only need the classic three-segment shape. */
+export function roundedPath(sx: number, sy: number, ex: number, ey: number, ty: number, r = CORNER_R): string {
+  return roundedPolyline(treeGeom(sx, sy, ex, ey, ty).pts, r);
+}
+
+/** reverse = child -> parent (result pulses travel back up the same route) */
+export const edgePath = (g: EdgeGeom, reverse = false) => roundedPolyline(reverse ? [...g.pts].reverse() : g.pts);
+
+/** Route length (corners cut a little), for constant particle speed. */
+export function edgeLength(g: EdgeGeom): number {
+  let n = 0;
+  for (let i = 1; i < g.pts.length; i++) n += Math.abs(g.pts[i][0] - g.pts[i - 1][0]) + Math.abs(g.pts[i][1] - g.pts[i - 1][1]);
+  return n;
+}
 
 /** Trunk height for a child row: halfway down the gap above it (capped so deep grid rows keep the run near the children). */
 export function trunkY(parentBottom: number, childTop: number, maxDrop = 36): number {

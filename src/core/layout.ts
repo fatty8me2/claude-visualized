@@ -1,7 +1,8 @@
 // Tree layout for the agent graph: main on top, subagents below, nested by parent.
 // Leaf-only sibling groups wrap into a grid so a 20-agent workflow stays readable.
 
-import { edgePath, trunkY, type EdgeGeom } from './edgePath';
+import { edgePath, treeGeom, trunkY } from './edgePath';
+import type { EdgeGeom } from './edgePath';
 import { MAIN, type AgentNode } from './state';
 
 export interface LayoutNode {
@@ -194,7 +195,7 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
       const cx = c.x + c.w / 2;
       const cy = c.y;
       const st = statusOf(c.id);
-      const geom: EdgeGeom = { x1: px, y1: py, x2: cx, y2: cy, ty: trunkY(py, cy) };
+      const geom: EdgeGeom = treeGeom(px, py, cx, cy, trunkY(py, cy));
       edges.push({ from: b.id, to: c.id, d: edgePath(geom), active: st === 'running' || st === 'waiting', geom });
     };
     if (b.children.length === 0) return;
