@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import type { UsageView, UsageWindow } from '@core/usage';
 import { useNow, useUsage } from '../hooks';
 import { ago } from '../util';
+import '../chrome.css';
 
 const WINDOW_MS = { fiveHour: 5 * 3600_000, sevenDay: 7 * 24 * 3600_000 };
 /** until the poller reports its own cadence */
@@ -84,17 +85,36 @@ function Meter({
   ]
     .filter(Boolean)
     .join('\n');
+  const lvl = level(pct);
+  const lines = tip.split(String.fromCharCode(10));
   return (
-    <div className={`meter ${level(pct)} ${stale ? 'stale' : ''}`} title={tip}>
+    <div className={`meter ${lvl} ${stale ? 'stale' : ''}`} title={compact ? tip : undefined} data-src={w.source}>
+      {/* a fresh reading sweeps a sheen across the pill (re-keyed on every new reading) */}
+      <span className="m-tick" key={`t${w.at}`} aria-hidden />
       <span className="m-label">{label}</span>
-      <span className="m-bar">
+      <span className="m-bar" style={{ '--p': pct / 100 } as CSSProperties}>
         <i style={{ width: `${pct}%` }} />
         {elapsed !== null && <b style={{ left: `${elapsed}%` }} />}
       </span>
       <span className="m-pct">{pct}%</span>
       <span className="m-dot" key={w.at} data-testid="m-dot" />
-      {!compact && w.resetsAt && <span className="m-reset">resets {untilText(w.resetsAt, now)}</span>}
-      {!compact && stale && <span className="m-reset">· {ago(w.at, now)}</span>}
+      {!compact && w.resetsAt && (
+        <span className="m-reset">
+          resets <em>{untilText(w.resetsAt, now)}</em>
+        </span>
+      )}
+      {!compact && stale && <span className="m-reset m-age">· {ago(w.at, now)}</span>}
+      {!compact && (
+        <span className="m-pop" role="tooltip">
+          <b className="m-pop-h">
+            {lines[0]}
+            <em>{SOURCE[w.source]}</em>
+          </b>
+          {lines.slice(1).map((l, i) => (
+            <span key={i}>{l}</span>
+          ))}
+        </span>
+      )}
     </div>
   );
 }

@@ -2,8 +2,39 @@ import { MAIN, type SessionView } from '@core/state';
 import { formatTokens, modelLabel, toolLabel } from '@core/summarize';
 import type { HookServerStatusView } from '@core/api';
 import { estimateAgents, estimateTooltip, formatUSD } from '@core/pricing';
+import { useRef } from 'react';
 import { displayStatus } from '../util';
+import '../chrome.css';
 import { tokensByProvider } from '@core/localModels';
+
+/** A value whose changed characters roll in (one-shot CSS transform/opacity; no timers, no state). Text content stays the plain value. */
+function Roll({ v, className }: { v: string; className?: string }) {
+  const prev = useRef(v);
+  const was = prev.current;
+  prev.current = v;
+  return (
+    <b className={className}>
+      {Array.from(v).map((c, i) => (
+        <span key={`${i}:${c}`} className={was !== v && was[i] !== c ? 'rc roll' : undefined}>
+          {c}
+        </span>
+      ))}
+    </b>
+  );
+}
+
+/** One lamp per subagent (up to 10): running ones glow and breathe. */
+function Lamps({ agents, running }: { agents: number; running: number }) {
+  const n = Math.min(agents, 10);
+  if (n === 0) return null;
+  return (
+    <span className="sb-lamps" aria-hidden>
+      {Array.from({ length: n }, (_, i) => (
+        <i key={i} className={i < running ? 'on' : undefined} style={{ animationDelay: `${(i % 5) * 0.18}s` }} />
+      ))}
+    </span>
+  );
+}
 
 export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView; now: number; hookSrv: HookServerStatusView | null; replaying: boolean }) {
   const main = view.agents[MAIN];
@@ -17,15 +48,13 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
   const plan = view.mode === 'plan';
   const est = view.costUSD == null ? estimateAgents(view.agents) : null;
   return (
-    <div className="statusbar">
+    <div className="statusbar" data-testid="statusbar">
       <span>
         mode <b className={plan ? 'mode-plan' : 'mode-build'}>[{plan ? 'plan' : 'build'}]</b>
       </span>
-      <span>
-        subagents{' '}
-        <b>
-          [{running}/{subs.length}]
-        </b>
+      <span className={running > 0 ? 'sb-agents live' : 'sb-agents'}>
+        subagents <Lamps agents={subs.length} running={running} />
+        <Roll v={`[${running}/${subs.length}]`} />
       </span>
       <span className="sb-grow">
         {modelLabel(main?.model).toLowerCase()}{' '}
@@ -35,20 +64,20 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
         </b>
       </span>
       <span>
-        tokens <b>{formatTokens(t.in + t.out + t.cacheRead + t.cacheWrite)}</b>
+        tokens <Roll v={formatTokens(t.in + t.out + t.cacheRead + t.cacheWrite)} />
       </span>
       {split.localAgents > 0 && (
         <span title="Tokens served by local models: not counted against Anthropic limits">
-          local tokens <b className="local-num">{formatTokens(lt.in + lt.out + lt.cacheRead + lt.cacheWrite)}</b>
+          local tokens <Roll className="local-num" v={formatTokens(lt.in + lt.out + lt.cacheRead + lt.cacheWrite)} />
         </span>
       )}
       {view.costUSD != null ? (
         <span title="As reported by Claude Code">
-          cost <b>${view.costUSD.toFixed(2)}</b>
+          cost <Roll v={`$${view.costUSD.toFixed(2)}`} />
         </span>
       ) : est && est.usd > 0 ? (
         <span title={estimateTooltip(est)}>
-          cost est. <b>~{formatUSD(est.usd)}</b>
+          cost est. <Roll v={`~${formatUSD(est.usd)}`} />
         </span>
       ) : null}
       <span className="spacer" />

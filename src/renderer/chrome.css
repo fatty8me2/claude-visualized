@@ -1,0 +1,538 @@
+/* The command deck: title bar, usage gauges, status strip. Glass, energy edges, mono numbers.
+   Motion is transform / opacity only (a one-shot sheen per fresh reading, a heartbeat, a breathing glow, a gliding scan line, a digit roll);
+   nothing here runs per frame in React. prefers-reduced-motion freezes all of it (see the end). */
+
+/* ---------- title bar ---------- */
+.titlebar {
+  --act: var(--faint);
+  --act-b: var(--faint);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--act) 5%, transparent), transparent 70%),
+    linear-gradient(90deg, color-mix(in srgb, var(--opus) 4%, transparent), transparent 40%, color-mix(in srgb, var(--haiku) 4%, transparent)),
+    var(--bg-2);
+  overflow: visible;
+}
+.titlebar[data-activity='live'] {
+  --act: var(--ok);
+  --act-b: var(--haiku);
+}
+.titlebar[data-activity='busy'] {
+  --act: var(--opus);
+  --act-b: var(--sonnet);
+}
+.titlebar[data-activity='wait'] {
+  --act: var(--warn);
+  --act-b: var(--sonnet);
+}
+/* the activity line: a faint rule along the bottom edge with a glint that glides along it; busier means faster and brighter */
+.tb-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+.tb-scan::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--act) 18%, var(--act-b) 82%, transparent);
+  opacity: 0.12;
+  transition: opacity 0.6s;
+}
+.tb-scan::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 0;
+  width: 26%;
+  background: linear-gradient(90deg, transparent, var(--act-b), #fff 60%, transparent);
+  opacity: 0;
+  transform: translateX(-110%);
+}
+.titlebar[data-activity='live'] .tb-scan::before {
+  opacity: 0.35;
+}
+.titlebar[data-activity='busy'] .tb-scan::before,
+.titlebar[data-activity='wait'] .tb-scan::before {
+  opacity: 0.6;
+}
+.titlebar[data-activity='live'] .tb-scan::after {
+  opacity: 0.55;
+  animation: tb-glide 9s linear infinite;
+}
+.titlebar[data-activity='busy'] .tb-scan::after {
+  opacity: 0.85;
+  animation: tb-glide 3.2s linear infinite;
+}
+.titlebar[data-activity='wait'] .tb-scan::after {
+  opacity: 0.8;
+  animation: tb-glide 2.2s ease-in-out infinite;
+}
+@keyframes tb-glide {
+  to {
+    transform: translateX(480%);
+  }
+}
+.titlebar[data-activity='busy'] .brand-mark,
+.titlebar[data-activity='live'] .brand-mark {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--opus) 55%, transparent));
+}
+.tb-brand {
+  font-family: var(--font-ui);
+}
+
+/* live sessions with a heartbeat */
+.tb-live {
+  --hb: var(--ok);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 22px;
+  padding: 0 10px 0 9px;
+  border: 1px solid color-mix(in srgb, var(--hb) 32%, var(--line-2));
+  border-radius: 999px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--hb) 10%, transparent), transparent), color-mix(in srgb, var(--panel) 75%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+  flex: none;
+}
+.tb-live b {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0;
+  color: var(--hb);
+  font-weight: 700;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--hb) 50%, transparent);
+}
+.tb-live[data-state='busy'] {
+  --hb: var(--opus);
+}
+.tb-live[data-state='wait'] {
+  --hb: var(--warn);
+}
+.tb-beat {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hb);
+  flex: none;
+  animation: tb-beat 2.4s ease-in-out infinite;
+}
+.tb-beat::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--hb);
+  animation: tb-ring 2.4s ease-out infinite;
+}
+.tb-live[data-state='busy'] .tb-beat,
+.tb-live[data-state='busy'] .tb-beat::after {
+  animation-duration: 1.2s;
+}
+.tb-live[data-state='wait'] .tb-beat,
+.tb-live[data-state='wait'] .tb-beat::after {
+  animation-duration: 0.9s;
+}
+@keyframes tb-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  12% {
+    transform: scale(1.35);
+  }
+  24% {
+    transform: scale(0.95);
+  }
+  36% {
+    transform: scale(1.22);
+  }
+  50% {
+    transform: scale(1);
+  }
+}
+@keyframes tb-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  45%,
+  100% {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+
+/* ---------- usage gauges ---------- */
+.usage {
+  gap: 8px;
+}
+.usage .meter {
+  position: relative;
+  gap: 8px;
+  padding: 0 11px 0 10px;
+  height: 24px;
+  border-color: color-mix(in srgb, var(--lvl) 26%, var(--line-2));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--lvl) 9%, transparent), transparent 80%),
+    color-mix(in srgb, var(--panel) 78%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.3s;
+}
+.usage .meter:hover {
+  border-color: color-mix(in srgb, var(--lvl) 55%, var(--line-2));
+}
+/* warn and critical: a halo behind the pill breathes (opacity only) */
+.usage .meter.warn,
+.usage .meter.hot {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.usage .meter.hot {
+  border-color: color-mix(in srgb, var(--err) 60%, var(--line-2));
+}
+.usage .meter.warn::before,
+.usage .meter.hot::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    0 0 14px -3px var(--lvl),
+    inset 0 0 10px -4px var(--lvl);
+  opacity: 0.35;
+  animation: m-halo 3.2s ease-in-out infinite;
+}
+.usage .meter.hot::before {
+  opacity: 0.55;
+  animation-duration: 1.3s;
+}
+@keyframes m-halo {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+.usage .meter.stale::before {
+  animation: none;
+  opacity: 0;
+}
+.m-label {
+  font-family: var(--font-ui);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+}
+/* segmented energy cells: the track shows the empty cells, the fill is masked into the same grid */
+.usage .m-bar {
+  --cell: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px);
+  width: 96px;
+  height: 9px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--track) 90%, transparent) 0 4px, transparent 4px 6px);
+  overflow: visible;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--lvl) 55%, transparent));
+}
+.usage .m-bar > i {
+  border-radius: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--lvl) 45%, transparent), var(--lvl) 85%, color-mix(in srgb, var(--lvl) 60%, #fff));
+  -webkit-mask-image: var(--cell);
+  mask-image: var(--cell);
+}
+/* the window-elapsed marker: usage ahead of it means burning faster than the window refills */
+.usage .m-bar > b {
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+  opacity: 0.7;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+}
+.usage .m-pct {
+  min-width: 34px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 9px color-mix(in srgb, var(--lvl) 55%, transparent);
+}
+.usage .meter.empty .m-pct {
+  text-shadow: none;
+}
+.usage .meter.empty .m-bar {
+  filter: none;
+}
+.m-reset {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  color: var(--faint);
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+  line-height: 14px;
+}
+.m-reset em {
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.m-reset.m-age {
+  border-left: 0;
+  padding-left: 0;
+}
+/* a fresh reading: the pill is swept by a sheen, once */
+.m-tick {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.m-tick::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 36%;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--lvl) 45%, transparent), transparent);
+  opacity: 0;
+  animation: m-sweep 1.3s ease-out 1;
+}
+.meter.stale .m-tick::after {
+  animation: none;
+}
+@keyframes m-sweep {
+  0% {
+    opacity: 0.9;
+    transform: translateX(-110%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(300%);
+  }
+}
+.usage .m-dot {
+  width: 5px;
+  height: 5px;
+  opacity: 0.6;
+  box-shadow: 0 0 6px var(--lvl);
+}
+/* hover card: what the reading is, where it came from, how old it is */
+.m-pop {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 80;
+  width: 292px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 12px 10px;
+  border: 1px solid color-mix(in srgb, var(--lvl) 40%, var(--line-2));
+  border-radius: 8px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lvl) 8%, transparent), transparent 50px), color-mix(in srgb, var(--panel) 94%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  backdrop-filter: blur(10px) saturate(1.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 28px -8px rgba(0, 0, 0, 0.85);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: normal;
+  text-align: left;
+  letter-spacing: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition:
+    opacity 0.14s,
+    transform 0.14s;
+}
+.meter:hover .m-pop {
+  opacity: 1;
+  transform: none;
+}
+.m-pop-h {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: var(--text);
+  font-weight: 700;
+  margin-bottom: 3px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+}
+.m-pop-h em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 10.5px;
+  color: var(--lvl);
+}
+.m-note {
+  font-family: var(--font-ui);
+}
+
+/* ---------- status strip ---------- */
+.statusbar {
+  position: relative;
+  gap: 0;
+  padding: 0 var(--gutter);
+  align-items: stretch;
+  line-height: 24px;
+  font-family: var(--font-mono);
+  background:
+    linear-gradient(0deg, color-mix(in srgb, var(--opus) 4%, transparent), transparent),
+    var(--bg-2);
+}
+/* a hairline of energy along the top edge */
+.statusbar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--opus) 45%, transparent) 20%, color-mix(in srgb, var(--haiku) 45%, transparent) 80%, transparent);
+  opacity: 0.45;
+}
+.statusbar > span:not(.spacer) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-left: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+.statusbar > span:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.statusbar > span:last-child {
+  padding-right: 0;
+}
+.statusbar > .sb-grow {
+  display: block;
+}
+.statusbar b {
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--text) 18%, transparent);
+}
+.statusbar b.mode-plan,
+.statusbar b.mode-build {
+  padding: 0 7px;
+  line-height: 17px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+  background: color-mix(in srgb, currentColor 11%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, currentColor 45%, transparent);
+}
+.statusbar b.ok {
+  text-shadow: 0 0 9px color-mix(in srgb, var(--ok) 55%, transparent);
+}
+.statusbar .local-num {
+  color: var(--peer, var(--haiku));
+}
+.sb-agents.live b {
+  color: var(--run);
+  text-shadow: 0 0 9px color-mix(in srgb, var(--run) 55%, transparent);
+}
+/* one lamp per subagent; running ones glow and breathe */
+.sb-lamps {
+  display: inline-flex;
+  gap: 2px;
+}
+.sb-lamps i {
+  width: 4px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--track);
+  border: 1px solid color-mix(in srgb, var(--line-2) 80%, transparent);
+  box-sizing: border-box;
+}
+.sb-lamps i.on {
+  background: var(--run);
+  border-color: var(--run);
+  box-shadow: 0 0 6px var(--run);
+  animation: sb-lamp 1.6s ease-in-out infinite;
+}
+@keyframes sb-lamp {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* a changed digit rolls up into place and flashes once */
+.statusbar .rc {
+  display: inline-block;
+  white-space: pre;
+}
+.statusbar .rc.roll {
+  animation: sb-roll 0.55s cubic-bezier(0.2, 0.8, 0.3, 1) 1;
+}
+@keyframes sb-roll {
+  0% {
+    transform: translateY(70%);
+    opacity: 0;
+    color: var(--sonnet);
+  }
+  60% {
+    opacity: 1;
+    color: var(--sonnet);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@media (max-width: 1150px) {
+  .usage .m-bar {
+    width: 64px;
+  }
+}
+@media (max-width: 980px) {
+  .tb-live > span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-scan::after,
+  .tb-beat,
+  .tb-beat::after,
+  .usage .meter::before,
+  .m-tick::after,
+  .sb-lamps i.on,
+  .statusbar .rc.roll,
+  .m-pop {
+    animation: none;
+    transition: none;
+  }
+  .tb-beat::after {
+    opacity: 0;
+  }
+  .usage .meter.warn::before,
+  .usage .meter.hot::before {
+    opacity: 0.55;
+  }
+}
