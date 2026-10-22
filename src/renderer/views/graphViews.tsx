@@ -50,6 +50,7 @@ export const GRAPH_VIEWS: readonly GraphViewDef[] = [
         highlight={c.highlight}
         onHoverAgent={c.onHoverAgent}
         extraTools={c.extraTools}
+        replaying={c.replaying}
       />
     ),
   },

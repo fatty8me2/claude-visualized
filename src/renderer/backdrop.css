@@ -1,0 +1,22 @@
+/* The graph backdrop: a zero-size sticky anchor at the top-left of the scrolling graph panel holds a canvas the size of the visible area,
+   so it stays put while the content pans and sits under the connectors and cards (they come later in the DOM and are positioned). */
+.gb-anchor {
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.gb-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  pointer-events: none;
+}
+/* the canvas draws the grid in the main graph; overview panels keep the cheap static CSS dots */
+.graph-wrap.has-backdrop {
+  background-image: none;
+}
