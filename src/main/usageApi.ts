@@ -12,9 +12,11 @@ import { claudeHome } from './paths';
  */
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
+/** test hook: a fake usage server (the access token is still only ever sent to the URL configured here) */
+const usageUrl = () => process.env.CLAUDE_VIS_USAGE_URL || USAGE_URL;
 
 export type UsageApiResult =
-  { ok: true; body: Record<string, unknown> } | { ok: false; state: 'no-login' | 'expired' | 'error'; message: string; retryAfterMs?: number };
+  { ok: true; body: Record<string, unknown> } | { ok: false; state: 'no-login' | 'expired' | 'error'; message: string; rateLimited?: boolean; retryAfterMs?: number };
 
 interface Login {
   token: string;
@@ -66,7 +68,7 @@ export async function fetchUsage(retried = false): Promise<UsageApiResult> {
     };
   }
   try {
-    const res = await fetch(USAGE_URL, {
+    const res = await fetch(usageUrl(), {
       headers: { Authorization: `Bearer ${login.token}`, 'anthropic-beta': 'oauth-2025-04-20', 'content-type': 'application/json' },
       signal: AbortSignal.timeout(10_000),
     });
@@ -76,12 +78,15 @@ export async function fetchUsage(retried = false): Promise<UsageApiResult> {
       return { ok: false, state: 'expired', message: DEAD_LOGIN };
     }
     if (res.status === 429) {
-      const ra = Number(res.headers.get('retry-after'));
+      // Retry-After is seconds (or an HTTP date). The real endpoint often answers `0`, which says nothing; the scheduler then backs off by itself.
+      const h = res.headers.get('retry-after');
+      const secs = h === null ? NaN : /^\d+(\.\d+)?$/.test(h.trim()) ? Number(h) : (Date.parse(h) - Date.now()) / 1000;
       return {
         ok: false,
         state: 'error',
+        rateLimited: true,
         message: 'Usage API is rate limiting; will retry.',
-        retryAfterMs: Number.isFinite(ra) && ra > 0 ? ra * 1000 : 10 * 60_000,
+        retryAfterMs: Number.isFinite(secs) && secs > 0 ? Math.min(secs, 3600) * 1000 : undefined,
       };
     }
     if (!res.ok) return { ok: false, state: 'error', message: `Usage API answered ${res.status}.` };

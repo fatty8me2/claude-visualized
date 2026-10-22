@@ -150,7 +150,8 @@ export interface VisApi {
   /** the user's Claude Code default model alias from settings.json (e.g. "opus[1m]") */
   claudeModelSetting(): Promise<string | null>;
   getUsage(): Promise<UsageView>;
-  refreshUsage(): Promise<void>;
+  /** read the usage API now; `ran: false` when it is too soon or a Retry-After is pending (`nextAllowedAt`, epoch ms) */
+  refreshUsage(): Promise<{ ran: boolean; nextAllowedAt: number | null }>;
   onUsage(cb: (u: UsageView) => void): () => void;
   /** history index (local SQLite built from the transcripts) */
   historyStatus(): Promise<HistoryStatus>;

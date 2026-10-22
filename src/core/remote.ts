@@ -3,7 +3,7 @@
 
 import { compareItems, type InboxItem } from './inbox';
 import type { SessionSummary, SessionView } from './state';
-import type { UsageView, UsageWindow } from './usage';
+import { resolveWindow, type UsageView } from './usage';
 
 export const REMOTE_PREFIX = 'remote:';
 
@@ -96,11 +96,7 @@ export function mergeInbox(local: readonly InboxItem[], remotes: readonly Remote
   return out.sort(compareItems);
 }
 
-function fresher<T extends UsageWindow>(a: T | null | undefined, b: T | null | undefined): T | null {
-  if (!a) return b ?? null;
-  if (!b) return a;
-  return b.at > a.at ? b : a;
-}
+const fresher = resolveWindow;
 
 /**
  * Usage meters across machines (one account): each window takes the freshest reading from any machine, and the API state shows "ok"

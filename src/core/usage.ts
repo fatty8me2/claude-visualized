@@ -12,6 +12,8 @@ export interface UsageWindow {
   /** epoch ms of the reading */
   at: number;
   source: 'statusline' | 'transcript' | 'api';
+  /** the window rolled over and no reading of the new one has arrived yet: 0% is inferred, not read */
+  inferred?: boolean;
 }
 
 export interface SpendWindow extends UsageWindow {
@@ -28,8 +30,28 @@ export interface UsageView {
   statuslineAt: number | null;
   /** per-model weekly windows from the usage API (e.g. "Opus", "Sonnet") */
   models?: { label: string; window: UsageWindow }[];
-  /** state of the usage API poller */
-  api?: { state: 'ok' | 'no-login' | 'expired' | 'error'; message: string; at: number };
+  /** state of the usage API poller; `intervalMs`/`nextAt`/`blockedUntil` come from the scheduler (core/usageScheduler.ts) */
+  api?: { state: 'ok' | 'no-login' | 'expired' | 'error'; message: string; at: number; intervalMs?: number; nextAt?: number | null; blockedUntil?: number | null };
+}
+
+/** Two readings of one window are the same window when their reset times agree within a minute (sources round differently). */
+const SAME_WINDOW_MS = 60_000;
+
+/**
+ * The reading to keep when two sources report the same window. Rules:
+ *  - a reading of a later window (later resets_at) beats an earlier window, whatever its timestamp
+ *  - within one window usage only grows, so a lower percentage from an older reading (an idle terminal re-sending the numbers of its
+ *    last response) never pulls a newer, higher one down; the percentage is the max of the two and the timestamp the newer one
+ *  - otherwise (unknown reset time, or a window that just started) the newer reading wins, compared on the reading's own `at`
+ */
+export function resolveWindow<T extends UsageWindow>(cur: T | null | undefined, cand: T | null | undefined): T | null {
+  if (!cur) return cand ?? null;
+  if (!cand) return cur;
+  if (cur.resetsAt && cand.resetsAt && Math.abs(cur.resetsAt - cand.resetsAt) > SAME_WINDOW_MS) return cand.resetsAt > cur.resetsAt ? cand : cur;
+  const newer = cand.at >= cur.at ? cand : cur;
+  const older = newer === cand ? cur : cand;
+  if (older.pct > newer.pct && newer.resetsAt && older.resetsAt && !newer.inferred) return { ...newer, pct: older.pct };
+  return newer;
 }
 
 export const emptyUsage = (): UsageView => ({ fiveHour: null, sevenDay: null, spend: null, statuslineAt: null });
@@ -51,17 +73,17 @@ export function applyStatusline(u: UsageView, payload: Json, now: number): Usage
   const next: UsageView = { ...u, statuslineAt: now };
   const f = win(rl.five_hour, now);
   const s = win(rl.seven_day, now);
-  if (f) next.fiveHour = f;
-  if (s) next.sevenDay = s;
+  if (f) next.fiveHour = resolveWindow(u.fiveHour, f);
+  if (s) next.sevenDay = resolveWindow(u.sevenDay, s);
   const sp = rl.spend_limit as Json | undefined;
   const spw = win(sp, now);
   if (spw) {
-    next.spend = {
+    next.spend = resolveWindow(u.spend, {
       ...spw,
       usedUsd: typeof sp!.used_usd === 'number' ? sp!.used_usd : null,
       limitUsd: typeof sp!.limit_usd === 'number' ? sp!.limit_usd : null,
       period: typeof sp!.period === 'string' ? sp!.period : null,
-    };
+    });
   }
   return next;
 }
@@ -74,7 +96,7 @@ export function applyQuota(u: UsageView, q: { limitType: string; status: string;
   if (!key) return u;
   const cur = u[key];
   if (cur && cur.at >= q.ts) return u;
-  return { ...u, [key]: { pct: 100, resetsAt: q.resetsAt, at: q.ts, source: 'transcript' } };
+  return { ...u, [key]: resolveWindow(cur, { pct: 100, resetsAt: q.resetsAt, at: q.ts, source: 'transcript' }) };
 }
 
 /**
@@ -85,7 +107,8 @@ export function settleUsage(u: UsageView, now: number): UsageView {
   const fix = <T extends UsageWindow>(w: T | null): T | null => {
     if (!w) return w;
     if (w.source === 'transcript' && (!w.resetsAt || w.resetsAt <= now)) return null;
-    return w.resetsAt && w.resetsAt <= now ? { ...w, pct: 0, resetsAt: null, at: now } : w;
+    // the new window starts at 0% at the moment of the reset; that moment (not "now") is when we last knew anything about it
+    return w.resetsAt && w.resetsAt <= now ? { ...w, pct: 0, resetsAt: null, at: w.resetsAt, inferred: true } : w;
   };
   return { ...u, fiveHour: fix(u.fiveHour), sevenDay: fix(u.sevenDay), spend: fix(u.spend) };
 }
@@ -107,14 +130,18 @@ function apiWin(w: Json | undefined, now: number): UsageWindow | null {
   return { pct: Math.max(0, Math.min(100, raw)), resetsAt: toMs(w.resets_at), at: now, source: 'api' };
 }
 
-/** Merge a response from Anthropic's OAuth usage endpoint (what Claude Code's /usage shows). */
+/**
+ * Merge a response from Anthropic's OAuth usage endpoint (what Claude Code's /usage shows). `now` is when the answer arrived; it is
+ * the reading's timestamp, so a status-line reading that landed meanwhile and is newer is kept. When the API is the newer reading an
+ * absent window means no limit applies right now.
+ */
 export function applyUsageApi(u: UsageView, body: Json, now: number): UsageView {
   const next: UsageView = { ...u, api: { state: 'ok', message: 'usage API', at: now } };
   const f = apiWin(body?.five_hour, now);
   const s = apiWin(body?.seven_day, now);
-  // the API is authoritative when it answers: an absent window means no limit applies right now
-  next.fiveHour = f;
-  next.sevenDay = s;
+  const take = (cur: UsageWindow | null, w: UsageWindow | null) => (w ? resolveWindow(cur, w) : cur && cur.at > now ? cur : null);
+  next.fiveHour = take(u.fiveHour, f);
+  next.sevenDay = take(u.sevenDay, s);
   const models: { label: string; window: UsageWindow }[] = [];
   for (const [k, v] of Object.entries(body ?? {})) {
     const m = /^seven_day_(\w+)$/.exec(k);
