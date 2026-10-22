@@ -52,6 +52,14 @@ export function TokenBars({ groups, by, all }: { groups: GroupRow[]; by: 'day' |
   return (
     <div ref={ref} className="hist-chart" data-testid="history-chart">
       <svg width={w} height={H} role="img" aria-label={`Tokens per ${by} by model family`}>
+        <defs>
+          {FAMILIES.map((f) => (
+            <linearGradient key={f} id={`hist-grad-${f}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" style={{ stopColor: familyColor(f) }} stopOpacity={1} />
+              <stop offset="1" style={{ stopColor: familyColor(f) }} stopOpacity={0.42} />
+            </linearGradient>
+          ))}
+        </defs>
         {ticks.map((t) => (
           <g key={t}>
             <line x1={M.left} x2={w - M.right} y1={y(t)} y2={y(t)} className={t === 0 ? 'hist-axis' : 'hist-grid'} />
@@ -64,7 +72,13 @@ export function TokenBars({ groups, by, all }: { groups: GroupRow[]; by: 'day' |
           let acc = 0;
           const x = M.left + i * step + (step - bw) / 2;
           return (
-            <g key={g.key} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} data-day={g.key}>
+            <g
+              key={g.key}
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+              data-day={g.key}
+              style={{ '--i': i } as React.CSSProperties}
+            >
               <rect x={M.left + i * step} y={M.top} width={step} height={ih} fill="transparent" />
               {FAMILIES.map((f) => {
                 const v = series(g)[f] ?? 0;
@@ -73,7 +87,7 @@ export function TokenBars({ groups, by, all }: { groups: GroupRow[]; by: 'day' |
                 const hgt = Math.max(1, y(acc) - y1);
                 acc += v;
                 return (
-                  <rect key={f} x={x} y={y1} width={bw} height={hgt} fill={familyColor(f)} opacity={hover == null || hover === i ? 1 : 0.55} data-family={f} />
+                  <rect key={f} x={x} y={y1} width={bw} height={hgt} fill={`url(#hist-grad-${f})`} opacity={hover == null || hover === i ? 1 : 0.55} data-family={f} />
                 );
               })}
               {i % every === 0 && (
@@ -161,7 +175,12 @@ export function Heatmap({ grid }: { grid: number[][] }) {
                 height={ch - 2}
                 rx={2}
                 className="hist-cell"
-                style={v > 0 ? { fill: `color-mix(in srgb, var(--opus) ${Math.round(12 + 88 * (v / max))}%, var(--panel-2))` } : undefined}
+                style={
+                  {
+                    ...(v > 0 ? { fill: `color-mix(in srgb, var(--opus) ${Math.round(12 + 88 * (v / max))}%, var(--panel-2))` } : {}),
+                    '--i': d * 24 + hr,
+                  } as React.CSSProperties
+                }
                 data-v={v}
               >
                 <title>{`${DAYS[d]} ${String(hr).padStart(2, '0')}:00 - ${v} message${v === 1 ? '' : 's'}`}</title>
@@ -196,7 +215,7 @@ export function BarList({
         <div key={r.key} className="hist-bar-row" title={r.title}>
           <span className="hist-bar-label">{r.label}</span>
           <span className="hist-bar-track">
-            <i style={{ width: `${Math.max(1.5, (r.value / max) * 100)}%`, background: r.color ?? color ?? 'var(--opus)' }} />
+            <i style={{ width: `${Math.max(1.5, (r.value / max) * 100)}%`, ['--c' as string]: r.color ?? color ?? 'var(--opus)' } as React.CSSProperties} />
           </span>
           <span className="hist-bar-val">{fmt(r.value)}</span>
         </div>

@@ -31,7 +31,7 @@ const KIND_LABEL: Record<InboxKind, string> = {
 function Row({ item, now, onShow }: { item: InboxItem; now: number; onShow: (sessionId: string, agentId: string | null) => void }) {
   return (
     <div
-      className={`inbox-item sev-${item.severity} ${item.resolved ? 'resolved' : ''}`}
+      className={`inbox-item sev-${item.severity} kind-${item.kind} ${item.resolved ? 'resolved' : ''}`}
       data-testid="inbox-item"
       data-kind={item.kind}
       data-resolved={item.resolved}

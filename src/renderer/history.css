@@ -1,4 +1,5 @@
-/* History page: KPI tiles, SVG charts and search results in the app's dark terminal style */
+/* History page: glass stat tiles, SVG charts with gradient fills and a draw-in on mount, and search results as glass cards.
+   Motion is transform / opacity only, and every animation sits behind prefers-reduced-motion: no-preference. */
 .page {
   display: flex;
   flex-direction: column;
@@ -23,12 +24,28 @@
   padding: 0 8px;
   font-size: var(--fs-xs);
 }
+
+/* search: a glass field whose focus ring glows in the Opus colour */
 .hist-search {
   flex: 1 1 280px;
   min-width: 200px;
   max-width: 560px;
   margin-left: auto;
+  border-radius: var(--r-2);
+  transition:
+    box-shadow var(--dur-2) var(--ease-out),
+    background-color var(--dur-2);
 }
+.hist-search:focus-within {
+  box-shadow:
+    0 0 0 1px var(--focus),
+    0 0 22px -4px color-mix(in srgb, var(--opus) 55%, transparent);
+}
+.hist-search > input {
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  font-family: var(--font-ui);
+}
+
 .hist-status {
   display: flex;
   align-items: center;
@@ -44,6 +61,7 @@
 }
 .hist-ok {
   color: var(--ok);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--ok) 70%, transparent);
 }
 .hist-err {
   color: var(--err);
@@ -64,51 +82,115 @@
 .hist-progress i {
   display: block;
   height: 100%;
-  background: var(--opus);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--opus) 50%, transparent), var(--opus));
+  box-shadow: 0 0 10px -1px var(--opus);
   transition: width 0.2s;
 }
+
+/* empty states: a slow radar glyph above the line of text */
 .hist-empty {
   border: 1px dashed var(--line-2);
   border-radius: var(--r-3);
   padding: 28px;
   text-align: center;
   color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+}
+.hist-empty::before {
+  content: '';
+  display: block;
+  position: relative;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--opus) 45%, transparent);
+  background: radial-gradient(circle, color-mix(in srgb, var(--opus) 35%, transparent) 0 3px, transparent 4px);
+  box-shadow: 0 0 18px -4px color-mix(in srgb, var(--opus) 50%, transparent);
 }
 .hist-empty-line {
   color: var(--faint);
   padding: 4px 0;
 }
+
+/* stat tiles: glass with a coloured hairline and a mono figure */
 .hist-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 10px;
 }
 .hist-kpi {
-  background: var(--panel);
+  --acc: var(--opus);
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--acc) 9%, transparent), transparent 60%),
+    color-mix(in srgb, var(--panel) 82%, transparent);
   border: 1px solid var(--line);
+  border-top: 1px solid color-mix(in srgb, var(--acc) 45%, var(--line));
   border-radius: var(--r-3);
   padding: 10px 14px 12px;
   min-width: 0;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 2px 12px -8px rgb(0 0 0 / 0.8);
+  transition:
+    transform var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out);
+}
+.hist-kpi:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 8px 22px -10px color-mix(in srgb, var(--acc) 50%, transparent);
+}
+.hist-kpi[data-kpi='tokens'] {
+  --acc: var(--opus);
+}
+.hist-kpi[data-kpi='cost'] {
+  --acc: var(--ok);
+}
+.hist-kpi[data-kpi='sessions'] {
+  --acc: var(--haiku);
+}
+.hist-kpi[data-kpi='agents'] {
+  --acc: var(--sonnet);
+}
+.hist-kpi[data-kpi='days'] {
+  --acc: var(--other);
+}
+.hist-kpi-label {
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
 }
 .hist-kpi-value {
+  font-family: var(--font-mono);
   font-size: var(--fs-2xl);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   line-height: 1.25;
   margin-top: 4px;
   color: var(--text);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--acc) 35%, transparent);
 }
 .hist-kpi-sub {
   color: var(--muted);
   font-size: var(--fs-2xs);
   margin-top: 2px;
 }
+
 .hist-panel {
-  background: var(--panel);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
   border: 1px solid var(--line);
   border-radius: var(--r-3);
   padding: 12px 16px 14px;
   min-width: 0;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.03),
+    0 2px 14px -10px rgb(0 0 0 / 0.8);
 }
 .hist-panel h4 {
   margin: 0 0 10px;
@@ -150,10 +232,13 @@
 }
 .hist-tick {
   fill: var(--muted);
+  font-family: var(--font-mono);
   font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 .hist-axis-title {
   fill: var(--faint);
+  font-family: var(--font-mono);
   font-size: 10px;
 }
 .hist-cell {
@@ -164,13 +249,14 @@
   top: 8px;
   z-index: 3;
   pointer-events: none;
-  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
   border: 1px solid var(--line-2);
-  border-radius: 4px;
+  border-radius: var(--r-2);
   padding: 6px 9px;
   font-size: 11px;
   min-width: 150px;
   box-shadow: var(--shadow-2);
+  backdrop-filter: blur(6px);
 }
 .hist-tip i {
   display: inline-block;
@@ -182,11 +268,14 @@
 .hist-tip b {
   float: right;
   margin-left: 12px;
+  font-family: var(--font-mono);
+  font-weight: 500;
 }
 .hist-tip > b:first-child {
   float: none;
   display: block;
   margin: 0 0 3px;
+  font-family: var(--font-ui);
 }
 .hist-tip-sub {
   color: var(--muted);
@@ -206,16 +295,17 @@
   height: 9px;
   border-radius: 2px;
   margin-right: 5px;
+  box-shadow: 0 0 8px -1px currentColor;
 }
 .hist-legend .local-tag {
   margin-left: -2px;
 }
 
-/* bar lists */
+/* bar lists: a gradient that fades in from the left, with a soft glow at the leading edge */
 .hist-bars {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 .hist-bar-row {
   display: grid;
@@ -223,6 +313,8 @@
   align-items: center;
   gap: 8px;
   font-size: 11.5px;
+  padding: 1px 0;
+  border-radius: var(--r-1);
 }
 .hist-bar-label {
   display: flex;
@@ -243,44 +335,73 @@
 }
 .hist-bar-track {
   height: 9px;
-  background: var(--panel-2);
+  background: var(--track);
   border-radius: 2px;
   overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.03);
 }
 .hist-bar-track i {
   display: block;
   height: 100%;
   border-radius: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c, var(--opus)) 35%, transparent), var(--c, var(--opus)));
+  box-shadow: 0 0 12px -2px var(--c, var(--opus));
+  transform-origin: left center;
 }
 .hist-bar-val {
   text-align: right;
   color: var(--text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 .hist-foot {
   color: var(--faint);
   font-size: 10.5px;
 }
 
-/* search results */
+/* search results: glass cards with a kind-coloured edge */
 .hist-results {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   max-height: 46vh;
   overflow-y: auto;
 }
 .hist-hit {
+  --acc: var(--line-2);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: stretch;
+  gap: 3px;
+  width: 100%;
   text-align: left;
-  background: var(--bg-2);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--acc) 8%, transparent), transparent 40%),
+    color-mix(in srgb, var(--panel) 80%, transparent);
   border: 1px solid var(--line);
+  border-left: 3px solid var(--acc);
   border-radius: var(--r-2);
-  padding: 6px 10px;
+  padding: 7px 11px 8px 12px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+  transition:
+    border-color var(--dur-2),
+    box-shadow var(--dur-2),
+    transform var(--dur-1) var(--ease-out);
 }
 .hist-hit:hover {
-  border-color: var(--opus);
+  border-color: color-mix(in srgb, var(--acc) 55%, var(--line));
+  border-left-color: var(--acc);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--acc) 60%, transparent);
+}
+.hist-hit.kind-prompt {
+  --acc: var(--opus);
+}
+.hist-hit.kind-tool {
+  --acc: var(--haiku);
+}
+.hist-hit.kind-assistant {
+  --acc: var(--sonnet);
 }
 .hist-hit-head {
   display: flex;
@@ -295,10 +416,12 @@
   overflow-wrap: anywhere;
 }
 .hist-hit mark {
-  background: color-mix(in srgb, var(--warn) 30%, transparent);
+  background: color-mix(in srgb, var(--warn) 26%, transparent);
   color: var(--warn);
-  border-radius: 2px;
-  padding: 0 1px;
+  border-radius: 3px;
+  padding: 0 2px;
+  box-shadow: 0 0 10px -3px color-mix(in srgb, var(--warn) 80%, transparent);
+  font-weight: 600;
 }
 .hist-kind {
   font-size: 10px;
@@ -318,4 +441,78 @@
 .hist-kind.kind-assistant {
   color: var(--fable);
   border-color: color-mix(in srgb, var(--fable) 50%, transparent);
+}
+
+/* motion: panels and tiles rise in, bars grow from their baseline, heatmap cells fade in */
+@media (prefers-reduced-motion: no-preference) {
+  .hist-kpis > .hist-kpi,
+  .hist-panel,
+  .hist-grid2 > .hist-panel {
+    animation: hist-rise var(--dur-3) var(--ease-out) backwards;
+  }
+  .hist-kpis > .hist-kpi:nth-child(2) {
+    animation-delay: 50ms;
+  }
+  .hist-kpis > .hist-kpi:nth-child(3) {
+    animation-delay: 100ms;
+  }
+  .hist-kpis > .hist-kpi:nth-child(4) {
+    animation-delay: 150ms;
+  }
+  .hist-kpis > .hist-kpi:nth-child(5) {
+    animation-delay: 200ms;
+  }
+  .hist-chart rect[data-family] {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: hist-grow var(--dur-3) var(--ease-out) backwards;
+    animation-delay: calc(var(--i, 0) * 16ms);
+  }
+  .hist-cell {
+    animation: hist-fade var(--dur-3) var(--ease-out) backwards;
+    animation-delay: calc(var(--i, 0) * 3ms);
+  }
+  .hist-bar-track i {
+    animation: hist-bar-in var(--dur-3) var(--ease-out) backwards;
+  }
+  .hist-hit {
+    animation: hist-rise var(--dur-2) var(--ease-out) backwards;
+  }
+}
+
+@keyframes hist-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes hist-grow {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+@keyframes hist-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hist-bar-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
