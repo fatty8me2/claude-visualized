@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { describeActivity, firstLine } from '@core/activity';
 import { agentGoal } from '@core/insight';
 import { GoalBadge } from './GoalBadge';
+import { GraphBackdrop } from './GraphBackdrop';
 import { COMPACT_LAYOUT, DEFAULT_LAYOUT, layoutAgents, type LayoutOptions } from '@core/layout';
 import { clampZoom, fitScale, nextCardMode, revealDelta, zoomAnchor, ZOOM, type CardMode } from '@core/graphZoom';
 import { MAIN, type AgentNode, type SessionView } from '@core/state';
@@ -250,6 +251,7 @@ export function AgentGraph({
   onHoverAgent,
   extraTools,
   embedded = false,
+  replaying = false,
 }: {
   view: SessionView;
   now: number;
@@ -265,6 +267,8 @@ export function AgentGraph({
   extraTools?: ReactNode;
   /** overview panels: no toolbar, compact cards, scaled to fit both width and height */
   embedded?: boolean;
+  /** replaying: the backdrop stands still */
+  replaying?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -472,7 +476,7 @@ export function AgentGraph({
 
   return (
     <div
-      className={`graph-wrap ${embedded ? 'embedded' : ''}`}
+      className={`graph-wrap ${embedded ? 'embedded' : 'has-backdrop'}`}
       data-tour="graph"
       ref={wrapRef}
       onPointerDown={onPointerDown}
@@ -487,6 +491,7 @@ export function AgentGraph({
         if (!(e.target as HTMLElement).closest('.node, .graph-tools, button')) onSelect(null);
       }}
     >
+      {!embedded && <GraphBackdrop layout={layout} meta={edgeMeta} resetKey={motionKey} paused={!!replaying} />}
       {!embedded && (
         <div className="graph-tools">
           <div className="seg zoom-seg">
