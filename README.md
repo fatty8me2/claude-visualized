@@ -12,7 +12,9 @@ Claude Visualized is a desktop app for Windows and macOS that shows what your Cl
 
 ![A fresh install with no Claude Code sessions yet](docs/images/empty-state.png)
 
-The images live in [docs/images/](docs/images/), which lists the screenshots still to be added.
+![The first-launch setup wizard checking your Claude account and usage](docs/images/setup.png)
+
+The screenshots use made-up demo sessions.
 
 ## Install
 
