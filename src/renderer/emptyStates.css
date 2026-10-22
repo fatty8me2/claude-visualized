@@ -1,0 +1,70 @@
+/* empty states for a fresh install (no Claude Code transcripts yet): one glass card, used in the session list and the main view.
+   Loaded by SessionList.tsx and views/pages.tsx. Dark glass like the dialogs (dialogs.css), so it reads the same in both themes. */
+
+.glass-empty {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 16px;
+  border-radius: var(--r-3);
+  text-align: center;
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--text) 4%, transparent), transparent 60px), color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line-2) 70%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent),
+    0 14px 40px -18px rgb(0 0 0 / 0.6);
+}
+
+.glass-empty > .icon {
+  color: var(--faint);
+  margin-bottom: 2px;
+}
+
+.glass-empty .ge-title {
+  color: var(--text);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.glass-empty p {
+  margin: 0;
+  max-width: 420px;
+}
+
+.glass-empty code {
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+.glass-empty .ge-note {
+  color: var(--faint);
+  font-size: var(--fs-xs);
+}
+
+.glass-empty .ge-action {
+  margin-top: 4px;
+}
+
+/* in the session list: a compact card between the sidebar tools and the footer */
+.session-list > .glass-empty {
+  margin: 10px 12px;
+  padding: 14px 12px;
+  font-size: var(--fs-xs);
+}
+
+/* in the main view: a centred card, a little wider than the list one */
+.empty-state > .glass-empty {
+  width: 100%;
+  max-width: 460px;
+  padding: 26px 28px;
+  gap: 10px;
+}
