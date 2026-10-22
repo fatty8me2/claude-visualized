@@ -143,6 +143,10 @@ describe('visual check: devices, local models, settings and the tour', () => {
     const tourUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-vis-tour-'));
     try {
       ({ app, page } = await launch({ CLAUDE_VIS_HOME: home, CLAUDE_VIS_SKIP_ONBOARDING: '' }, tourUserData));
+      await page.getByTestId('setup-wizard').waitFor({ timeout: 20_000 });
+      await page.getByTestId('setup-skip').click();
+      await page.getByRole('button', { name: /hooks/ }).click();
+      await page.getByRole('button', { name: /Show welcome/ }).click();
       await page.getByTestId('welcome').waitFor({ timeout: 20_000 });
       await page.waitForTimeout(400);
       await page.screenshot({ path: path.join(ART, 'vis-dialogs-welcome.png') });

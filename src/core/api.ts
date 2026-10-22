@@ -8,6 +8,7 @@ import type { UpdateView } from './updates';
 import type { HistoryStatus, HistorySummary, SearchArgs, SearchResult, SummaryArgs } from './history';
 import type { OverviewMsg, ViewMsg } from './sync';
 import type { LocalModelsConfig, LocalModelsView } from './localModels';
+import type { AccountView } from './setupWizard';
 
 export interface AppConfigView {
   port: number;
@@ -21,7 +22,24 @@ export interface AppConfigView {
   miniHotkey: string;
   onboardingDone?: boolean;
   onboardingVersion?: number;
+  setupVersion?: number;
+  setupStep?: number;
   localModels: LocalModelsConfig;
+}
+
+/** What the setup wizard learns about Claude Code on this computer. Never contains a token. */
+export interface SetupDetectView {
+  platform: string;
+  /** the Claude home: CLAUDE_CONFIG_DIR or ~/.claude */
+  claudeHome: string;
+  homeExists: boolean;
+  projectsExists: boolean;
+  sessionCount: number;
+  /** the `claude` command on PATH (or where the installers put it) */
+  cli: { found: boolean; path: string | null };
+  /** best effort: the Claude desktop app */
+  desktop: { found: boolean };
+  account: AccountView;
 }
 
 export interface SystemInfoView {
@@ -172,6 +190,12 @@ export interface VisApi {
   showMain(): Promise<void>;
   openPath(p: string): Promise<void>;
   setupStatus(): Promise<SetupStatusView>;
+  /** setup wizard: look at this computer's Claude Code install and login (read-only) */
+  setupDetect(): Promise<SetupDetectView>;
+  /** open a terminal in the home folder, for `claude /login` */
+  setupOpenTerminal(): Promise<{ ok: boolean; error?: string }>;
+  /** open the Claude Code download page in the browser */
+  setupOpenDownload(): Promise<{ ok: boolean; url: string; error?: string }>;
   /** the tray menu asks the window to show the welcome screen */
   onShowOnboarding(cb: () => void): () => void;
   /** local model servers (Ollama, LM Studio, OpenAI-compatible), polled by the main process */

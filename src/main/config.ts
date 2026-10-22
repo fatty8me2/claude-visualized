@@ -16,6 +16,10 @@ export interface AppConfig {
   miniHotkey: string;
   onboardingDone?: boolean;
   onboardingVersion?: number;
+  /** the setup wizard version that was completed or skipped (see core/setupWizard.ts) */
+  setupVersion?: number;
+  /** step the wizard was left on, so it resumes there */
+  setupStep?: number;
   localModels: LocalModelsConfig;
   /** peer link: "Share with my other computers" (off by default) and its TCP port */
   shareEnabled: boolean;
