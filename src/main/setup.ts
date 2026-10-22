@@ -1,9 +1,10 @@
-import { execFile, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { SetupDetectView } from '@core/api';
 import { buildAccount, parseCredentials, parseOauthAccount, type CredentialsInfo } from '@core/setupWizard';
+import { readCredentials, usesApiKey } from './claudeLogin';
 import { claudeHome } from './paths';
 
 /**
@@ -29,15 +30,10 @@ async function readText(p: string, max = 32 * 1024 * 1024): Promise<string | nul
   }
 }
 
-/** Claude Code's saved login: the credentials file, else (macOS) the login keychain item. */
-async function readCredentials(): Promise<CredentialsInfo | null> {
-  const fromFile = parseCredentials(await readText(path.join(claudeHome(), '.credentials.json')));
-  if (fromFile) return fromFile;
-  if (process.platform !== 'darwin' || process.env.CLAUDE_VIS_HOME) return null;
-  const raw = await new Promise<string | null>((resolve) =>
-    execFile('security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'], { timeout: 5000 }, (err, out) => resolve(err ? null : out.trim())),
-  );
-  return parseCredentials(raw);
+/** Claude Code's saved login (file, or the macOS keychain), via claudeLogin.ts; reduced at once to presence / expiry / plan. */
+async function readCredentialsInfo(): Promise<CredentialsInfo | null> {
+  const c = await readCredentials();
+  return c ? parseCredentials(c.raw) : null;
 }
 
 /** where Claude Code keeps its account file: next to the config dir when one is set, else ~/.claude.json */
@@ -93,10 +89,10 @@ export async function detectSetup(sessionCount: number): Promise<SetupDetectView
     exists(home),
     findClaudeCli(),
     findClaudeDesktop(),
-    readCredentials(),
+    readCredentialsInfo(),
     readText(accountFile()),
   ]);
-  const hasApiKey = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+  const hasApiKey = await usesApiKey();
   return {
     platform: process.platform,
     claudeHome: home,
@@ -133,4 +129,18 @@ export async function openTerminalInHome(): Promise<{ ok: boolean; error?: strin
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+}
+
+/** A free local port for the hook receiver, searching upward from `from` (127.0.0.1 only, as the receiver itself is). */
+export async function findFreePort(from: number): Promise<number | null> {
+  const { createServer } = await import('node:net');
+  for (let port = from + 1; port < from + 60 && port < 65535; port++) {
+    const ok = await new Promise<boolean>((resolve) => {
+      const srv = createServer();
+      srv.once('error', () => resolve(false));
+      srv.listen(port, '127.0.0.1', () => srv.close(() => resolve(true)));
+    });
+    if (ok) return port;
+  }
+  return null;
 }

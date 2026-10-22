@@ -50,6 +50,7 @@ const api: VisApi = {
   openPath: (p) => ipcRenderer.invoke('path:open', p),
   setupStatus: () => ipcRenderer.invoke('setup:status'),
   setupDetect: () => ipcRenderer.invoke('setup:detect'),
+  setupFreePort: () => ipcRenderer.invoke('setup:freePort'),
   setupOpenTerminal: () => ipcRenderer.invoke('setup:openTerminal'),
   setupOpenDownload: () => ipcRenderer.invoke('setup:openDownload'),
   onShowOnboarding: (cb) => on<void>('onboarding:show', () => cb()),

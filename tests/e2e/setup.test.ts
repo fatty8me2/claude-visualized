@@ -269,3 +269,34 @@ describe('setup wizard: honours CLAUDE_VIS_SKIP_ONBOARDING and re-opens from Set
     }
   });
 });
+
+describe('setup wizard: the hook port is taken', () => {
+  it('says so and moves to a free port, and the hooks are written for it', async () => {
+    const blocker = http.createServer((_q, r) => r.end('busy'));
+    const busy = BASE + 5;
+    await new Promise<void>((r) => blocker.listen(busy, '127.0.0.1', r));
+    const userData = tmp('cvis-setup4-ud-');
+    const home = tmp('cvis-setup4-home-');
+    writeFixture(home);
+    const { app, page } = await launch({ CLAUDE_VIS_HOME: home, CLAUDE_VIS_SETUP_PATH: home, CLAUDE_VIS_PORT: String(busy) }, userData);
+    try {
+      await wizard(page).waitFor({ timeout: 25_000 });
+      for (let i = 0; i < 3; i++) await page.getByTestId('setup-next').click();
+      await page.getByTestId('setup-port-busy').waitFor({ timeout: 15_000 });
+      expect(await page.getByTestId('setup-port-busy').innerText()).toContain(`Port ${busy} is already in use`);
+      await shot(page, '10-port-busy');
+      await page.getByTestId('setup-use-port').click();
+      await page.getByTestId('setup-port-busy').waitFor({ state: 'detached', timeout: 10_000 });
+      const cfg = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8'));
+      expect(cfg.port).not.toBe(busy);
+      await page.getByTestId('setup-install').click();
+      await page.getByTestId('setup-install-result').waitFor({ timeout: 15_000 });
+      expect(fs.readFileSync(path.join(home, 'settings.json'), 'utf8')).toContain(`127.0.0.1:${cfg.port}`);
+    } finally {
+      await app.close();
+      await new Promise((r) => blocker.close(r));
+      rm(userData);
+      rm(home);
+    }
+  });
+});

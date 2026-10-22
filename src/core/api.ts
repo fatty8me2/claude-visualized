@@ -192,6 +192,8 @@ export interface VisApi {
   setupStatus(): Promise<SetupStatusView>;
   /** setup wizard: look at this computer's Claude Code install and login (read-only) */
   setupDetect(): Promise<SetupDetectView>;
+  /** a free local port for the hook receiver (the configured one is taken) */
+  setupFreePort(): Promise<number | null>;
   /** open a terminal in the home folder, for `claude /login` */
   setupOpenTerminal(): Promise<{ ok: boolean; error?: string }>;
   /** open the Claude Code download page in the browser */

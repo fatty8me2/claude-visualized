@@ -64,11 +64,11 @@ describe('parseOauthAccount', () => {
   it('reads only the display fields', () => {
     const a = parseOauthAccount(
       JSON.stringify({
-        oauthAccount: { emailAddress: 'a@b.co', displayName: 'Ann', organizationName: 'Acme', accountUuid: 'u-1', billingType: 'x' },
+        oauthAccount: { emailAddress: 'ann@example.test', displayName: 'Ann', organizationName: 'Acme', accountUuid: 'u-1', billingType: 'x' },
         other: 1,
       }),
     );
-    expect(a).toEqual({ email: 'a@b.co', name: 'Ann', org: 'Acme' });
+    expect(a).toEqual({ email: 'ann@example.test', name: 'Ann', org: 'Acme' });
   });
   it('is null when there is no account', () => {
     expect(parseOauthAccount('{}')).toBeNull();
@@ -88,10 +88,10 @@ describe('planLabel', () => {
 });
 
 describe('buildAccount', () => {
-  const acct = { email: 'a@b.co', name: null, org: 'Acme' };
+  const acct = { email: 'ann@example.test', name: null, org: 'Acme' };
   it('a valid login is ok and shows who it is', () => {
     const a = buildAccount({ present: true, hasRefresh: true, expiresAt: NOW + 5000, subscriptionType: 'pro', rateLimitTier: null }, acct, false, NOW);
-    expect(a).toMatchObject({ login: 'ok', plan: 'Claude Pro', email: 'a@b.co', org: 'Acme' });
+    expect(a).toMatchObject({ login: 'ok', plan: 'Claude Pro', email: 'ann@example.test', org: 'Acme' });
   });
   it('an expired pass with a refresh token is renewable', () => {
     expect(buildAccount({ present: true, hasRefresh: true, expiresAt: NOW - 1, subscriptionType: null, rateLimitTier: null }, null, false, NOW).login).toBe(
@@ -108,7 +108,7 @@ describe('buildAccount', () => {
     expect(buildAccount(null, acct, false, NOW)).toMatchObject({ login: 'none', email: null, org: null });
   });
   it('whoLabel', () => {
-    expect(whoLabel({ email: 'a@b.co', name: null, org: 'Acme' })).toBe('a@b.co (Acme)');
+    expect(whoLabel({ email: 'ann@example.test', name: null, org: 'Acme' })).toBe('ann@example.test (Acme)');
     expect(whoLabel({ email: null, name: 'Ann', org: null })).toBe('Ann');
     expect(whoLabel({ email: null, name: null, org: 'Acme' })).toBe('Acme');
     expect(whoLabel({ email: null, name: null, org: null })).toBeNull();

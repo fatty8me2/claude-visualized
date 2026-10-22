@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { HookPreviewView, HookStateView, SetupDetectView } from '@core/api';
+import type { HookPreviewView, HookServerStatusView, HookStateView, SetupDetectView } from '@core/api';
 import { HOOK_EVENTS } from '@core/hooksConfig';
 import { ONBOARDING_VERSION, LOGIN_COMMAND } from '@core/onboarding';
 import { claudeCodePresent, SETUP_STEPS, SETUP_VERSION, whoLabel, type SetupStepId } from '@core/setupWizard';
@@ -168,8 +168,13 @@ export function SetupWizard({
   const [previewErr, setPreviewErr] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState<{ ok: boolean; text: string } | null>(null);
+  const [srv, setSrv] = useState<HookServerStatusView | null>(null);
+  const [altPort, setAltPort] = useState<number | null>(null);
   const loadHooks = useCallback(async () => {
-    const s = await window.api.hookState();
+    const [s, sv] = await Promise.all([window.api.hookState(), window.api.hookServerStatus()]);
+    setSrv(sv);
+    // the receiver could not start (the port is taken): find another free one to offer
+    setAltPort(!sv.listening && sv.error ? await window.api.setupFreePort() : null);
     setHs(s);
     setPreviewErr(null);
     if (s.state === 'error') return setPreview(null);
@@ -198,6 +203,14 @@ export function SetupWizard({
     void loadHooks();
   };
 
+  const switchPort = async () => {
+    if (!altPort) return;
+    await window.api.setConfig({ port: altPort });
+    setApplied(null);
+    await new Promise((r) => setTimeout(r, 400)); // the receiver restarts on the new port
+    await loadHooks();
+  };
+  const portBusy = !!srv && !srv.listening && !!srv.error;
   const installed = hs?.state === 'installed';
   const port = config?.port ?? 47821;
   const nextLabel =
@@ -258,13 +271,17 @@ export function SetupWizard({
                   <span className="pi">
                     <Icon name="read" size="md" />
                   </span>
-                  <b>Looks, never touches</b>
-                  <span>It is read-only. The only thing it may ever change is a Claude settings file, and only when you click, with a backup.</span>
+                  <b>Reads, doesn&rsquo;t meddle</b>
+                  <span>
+                    It never edits your sessions. It writes only to your Claude settings (hooks, with a preview and backup, when you click) and renews your
+                    Claude Code sign-in when it is about to expire.
+                  </span>
                 </div>
               </div>
               <p className="fine">
-                The one thing that goes online: to show your usage meters it asks Anthropic for your own usage numbers, using the Claude Code login you already
-                have. Your login never leaves this computer except to Anthropic.
+                What goes online, and only this: your usage numbers are fetched from Anthropic (api.anthropic.com) with the Claude Code login you already have;
+                that login is renewed through platform.claude.com when it is about to expire (Windows and Linux; on macOS the app only reads it); and GitHub is
+                asked about app updates. Your sessions and files are never uploaded, and the login is never shown or sent anywhere else.
               </p>
             </>
           )}
@@ -449,6 +466,24 @@ export function SetupWizard({
                 <div className="callout bad" data-testid="setup-hooks-error">
                   <div className="callout-title">We can&rsquo;t change your Claude settings file</div>
                   <p>{hs.error}. To stay safe, the app will not touch a file it cannot read. You can fix it and run setup again later.</p>
+                </div>
+              )}
+              {portBusy && (
+                <div className="callout" data-testid="setup-port-busy">
+                  <div className="callout-title">Port {srv?.port} is already in use</div>
+                  <p>
+                    Another program is using the port the app listens on for live updates, so they can&rsquo;t arrive yet.
+                    {altPort
+                      ? ` Port ${altPort} is free; the app can use that one instead, and the hooks below are written for it.`
+                      : ' No free port was found nearby; you can pick one in Settings.'}
+                  </p>
+                  {altPort && (
+                    <div className="btnrow">
+                      <button className="primary" data-testid="setup-use-port" onClick={() => void switchPort()}>
+                        Use port {altPort}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               {hs && hs.state !== 'error' && (

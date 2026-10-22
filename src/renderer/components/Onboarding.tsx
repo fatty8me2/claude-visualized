@@ -70,7 +70,7 @@ export function Welcome({ onTour, onSkip, onOpenSettings }: { onTour: () => void
           and how much of your 5-hour and weekly limits you have used.
         </p>
         <p>
-          It only reads files Claude Code already writes on your computer. It does not change anything, and nothing leaves your machine except the usage check.
+          It reads files Claude Code already writes on your computer and never edits your sessions. Online it only does three things: it asks Anthropic (api.anthropic.com) for your usage numbers, renews your Claude Code sign-in when it is about to expire (platform.claude.com; Windows and Linux only), and checks GitHub for app updates. Your sessions are never uploaded.
         </p>
 
         <div className="w-sub">SETUP CHECKLIST</div>
