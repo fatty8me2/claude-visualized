@@ -312,3 +312,641 @@
 .drawer-acts button {
   flex: 1;
 }
+
+/* ===== 0.6 dossier drawer: glass body, energy ring, model-coloured hero band, stat tiles, activity stream ===== */
+.drawer {
+  --dc: var(--fam, var(--line-2));
+  width: 392px;
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid color-mix(in srgb, var(--dc) 38%, var(--line-2));
+  background:
+    radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--dc) 16%, transparent), transparent 70%),
+    color-mix(in srgb, var(--panel) 84%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.35);
+  backdrop-filter: blur(14px) saturate(1.35);
+  box-shadow:
+    0 18px 44px -14px rgba(0, 0, 0, 0.8),
+    0 0 26px -10px color-mix(in srgb, var(--dc) 55%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent);
+  animation: dossier-in 0.32s var(--ease-out);
+}
+.drawer.d-error {
+  --dc: var(--err);
+}
+@keyframes dossier-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px) scale(0.985);
+  }
+}
+.drawer .d-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 14px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+/* energy ring: a comet orbits the border while the agent is live, a dim static ring otherwise */
+.drawer > .d-orbit {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  padding: 1.5px;
+  overflow: hidden;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--dc) 20%, transparent);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+.drawer > .d-orbit::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190%;
+  aspect-ratio: 1;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 60deg,
+    color-mix(in srgb, var(--dc) 40%, transparent) 150deg,
+    transparent 200deg 230deg,
+    var(--dc) 335deg,
+    color-mix(in srgb, var(--dc) 40%, #fff) 354deg,
+    transparent 360deg
+  );
+  transform: translate(-50%, -50%) rotate(40deg);
+  opacity: 0.55;
+}
+.drawer.live > .d-orbit::before {
+  opacity: 1;
+  animation: drawer-orbit 5s linear infinite;
+}
+@keyframes drawer-orbit {
+  to {
+    transform: translate(-50%, -50%) rotate(400deg);
+  }
+}
+.drawer .d-body {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  animation: d-fade 0.26s var(--ease-out);
+}
+@keyframes d-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* hero band */
+.drawer .d-hero {
+  position: relative;
+  margin: 0 -14px;
+  padding: 13px 14px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 2px, color-mix(in srgb, #000 16%, transparent) 2px 3px),
+    linear-gradient(180deg, color-mix(in srgb, var(--dc) 30%, transparent), color-mix(in srgb, var(--dc) 7%, transparent));
+  border-bottom: 1px solid color-mix(in srgb, var(--dc) 36%, var(--line));
+}
+.drawer .hd b {
+  font-family: var(--font-ui);
+  font-size: var(--fs-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--dc) 60%, transparent);
+}
+.drawer .dtitle {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.drawer .d-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.drawer .d-model {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 9px 1px 7px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--dc) 55%, transparent);
+  background: color-mix(in srgb, var(--dc) 14%, transparent);
+  color: var(--dc);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.drawer .d-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dc);
+  box-shadow: 0 0 8px var(--dc);
+}
+.drawer .d-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-xs);
+}
+.drawer .d-elapsed {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  padding-left: 8px;
+  border-left: 1px solid var(--line-2);
+}
+.drawer.live .d-elapsed {
+  color: var(--dc);
+}
+.drawer .because {
+  margin-top: 0;
+  font-family: var(--font-ui);
+}
+.drawer .nowbox {
+  position: relative;
+  border-color: color-mix(in srgb, var(--dc) 28%, var(--line-2));
+  border-left: 3px solid var(--dc);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--dc) 12%, transparent), color-mix(in srgb, var(--panel-2) 70%, transparent));
+}
+.drawer.live .nowbox::after {
+  content: '';
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--dc);
+  box-shadow: 0 0 8px var(--dc);
+  animation: d-blink 1.6s ease-in-out infinite;
+}
+@keyframes d-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* stat tiles */
+.drawer .d-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 6px;
+}
+.drawer .d-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 6px 8px 7px;
+  border-radius: var(--r-2);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 85%, transparent), color-mix(in srgb, var(--bg-2) 60%, transparent));
+  overflow: hidden;
+}
+.drawer .d-tile::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--dc) 70%, transparent), transparent);
+}
+.drawer .d-tile .tk {
+  font-family: var(--font-ui);
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.drawer .d-tile .tv {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  animation: roll-in 0.38s var(--ease-out);
+}
+@keyframes roll-in {
+  from {
+    opacity: 0;
+    transform: translateY(55%);
+  }
+}
+.drawer .d-tile .ts {
+  font-size: 9.5px;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drawer .d-tile .ts.bad {
+  color: var(--err);
+}
+.drawer .d-tile .d-meter {
+  display: block;
+  height: 3px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--track);
+}
+.drawer .d-tile .d-meter > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ok);
+  transform-origin: left;
+  transition: transform 0.5s var(--ease-out);
+}
+.drawer .d-tile.lv-warn .d-meter > i {
+  background: var(--warn);
+}
+.drawer .d-tile.lv-high .d-meter > i,
+.drawer .d-tile.lv-crit .d-meter > i,
+.drawer .d-tile.lv-full .d-meter > i {
+  background: var(--err);
+}
+
+/* activity sparkline */
+.drawer .d-spark .bars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  align-items: end;
+  height: 32px;
+  padding-bottom: 1px;
+  border-bottom: 1px solid var(--line);
+}
+.drawer .d-spark .bars i {
+  display: block;
+  height: 100%;
+  transform-origin: bottom;
+  border-radius: 1px 1px 0 0;
+  background: color-mix(in srgb, var(--dc) 22%, var(--line));
+}
+.drawer .d-spark .bars i.on {
+  background: linear-gradient(0deg, color-mix(in srgb, var(--dc) 45%, transparent), var(--dc));
+}
+.drawer .d-spark .cap {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  font-size: 9.5px;
+  color: var(--faint);
+  letter-spacing: 0.04em;
+}
+
+/* quiet key/values */
+.drawer .kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  font-size: var(--fs-xs);
+  padding: 7px 9px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-2);
+}
+.drawer .kv .k {
+  color: var(--muted);
+}
+.drawer .kv .v {
+  color: var(--text-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* section headings */
+.drawer h4 {
+  font-family: var(--font-ui);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.drawer h4::before {
+  content: '';
+  width: 3px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--dc);
+  box-shadow: 0 0 6px var(--dc);
+}
+.drawer h4::after {
+  content: '';
+  order: 1;
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+.drawer h4 .copy-btn {
+  order: 2;
+  margin-left: 0;
+}
+
+/* task / last message blocks */
+.drawer .task,
+.drawer .last {
+  border-left: 2px solid color-mix(in srgb, var(--dc) 60%, var(--line-2));
+  background: color-mix(in srgb, var(--bg-2) 55%, transparent);
+  border-radius: 0 var(--r-2) var(--r-2) 0;
+  padding: 6px 9px;
+  font-family: var(--font-ui);
+  line-height: 1.5;
+}
+.drawer .task-wrap:not(.open) .task {
+  max-height: 5.9em;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent);
+  mask-image: linear-gradient(180deg, #000 55%, transparent);
+}
+.drawer .task-wrap.open .task {
+  max-height: 220px;
+}
+.drawer .task-more {
+  margin-top: 4px;
+  border: 0;
+  background: none;
+  color: var(--dc);
+  font-size: var(--fs-xs);
+  padding: 1px 4px;
+}
+.drawer .task-more:hover {
+  text-decoration: underline;
+}
+
+/* tool-call stream */
+.drawer .dtl {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.drawer .dtl::before {
+  content: '';
+  position: absolute;
+  left: 69px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: linear-gradient(180deg, var(--line-2), transparent);
+}
+.drawer .tl {
+  grid-template-columns: 56px 16px 1fr 34px 14px;
+  align-items: center;
+  padding: 2px 4px;
+  border-radius: var(--r-1);
+  position: relative;
+  z-index: 1;
+}
+.drawer .tl:hover {
+  background: color-mix(in srgb, var(--dc) 8%, transparent);
+}
+.drawer .tl .t {
+  font-size: 10px;
+}
+.drawer .tl .ic {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dc) 40%, var(--line-2));
+}
+.drawer .tl .tx {
+  font-family: var(--font-ui);
+}
+.drawer .tl .gap {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--track);
+  overflow: hidden;
+}
+.drawer .tl .gap > i {
+  display: block;
+  height: 100%;
+  transform-origin: left;
+  background: color-mix(in srgb, var(--dc) 70%, transparent);
+  border-radius: inherit;
+}
+.drawer .tl.bad {
+  background: color-mix(in srgb, var(--err) 9%, transparent);
+  box-shadow: inset 2px 0 0 var(--err);
+}
+.drawer .tl.bad .ic {
+  border-color: var(--err);
+  color: var(--err);
+}
+.drawer .tl.bad .gap > i {
+  background: var(--err);
+}
+.drawer .tl.run .ic {
+  border-color: var(--run);
+  color: var(--run);
+  animation: d-blink 1.4s ease-in-out infinite;
+}
+.drawer .tl.run .gap > i {
+  background: var(--run);
+}
+.drawer .tl-err {
+  margin-left: 64px;
+}
+
+/* chips, commands, mix, sub-agents */
+.drawer .chip {
+  border-radius: var(--r-pill);
+  padding: 0 8px;
+  background: color-mix(in srgb, var(--bg-2) 60%, transparent);
+}
+.drawer .cmds div {
+  padding: 2px 6px;
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  margin-bottom: 2px;
+}
+.drawer .mixrow .mb > i {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--dc) 50%, transparent), var(--dc));
+}
+.drawer .mixrow .mb {
+  height: 5px;
+}
+.drawer .kid {
+  border-radius: var(--r-2);
+}
+.drawer .kid:focus-visible,
+.drawer .tl:focus-visible,
+.drawer-acts button:focus-visible,
+.drawer .task-more:focus-visible {
+  outline: 1.5px solid var(--dc);
+  outline-offset: 1px;
+}
+.drawer-acts {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+/* ===== goal badges: a glyph in a tinted well, crisp per-goal colour ===== */
+.goal {
+  gap: 4px;
+  padding: 0 7px 0 4px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-color: color-mix(in srgb, var(--g) 45%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--g) 20%, transparent), color-mix(in srgb, var(--g) 7%, transparent));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent),
+    0 0 10px -5px var(--g);
+}
+.goal .icon {
+  width: 12px;
+  height: 12px;
+  padding: 1.5px;
+  box-sizing: content-box;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--g) 22%, transparent);
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--g) 70%, transparent));
+}
+.mini-chip .goal,
+.ov-tool .goal {
+  box-shadow: none;
+  background: none;
+}
+.mini-chip .goal .icon,
+.ov-tool .goal .icon {
+  padding: 0;
+  background: none;
+}
+
+/* copy button confirms in green */
+.copy-btn.done {
+  color: var(--ok);
+}
+
+/* ===== context menu: glass sheet, icon wells, a visible keyboard ring ===== */
+.ctx-menu {
+  min-width: 196px;
+  padding: 5px;
+  border-radius: var(--r-3);
+  border-color: color-mix(in srgb, var(--opus) 28%, var(--line-2));
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow:
+    0 14px 36px -10px rgba(0, 0, 0, 0.85),
+    0 0 22px -12px var(--opus),
+    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+  transform-origin: top left;
+  animation: ctx-in 0.16s var(--ease-out);
+}
+@keyframes ctx-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-3px);
+  }
+}
+.ctx-menu button {
+  position: relative;
+  gap: 9px;
+  padding: 5px 9px 5px 6px;
+  border-radius: var(--r-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.ctx-menu .icon {
+  width: 22px;
+  height: 22px;
+  padding: 5px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--opus) 10%, var(--bg-2));
+  color: var(--text-2);
+  transition:
+    color var(--dur-1),
+    background-color var(--dur-1);
+}
+.ctx-menu .ctx-pad {
+  width: 22px;
+}
+.ctx-menu button:hover,
+.ctx-menu button:focus,
+.ctx-menu button:focus-visible {
+  background: color-mix(in srgb, var(--opus) 14%, transparent);
+  outline: none;
+}
+.ctx-menu button:focus-visible,
+.ctx-menu button:focus {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--opus) 65%, transparent);
+}
+.ctx-menu button:hover .icon,
+.ctx-menu button:focus .icon {
+  color: var(--opus);
+  background: color-mix(in srgb, var(--opus) 20%, var(--bg-2));
+}
+.ctx-menu button.danger {
+  color: var(--err);
+}
+.ctx-menu button.danger .icon {
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 12%, var(--bg-2));
+}
+.ctx-menu button.danger:hover,
+.ctx-menu button.danger:focus {
+  background: color-mix(in srgb, var(--err) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--err) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawer .d-body,
+  .drawer .d-tile .tv,
+  .drawer.live > .d-orbit::before,
+  .drawer.live .nowbox::after,
+  .drawer .tl.run .ic,
+  .ctx-menu {
+    animation: none;
+  }
+  .drawer .d-tile .d-meter > i {
+    transition: none;
+  }
+}
+.drawer .kv .v {
+  text-align: left;
+  justify-self: start;
+  max-width: 100%;
+}
