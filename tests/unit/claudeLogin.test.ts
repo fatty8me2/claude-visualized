@@ -6,8 +6,8 @@ import { loginStatus, readCredentials, usesApiKey, type ExecFn } from '../../src
 import { refreshIfNeeded, resetRefreshBackoff } from '../../src/main/oauthRefresh';
 import { claudeHome } from '../../src/main/paths';
 
-const SECRET_A = 'sk-ant-oat01-SECRET-ACCESS';
-const SECRET_R = 'sk-ant-ort01-SECRET-REFRESH';
+const SECRET_A = 'fake-oat01-SECRET-ACCESS';
+const SECRET_R = 'fake-ort01-SECRET-REFRESH';
 
 const creds = (over: Record<string, unknown> = {}) =>
   JSON.stringify({ claudeAiOauth: { accessToken: SECRET_A, refreshToken: SECRET_R, expiresAt: Date.now() + 3600_000, scopes: ['user:inference', 'user:profile'], subscriptionType: 'max', ...over } });

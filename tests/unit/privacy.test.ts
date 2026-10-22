@@ -140,3 +140,22 @@ describe('privacy: per-user runtime defaults', () => {
     }
   });
 });
+
+describe('test-only URL overrides', () => {
+  it('cannot redirect the login token in an installed build', async () => {
+    const { testOverride } = await import('../../src/main/paths');
+    const saved = { electron: process.versions.electron, defaultApp: (process as { defaultApp?: boolean }).defaultApp, url: process.env.CLAUDE_VIS_USAGE_URL };
+    process.env.CLAUDE_VIS_USAGE_URL = 'http://127.0.0.1:1/usage';
+    try {
+      expect(testOverride('CLAUDE_VIS_USAGE_URL')).toBe('http://127.0.0.1:1/usage');
+      Object.defineProperty(process.versions, 'electron', { value: '44.0.0', configurable: true });
+      (process as { defaultApp?: boolean }).defaultApp = undefined;
+      expect(testOverride('CLAUDE_VIS_USAGE_URL')).toBeUndefined();
+    } finally {
+      Object.defineProperty(process.versions, 'electron', { value: saved.electron, configurable: true });
+      (process as { defaultApp?: boolean }).defaultApp = saved.defaultApp;
+      if (saved.url === undefined) delete process.env.CLAUDE_VIS_USAGE_URL;
+      else process.env.CLAUDE_VIS_USAGE_URL = saved.url;
+    }
+  });
+});

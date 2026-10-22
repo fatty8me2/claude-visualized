@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { applyRefresh, isDeadRefresh, needsRefresh, oauthOf, refreshRequestBody, TOKEN_URL } from '@core/oauth';
 import { readCredentials, type LoginDeps } from './claudeLogin';
-import { claudeHome } from './paths';
+import { claudeHome, testOverride } from './paths';
 
 /**
  * Keeps Claude Code's saved login fresh so the usage meters keep working when only the desktop app
@@ -68,7 +68,7 @@ async function withLock<T>(lockPath: string, fn: () => Promise<T>): Promise<T | 
 }
 
 function tokenUrl(): string {
-  return process.env.CLAUDE_VIS_OAUTH_TOKEN_URL || TOKEN_URL;
+  return testOverride('CLAUDE_VIS_OAUTH_TOKEN_URL') ?? TOKEN_URL;
 }
 
 /** Renew the saved login if it is (nearly) expired, or always when `force` (the usage API rejected it). */

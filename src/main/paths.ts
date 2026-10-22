@@ -13,3 +13,9 @@ export function projectsDir(): string {
 export function settingsPath(): string {
   return path.join(claudeHome(), 'settings.json');
 }
+
+/** True in an installed build (not `electron .` in dev/tests, not plain Node in unit tests). */
+export const isPackagedApp = (): boolean => !!process.versions.electron && !process.defaultApp;
+
+/** A test-only env override: ignored in an installed build, so nothing can redirect the user's login token elsewhere. */
+export const testOverride = (name: string): string | undefined => (isPackagedApp() ? undefined : process.env[name] || undefined);

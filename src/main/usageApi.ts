@@ -1,5 +1,6 @@
 import { readCredentials, usesApiKey } from './claudeLogin';
 import { lastRefreshProblem, refreshIfNeeded } from './oauthRefresh';
+import { testOverride } from './paths';
 
 /**
  * Reads 5-hour / weekly plan usage the same way Claude Code's /usage does: with the OAuth login
@@ -10,7 +11,7 @@ import { lastRefreshProblem, refreshIfNeeded } from './oauthRefresh';
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
 /** test hook: a fake usage server (the access token is still only ever sent to the URL configured here) */
-const usageUrl = () => process.env.CLAUDE_VIS_USAGE_URL || USAGE_URL;
+const usageUrl = () => testOverride('CLAUDE_VIS_USAGE_URL') ?? USAGE_URL;
 
 export type UsageApiResult =
   { ok: true; body: Record<string, unknown> } | { ok: false; state: 'no-login' | 'expired' | 'error'; message: string; rateLimited?: boolean; retryAfterMs?: number };
