@@ -42,6 +42,37 @@ function randomTree(seed: number): Record<string, AgentNode> {
   return agents;
 }
 
+/** Mixed siblings: many leaves, several subtrees (some deep) and workflow groups under the same parents. */
+function mixedTree(seed: number): Record<string, AgentNode> {
+  const r = rng(seed * 7919);
+  const pick = <T,>(xs: T[]) => xs[Math.floor(r() * xs.length)];
+  const agents: Record<string, AgentNode> = { [MAIN]: newAgent(MAIN, 'main', 0, null) };
+  agents[MAIN].status = 'running';
+  let n = 0;
+  const statuses: AgentStatus[] = ['running', 'running', 'done', 'done', 'error', 'waiting', 'idle'];
+  const add = (parent: string, workflow: boolean) => {
+    n++;
+    const id = workflow ? `wf:${n}` : `a${n}`;
+    const a = newAgent(id, workflow ? 'workflow' : 'agent', n, parent);
+    a.status = pick(statuses);
+    agents[id] = a;
+    return id;
+  };
+  const grow = (parent: string, depth: number) => {
+    const leaves = Math.floor(r() * (depth === 0 ? 30 : 12));
+    const subs = 1 + Math.floor(r() * (depth === 0 ? 7 : 3));
+    // interleave so ordering by start time mixes leaves and subtrees
+    const kinds: boolean[] = [...Array(leaves).fill(false), ...Array(subs).fill(true)].sort(() => r() - 0.5);
+    for (const isSub of kinds) {
+      const id = add(parent, isSub && r() < 0.3);
+      if (isSub && depth < 3) grow(id, depth + 1);
+      else if (isSub) add(id, false);
+    }
+  };
+  grow(MAIN, 0);
+  return agents;
+}
+
 type Rect = { x: number; y: number; w: number; h: number };
 
 function gap(a: Rect, b: Rect): number {
@@ -103,6 +134,43 @@ const optionSets: Array<[string, LayoutOptions]> = [
 ];
 
 describe('connector routing', () => {
+  it('routes mixed leaf/subtree/workflow siblings around every card (random mixed trees)', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const agents = mixedTree(seed);
+      for (const [name, opt] of optionSets) {
+        const o = opt.expanded ? { ...opt, expanded: new Set(Object.keys(agents)) } : opt;
+        check(layoutAgents(agents, o), `mixed seed ${seed} ${name}`);
+      }
+    }
+  }, 240_000);
+
+  it('lays out the showcase shape compactly: 9 running leaves, a subtree of 3, a workflow of 6, 39 done', () => {
+    const agents: Record<string, AgentNode> = { [MAIN]: newAgent(MAIN, 'main', 0, null) };
+    agents[MAIN].status = 'running';
+    let n = 0;
+    const add = (parent: string, status: AgentStatus, kind: 'agent' | 'workflow' = 'agent') => {
+      n++;
+      const a = newAgent(kind === 'workflow' ? `wf:${n}` : `a${n}`, kind, n, parent);
+      a.status = status;
+      agents[a.id] = a;
+      return a.id;
+    };
+    for (let i = 0; i < 9; i++) add(MAIN, 'running');
+    const sub = add(MAIN, 'running');
+    for (let i = 0; i < 3; i++) add(sub, 'running');
+    const wf = add(MAIN, 'running', 'workflow');
+    for (let i = 0; i < 6; i++) add(wf, 'running');
+    for (let i = 0; i < 39; i++) add(MAIN, 'done');
+    for (const [name, opt] of [['default', DEFAULT_LAYOUT], ['compact', COMPACT_LAYOUT]] as Array<[string, LayoutOptions]>) {
+      const lay = layoutAgents(agents, opt);
+      check(lay, `showcase ${name}`);
+      // main + 9 leaves + chip + subtree (1+3) + workflow (1+6)
+      expect(lay.nodes).toHaveLength(1 + 10 + 4 + 7);
+      expect(lay.width, name).toBeLessThanOrEqual(lay.height * 2);
+      expect(lay.width, name).toBeLessThanOrEqual(opt.maxCols * opt.nodeW + opt.maxCols * 40);
+    }
+  });
+
   it('never runs a segment through or under a card (random trees)', () => {
     for (let seed = 1; seed <= 40; seed++) {
       const agents = randomTree(seed);

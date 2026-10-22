@@ -111,3 +111,25 @@ export function edgeLength(g: EdgeGeom): number {
 export function trunkY(parentBottom: number, childTop: number, maxDrop = 36): number {
   return childTop - Math.min((childTop - parentBottom) / 2, maxDrop);
 }
+
+/**
+ * A vertical channel position inside [lo, hi] that keeps `clear` px from every blocked [x0, x1] span, as near as possible
+ * to `prefer`. Returns null when no such position exists.
+ */
+export function freeChannel(blocked: Array<[number, number]>, lo: number, hi: number, prefer: number, clear: number): number | null {
+  const spans = blocked.map(([a, b]) => [a - clear, b + clear] as [number, number]).sort((p, q) => p[0] - q[0]);
+  let best: number | null = null;
+  const consider = (a: number, b: number) => {
+    if (b < a) return;
+    const x = Math.min(Math.max(prefer, a), b);
+    if (best === null || Math.abs(x - prefer) < Math.abs(best - prefer)) best = x;
+  };
+  let cursor = lo;
+  for (const [a, b] of spans) {
+    if (a > cursor) consider(cursor, Math.min(a, hi));
+    cursor = Math.max(cursor, b);
+    if (cursor >= hi) break;
+  }
+  if (cursor < hi) consider(cursor, hi);
+  return best;
+}
