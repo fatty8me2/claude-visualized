@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { LogKind, SessionView } from '@core/state';
 import { agentName, clock, famClass } from '../util';
 import { Icon, type IconName } from './Icon';
+import '../log.css';
 
 const GROUPS: { key: string; label: string; kinds: LogKind[] }[] = [
   { key: 'prompts', label: 'prompts', kinds: ['prompt'] },
@@ -37,6 +38,10 @@ export function LogPanel({ view, agentFilter, onAgentFilter }: { view: SessionVi
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(400);
 
+  // only the newest lines animate: remember the highest seq already drawn and flag anything above it for ~900ms
+  const seenSeq = useRef<number | null>(null);
+  const freshAt = useRef<Map<number, number>>(new Map());
+
   const kinds = useMemo(() => new Set(GROUPS.filter((g) => enabled[g.key]).flatMap((g) => g.kinds)), [enabled]);
   const query = q.trim().toLowerCase();
   const rows = useMemo(
@@ -63,6 +68,24 @@ export function LogPanel({ view, agentFilter, onAgentFilter }: { view: SessionVi
     if (el && stick) el.scrollTop = el.scrollHeight;
   });
 
+  useLayoutEffect(() => {
+    const max = rows.length ? rows[rows.length - 1].seq : 0;
+    const prev = seenSeq.current;
+    const now = performance.now();
+    for (const [k, t] of freshAt.current) if (now - t > 900) freshAt.current.delete(k);
+    if (prev !== null && max > prev) {
+      // a burst (replay jump, big backlog) is not a stream: animate the last few lines only
+      const added = rows.filter((r) => r.seq > prev).slice(-8);
+      for (const r of added) freshAt.current.set(r.seq, now);
+    }
+    seenSeq.current = max;
+  }, [rows]);
+  const isFresh = (seq: number) => {
+    const prev = seenSeq.current;
+    if (freshAt.current.has(seq)) return true;
+    return prev !== null && seq > prev && rows.length - rows.findIndex((r) => r.seq === seq) <= 8;
+  };
+
   // window of rows to draw: stuck to the bottom the window is computed from the end, so a push never flashes empty space
   const contentH = rows.length * ROW_H + BODY_PAD * 2;
   const top = stick ? Math.max(0, contentH - viewH) : scrollTop;
@@ -87,11 +110,16 @@ export function LogPanel({ view, agentFilter, onAgentFilter }: { view: SessionVi
     <div className="log" data-tour="log">
       <div className="log-head">
         <span className="lbl">session log</span>
+        <span className={`log-live ${stick ? 'on' : ''}`} title={stick ? 'Following the newest line' : 'Scrolled back; new lines keep arriving'}>
+          <i />
+          {stick ? 'live' : 'paused'}
+          <b>{rows.length}</b>
+        </span>
         <div className="seg log-kinds" role="group" aria-label="Kinds of log lines">
           {GROUPS.map((g) => (
             <button
               key={g.key}
-              className={`chip ${enabled[g.key] ? 'on' : ''}`}
+              className={`chip g-${g.key} ${enabled[g.key] ? 'on' : ''}`}
               aria-pressed={enabled[g.key]}
               onClick={() => setEnabled({ ...enabled, [g.key]: !enabled[g.key] })}
             >
@@ -136,20 +164,23 @@ export function LogPanel({ view, agentFilter, onAgentFilter }: { view: SessionVi
         }}
       >
         <div style={{ paddingTop: first * ROW_H, paddingBottom: (rows.length - last) * ROW_H }}>
-          {rows.slice(first, last).map((l) => {
+          {rows.slice(first, last).map((l, k) => {
             const a = view.agents[l.agentId];
+            const long = l.text.length > 70;
+            const flip = (first + k) * ROW_H + BODY_PAD - top < 96;
             return (
               <div
                 key={l.seq}
-                className={`log-row k-${l.kind} ${famClass(a?.model)}`}
+                className={`log-row k-${l.kind} ${famClass(a?.model)} ${isFresh(l.seq) ? 'fresh' : ''} ${long ? 'long' : ''} ${flip ? 'flip' : ''}`}
+                data-full={long ? l.text.slice(0, 600) : undefined}
                 onClick={() => onAgentFilter(agentFilter === l.agentId ? null : l.agentId)}
-                title={agentFilter === l.agentId ? 'Click to show every agent again' : `Click to show only ${agentName(a)}`}
+                title={long ? undefined : agentFilter === l.agentId ? 'Click to show every agent again' : `Click to show only ${agentName(a)}`}
               >
                 <span className="ts">{clock(l.ts)}</span>
                 <span className="who" title={l.agentId}>
                   {agentName(a)}
                 </span>
-                <span className="msg" title={l.text}>
+                <span className="msg" title={long ? undefined : l.text}>
                   <span className="kind">
                     <Icon name={KIND_ICON[l.kind] ?? 'notice'} size="xs" />
                   </span>
