@@ -6,6 +6,7 @@ import { LocalModelsPage } from '../components/LocalModelsPage';
 import { Overview } from '../components/Overview';
 import { SessionView, type SessionViewProps } from './SessionView';
 import { Icon, type IconName } from '../components/Icon';
+import '../emptyStates.css';
 
 /**
  * Page registry: the pages that fill the area next to the sidebar.
@@ -80,18 +81,17 @@ function EmptySession({ selected, known, onWelcome }: { selected: string | null;
   }
   return (
     <div className="empty-state">
-      <div className="getting-started" data-testid="empty-state">
-        <div className="gs-title">No Claude Code sessions found yet</div>
-        <ol>
-          <li>
-            Install Claude Code: the <b>Code</b> tab in the Claude desktop app, or the <code>claude</code> command in a terminal.
-          </li>
-          <li>Start a session and ask Claude something. It will show up here within a second or two, and this page fills in by itself.</li>
-          <li>
-            Optional: run <code>claude /login</code> once so the usage meters work.
-          </li>
-        </ol>
-        <button className="primary" onClick={onWelcome}>
+      <div className="glass-empty" data-testid="empty-state">
+        <Icon name="session" size="lg" />
+        <div className="ge-title">No Claude Code sessions yet</div>
+        <p>
+          Start one in the Claude desktop app (the Code tab), or run <code>claude</code> in a terminal and ask it something. It shows up here within a second or
+          two, and this page fills in by itself.
+        </p>
+        <p className="ge-note">
+          Optional: run <code>claude /login</code> once so the usage meters work.
+        </p>
+        <button className="primary ge-action" onClick={onWelcome}>
           open the welcome guide
         </button>
       </div>

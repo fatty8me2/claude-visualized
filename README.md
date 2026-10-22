@@ -1,5 +1,96 @@
 # Claude Visualized
 
+Claude Visualized is a desktop app for Windows and macOS that shows what your Claude Code sessions are doing while they run. Every main agent and subagent becomes a card in a live graph, with its model, status, current tool and token use; beside it you get the plan Claude is following, the session log, your usage meters and an inbox of anything that is waiting for you. It reads the transcripts Claude Code already writes on your computer, so you keep working the way you already do.
+
+## Screenshots
+
+![A live session: the agent graph with its plan beside it](docs/images/session-graph.png)
+
+![All sessions side by side on the overview page](docs/images/overview.png)
+
+![The attention inbox: permission prompts and replies waiting for you](docs/images/inbox.png)
+
+![A fresh install with no Claude Code sessions yet](docs/images/empty-state.png)
+
+The images live in [docs/images/](docs/images/), which lists the screenshots still to be added.
+
+## Install
+
+### Windows
+
+1. Open the [Releases page](https://github.com/fatty8me2/claude-visualized/releases) and download the installer `.exe` from the latest release. Its file name ends in `Setup-<version>.exe`.
+2. Run it. It installs for your user only (no administrator password) and adds Claude Visualized to the Start menu.
+3. Windows SmartScreen may say it protected your PC, because the installer is not code-signed yet. Click **More info**, then **Run anyway**.
+
+### macOS
+
+The Mac build is not signed or notarized yet, so macOS blocks it the first time. Either:
+
+- open the `.dmg` from the release, drag **Claude Visualized** to **Applications**, then right-click it and choose **Open** the first time (or run `xattr -dr com.apple.quarantine "/Applications/Claude Visualized.app"` in a terminal), or
+- build it yourself from source (see [Build from source](#build-from-source)). [docs/MAC.md](docs/MAC.md) has the steps.
+
+## First launch
+
+The first time you open Claude Visualized, a welcome screen shows a checklist of what it found on this computer:
+
+- **Claude Code data**: whether it found your Claude Code transcripts (`~/.claude/projects`) and how many sessions they hold. If there are none yet, start one: open the **Code** tab in the Claude desktop app, or run `claude` in a terminal. It appears within a second or two.
+- **Usage meters**: the 5-hour and weekly limits, read with the login Claude Code already saved on this computer. If it says login is needed, run `claude /login` once in a terminal.
+- **Live hooks** (optional): without them the app reads the transcripts, about a second behind. Installing hooks makes updates instant. The hooks dialog shows exactly what it will change before it writes anything.
+- **Mini view**: a small always-on-top window with the current mode and running agents.
+
+Take the tour from the welcome screen, or reopen it any time with **help & tour** at the bottom of the sidebar. Nothing leaves your machine except the calls listed in [docs/PRIVACY.md](docs/PRIVACY.md).
+
+## Privacy
+
+- **Read**: your Claude Code transcripts in `~/.claude/projects`, which the app never modifies. It also uses the Claude Code login saved on this computer, only to ask Anthropic for your usage numbers.
+- **Written**: the app's own settings, usage reading and history index, kept in its profile folder (`%APPDATA%\Claude Visualized` on Windows). `~/.claude/settings.json` changes only when you click install or remove hooks, after you have seen the preview, and a backup is written first. The app also renews Claude Code's saved login when its token is about to expire, which is what the CLI does too.
+- **Sent over the network**: Anthropic's usage endpoint and its login-renewal endpoint (both with your own login), and GitHub for update checks. Local model servers on this computer are polled. The source has no analytics or telemetry.
+- **Peer link**: off by default. Only after you tick **Share with my other computers** does it listen for a paired viewer, and then the traffic is encrypted.
+
+The full list of files and network calls, with the conditions for each, is in [docs/PRIVACY.md](docs/PRIVACY.md).
+
+## Uninstall hooks
+
+1. Click **Hooks and settings** (the button in the title bar).
+2. Under hooks, click **Remove hooks…**, check the preview, then click **Remove hooks from settings.json**.
+
+This removes only the entries the app added (your own hooks stay), deletes the status-line script it wrote, and keeps a backup of `settings.json` in the app's `backups` folder. To remove the app itself, uninstall it like any other program. Its profile folder may stay behind; delete it too if you want all of its data gone.
+
+## Troubleshooting
+
+**No sessions show up.** Claude Code writes its transcripts to `%USERPROFILE%\.claude\projects` (on macOS, `~/.claude/projects`). Check that the folder exists and that a session has run. If Claude Code keeps its data somewhere else, set `CLAUDE_CONFIG_DIR`. In the sidebar, the **live sessions only** box hides sessions that are more than about ten minutes old, and the search box filters the list, so check both.
+
+**The usage meters say not signed in or login needed.** The meters read the login Claude Code saves on this computer. Run `claude` once and sign in (`claude /login`); after that the app keeps the login fresh. The meters need a subscription login: if you only use an API key (for example `ANTHROPIC_API_KEY`), there is no such login to read, so the meters stay empty. Hooks and the session views work either way.
+
+**"port 47821 is in use".** Another program already listens on the hook port. The app still reads the transcripts, but updates are not instant. Close the other program, or pick another port in `config.json` (in the profile folder) or with the `CLAUDE_VIS_PORT` environment variable, then reinstall the hooks.
+
+**The mini-view hotkey does nothing.** Another app may own that shortcut. Settings shows the error, and the previous hotkey keeps working. Pick another one there.
+
+**A session shows "unparsed" lines in the status bar.** Claude Code's transcript format is internal and changes between versions. The app counts the lines it does not understand instead of failing; the rest of the session still shows.
+
+**Local models show nothing.** The local models view only sees servers listening on this computer (Ollama on port 11434, LM Studio on port 1234) or endpoints you add in its settings.
+
+## Build from source
+
+You need Node.js 24 and git.
+
+```bash
+git clone https://github.com/fatty8me2/claude-visualized.git
+cd claude-visualized
+npm ci
+npm run dev          # run the app with hot reload
+npm run dist:win     # Windows installer in release/<version>/
+npm run dist:mac     # macOS disk images in release/<version>/ (run this on a Mac)
+```
+
+`npm ci` also downloads the Electron binary. The `dist:*` scripts build only; they never publish. Checks: `npm run check` (typecheck, lint, unit tests) and `npm run test:e2e` (the Playwright suite). The developer reference below has the full script list and the code layout.
+
+## Technical reference
+
+The rest of this page is the detailed reference: what the app shows, how it reads data, and the developer notes.
+
+### What it shows
+
 A desktop app (Windows + macOS) that shows what your Claude Code sessions are doing, live:
 
 - **Agent graph**: the main agent, every subagent it spawns (including nested agents, background agents and
@@ -26,7 +117,7 @@ A desktop app (Windows + macOS) that shows what your Claude Code sessions are do
 
 It works with both the Claude desktop app's Code tab and the `claude` CLI, because both write the same transcripts.
 
-## Local models
+### Local models
 
 Claude Code can run against local models through a gateway or proxy (LiteLLM, Ollama's Anthropic-compatible endpoint, claude-code-router, LM Studio, ...) via `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL`. The transcripts then carry non-Claude model ids such as `qwen2.5-coder:32b` or `ollama/llama3.1:70b`.
 
@@ -41,7 +132,7 @@ Claude Code can run against local models through a gateway or proxy (LiteLLM, Ol
   - An agent whose model a server has loaded shows "loaded in Ollama · 18.2 GB VRAM" on its card, and the view lists "used by: session / agent".
   - Test hooks: `CLAUDE_VIS_OLLAMA_URL`, `CLAUDE_VIS_LMSTUDIO_URL` (`off` disables).
 
-## First run
+### First run
 
 On first launch the app shows a welcome screen with a live setup checklist:
 
@@ -52,13 +143,13 @@ On first launch the app shows a welcome screen with a live setup checklist:
 
 Then "Take the tour" walks through the sidebar, the agent graph, the mode panel, the log, the usage meters and the buttons in the title bar. Reopen it any time with **help & tour** at the bottom of the sidebar, **Show welcome & tour** in the tray menu, or the button in the settings dialog. Tour versions are tracked in `src/core/onboarding.ts` (`ONBOARDING_VERSION`); bumping it shows the welcome screen again to existing users.
 
-## Window and keys
+### Window and keys
 
 The app draws its own title bar (brand, page, usage meters, mini view and settings); the window buttons are the system's own. Packaged
 builds have no application menu on Windows and Linux, so Ctrl+R no longer reloads (and resets) the window; dev builds keep a Dev menu
 with DevTools and reload. Esc closes the agent details, dialogs and menus.
 
-## How it gets data
+### How it gets data
 
 1. **Transcripts (default, zero setup).** The app tails `~/.claude/projects/<project>/<session>.jsonl`, the
    per-subagent files in `<session>/subagents/` (including `subagents/workflows/<run>/`), their `.meta.json` files
@@ -73,7 +164,7 @@ with DevTools and reload. Esc closes the agent details, dialogs and menus.
 The transcript format is internal to Claude Code and changes between versions. The parser treats every field as
 optional and counts lines it doesn't understand (shown as "unparsed" in the status bar) instead of failing.
 
-### What "progress" means here
+#### What "progress" means here
 
 Claude Code doesn't report a percentage for an agent, so the app doesn't invent one:
 
@@ -83,7 +174,7 @@ Claude Code doesn't report a percentage for an agent, so the app doesn't invent 
 - The sparkline shows tool calls over the last 12 minutes.
 - An agent that's still marked running but has been silent for a few minutes is shown as *quiet*.
 
-## Everyday use
+### Everyday use
 
 Settings (the settings button at the top right, section **App**) and the tray menu expose:
 
@@ -101,7 +192,7 @@ Settings (the settings button at the top right, section **App**) and the tray me
 A second launch of the app focuses the running window; a second launch with `--hidden` (what the login item uses) does not.
 Set `CLAUDE_VIS_NO_SYSTEM_INTEGRATION=1` to skip login-item and global-hotkey registration (the e2e tests do).
 
-## Watching another computer
+### Watching another computer
 
 The **devices** page links two installs, e.g. a Mac that runs Claude Code and a Windows PC you look at it from. On the Mac, tick
 **Share with my other computers** (off by default; nothing listens on the network until you do). It shows a one-time code. On the PC, enter the
@@ -109,13 +200,13 @@ Mac's host name or IP (or its Tailscale name), port `47830` and the code. From t
 the Mac's name, on the all-sessions page and in the inbox, and the usage meters use the freshest reading from either machine. The link is
 read-only and encrypted. Design and security notes: [docs/PEER-LINK.md](docs/PEER-LINK.md). Building on a Mac: [docs/MAC.md](docs/MAC.md).
 
-## Launching
+### Launching
 
 - **Installed app:** run `release/<version>/Claude Visualized Setup <version>.exe` once. It installs per user (no admin), adds **Claude Visualized** to the Start menu, so you can just search for it, and puts a shortcut on the desktop.
 - **From this folder:** double-click **`Launch Claude Visualized.cmd`**. It starts the installed app, or the latest local build in `release/` if it is not installed.
 - **Tray / login:** the app keeps running in the tray when you close the window. Turn on "Start with Windows" in the settings (settings → App) to have it start with your computer.
 
-## Develop
+### Develop
 
 ```bash
 npm install
@@ -165,7 +256,7 @@ Environment overrides (mainly for tests):
 | `CLAUDE_VIS_NO_DISCOVERY` | no LAN discovery beacon / listener |
 | `CLAUDE_VIS_DEVICE_NAME` | this computer's name as shown on paired computers |
 
-### Layout
+#### Layout
 
 ```
 src/core/       pure logic shared by main + renderer: events, normalize (lines/hooks → events),
@@ -177,7 +268,7 @@ src/renderer/   React UI: AgentGraph, ModePanel, LogPanel, StatusBar, SessionLis
 tests/          vitest unit tests with a synthetic ~/.claude fixture, Playwright e2e
 ```
 
-## Packaging notes
+### Packaging notes
 
 - **Windows:** `npm run dist:win` builds an NSIS installer that installs per user, with no admin needed. It is unsigned, so
   SmartScreen will warn until you sign it with a code-signing certificate.
