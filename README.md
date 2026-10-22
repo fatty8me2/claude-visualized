@@ -49,6 +49,14 @@ Take the tour from the welcome screen, or reopen it any time with **help & tour*
 
 The full list of files and network calls, with the conditions for each, is in [docs/PRIVACY.md](docs/PRIVACY.md).
 
+## Sync with Google Drive
+
+**Settings > Sync** keeps your layouts and preferences the same on all your computers. It uses the folder that Google Drive for desktop already syncs (or any folder you choose, such as Dropbox or OneDrive), so the app has no Google sign-in and no network code for it. If Drive for desktop is not installed, the Sync section links to the download and has a **Check again** button.
+
+- **Synced** (into `<Drive>/Claude Visualized/`): panel layout, overview grid and density, plan rail, graph view options, pinned and hidden sessions, collapsed sections, and a few switches (notifications, follow active session, mini view on top, auto-update).
+- **Never synced**: anything in `~/.claude`, your Claude login, the peer-link key and paired computers, the history database, the hook port, window position, local model server addresses, and this computer's name. The synced keys are an explicit allowlist, covered by a unit test.
+- The newest change to each setting wins. If Drive already has settings when you turn sync on, you choose between Drive's settings, this computer's, or a merge. Turning sync off leaves the files in Drive. If the folder is unavailable (Drive not running), the app keeps working and syncs again when it returns.
+
 ## Uninstall hooks
 
 1. Click **Hooks and settings** (the button in the title bar).

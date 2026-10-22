@@ -1,0 +1,136 @@
+/* Settings > Sync: glass cards in the same language as dialogs.css / insights.css. Loaded by components/SyncSettings.tsx. */
+.sync {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sync .sync-lead {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.sync-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-3);
+  border: 1px solid color-mix(in srgb, var(--line-2) 80%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--text) 3.5%, transparent), transparent 60px),
+    color-mix(in srgb, var(--bg) 55%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent);
+}
+.sync-path {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+.sync-warn {
+  margin: 0;
+  color: var(--warn);
+  font-size: 12px;
+}
+.sync-machines {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+.sync-machine {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+}
+.sync-mname {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sync-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.sync-dot[data-on='true'] {
+  background: var(--ok);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 70%, transparent);
+}
+.sync-install {
+  border-color: color-mix(in srgb, var(--opus) 40%, var(--line-2));
+}
+.sync-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: var(--r-2);
+  border: 1px solid color-mix(in srgb, var(--opus) 70%, transparent);
+  background: color-mix(in srgb, var(--opus) 22%, var(--track));
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12.5px;
+}
+.sync-link:hover {
+  background: color-mix(in srgb, var(--opus) 32%, var(--track));
+}
+.sync-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sync-folder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--r-2);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-1) var(--ease-out),
+    background var(--dur-1) var(--ease-out);
+}
+.sync-folder:hover {
+  background: var(--hover);
+}
+.sync-folder.on {
+  border-color: color-mix(in srgb, var(--opus) 65%, transparent);
+  background: var(--sel);
+  box-shadow: 0 0 14px -6px color-mix(in srgb, var(--opus) 70%, transparent);
+}
+.sync-flabel {
+  white-space: nowrap;
+}
+.sync-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sync-choices button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  padding: 8px 12px;
+}
+.sync-what summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sync-what p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}

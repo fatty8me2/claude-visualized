@@ -39,6 +39,15 @@ Outside that folder, the app writes only in these cases:
 
 The app never writes to transcripts, project folders or anything else in `~/.claude`.
 
+## Sync with Google Drive (off by default)
+
+When you turn on **Settings > Sync** and pick a folder, the app writes two kinds of file into `<folder>/Claude Visualized/`: `settings.<device id>.json` (one per computer) and a shared `settings.json`. Syncing them between computers is done by Google Drive for desktop (or whichever client owns the folder); the app itself makes no network call for this and has no Google account access.
+
+- **What is written**: an explicit allowlist (`src/core/settingsSync.ts`, pinned by `tests/unit/settingsSync.test.ts`): panel layout, overview grid and density, plan rail, graph view options, pinned and hidden session ids, collapsed sections, the "active only" filter, and these switches: follow active session, notify on attention, notify on subagent done, mini view on top, auto-download updates. Each file also holds this computer's name, a random device id and the time of its last sync, so the other computers can list it.
+- **What is never written**: anything from `~/.claude`, Claude login credentials or tokens, `peers.json` (the peer-link private key and paired computers), the history database (a live SQLite file that cloud sync can corrupt), the hook port, the peer port, window position, the global hotkey, the login-item setting, local model server addresses.
+- Files from the folder are validated before use: unknown keys, wrong types and broken JSON are ignored. Turning sync off leaves the files in the folder; delete them from Drive to remove them.
+- The app keeps its own sync bookkeeping (device id, folder, last values) in `sync-state.json` in the profile folder, which is never synced.
+
 ## Network calls
 
 Every outbound connection the source makes, and when it happens:
@@ -76,5 +85,6 @@ Design and security notes: [PEER-LINK.md](PEER-LINK.md).
 - **Usage meters:** leave them alone and no usage calls or token renewals happen. Setting `CLAUDE_VIS_NO_USAGE_API=1` turns them off for a run (the e2e tests use this).
 - **Updates:** set `CLAUDE_VIS_NO_UPDATES=1` to turn off update checks entirely. The settings page has "Automatically download updates" to stop background downloads while still checking.
 - **Hooks:** remove them from the hooks dialog. The app then reads transcripts only, which is about a second behind.
+- **Sync:** off by default; turn it off in Settings > Sync. The files stay in the folder.
 - **Sharing:** off by default, and it stops listening as soon as you untick it.
 - **Local model servers:** remove the endpoints you added in local model settings.

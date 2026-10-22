@@ -4,6 +4,7 @@ import type { InboxService } from '../inbox';
 import type { LocalMonitor } from '../localMonitor';
 import type { SessionManager } from '../manager';
 import type { PeerService } from '../peer/service';
+import type { SettingsSync } from '../settingsSync';
 import type { SystemInfoView } from '@core/api';
 import type { Updater } from '../updater';
 import type { UsageView } from '@core/usage';
@@ -13,6 +14,7 @@ import { registerHistoryIpc } from './history';
 import { registerLocalIpc } from './local';
 import { registerPeersIpc } from './peers';
 import { registerSessionsIpc } from './sessions';
+import { registerSyncIpc } from './sync';
 import { registerSystemIpc } from './system';
 import { registerUpdatesIpc } from './updates';
 import { registerUsageIpc } from './usage';
@@ -40,6 +42,7 @@ export interface IpcContext {
   takePendingOpenSettings: () => boolean;
   updater: Updater;
   peers: PeerService;
+  sync: SettingsSync;
   /** turn "Share with my other computers" on or off (persisted) */
   setSharing: (on: boolean) => Promise<void>;
   setPeerPort: (port: number) => Promise<void>;
@@ -63,6 +66,7 @@ export const IPC_AREAS: readonly IpcRegistrar[] = [
   registerUpdatesIpc,
   registerHistoryIpc,
   registerPeersIpc,
+  registerSyncIpc,
 ];
 
 export function registerAllIpc(ctx: IpcContext): void {

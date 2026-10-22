@@ -20,9 +20,13 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { MiniView } from './components/MiniView';
+import { startSyncBridge } from './state/syncBridge';
 
 // lets CSS adapt to the window chrome (macOS traffic lights vs the Windows caption buttons)
 document.documentElement.dataset.platform = window.api.platform;
+
+// settings sync: mirrors the allowlisted preferences to the main process (the mini window shares localStorage and needs none of this)
+if (!window.api.isMini) startSyncBridge();
 
 const root = createRoot(document.getElementById('root')!);
 root.render(<ErrorBoundary>{window.api.isMini ? <MiniView /> : <App />}</ErrorBoundary>);
