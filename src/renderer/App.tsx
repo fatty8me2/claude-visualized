@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Tour, Welcome } from './components/Onboarding';
+import { SetupWizard } from './components/SetupWizard';
 import { SessionList } from './components/SessionList';
 import { SettingsDialog } from './components/SettingsDialog';
 import { UpdatePill, useUpdates } from './components/UpdatesSettings';
@@ -44,6 +45,8 @@ export function App() {
     onboarding,
     setOnboarding,
     openWelcome,
+    openSetup,
+    setupStart,
     finish: finishOnboarding,
     startTour,
   } = useOnboarding(config, () => {
@@ -95,7 +98,7 @@ export function App() {
           onCollapse={() => setCollapsed(!collapsed)}
           page={page}
           onPage={setPage}
-          onHelp={openWelcome}
+          onHelp={() => openSetup(false)}
           activeOnly={activeOnly}
           onActiveOnly={setActiveOnly}
           badges={{ inbox: inbox?.count ?? 0 }}
@@ -111,7 +114,7 @@ export function App() {
           showAgent,
           setPage,
           openSettings: () => setShowSettings(true),
-          openWelcome,
+          openWelcome: () => openSetup(false),
           activeOnly,
           session: view
             ? {
@@ -144,7 +147,24 @@ export function App() {
           onClose={() => setShowSettings(false)}
           onWelcome={() => {
             setShowSettings(false);
-            setOnboarding('welcome');
+            openWelcome();
+          }}
+          onSetup={() => {
+            setShowSettings(false);
+            openSetup(true);
+          }}
+        />
+      )}
+      {onboarding === 'setup' && (
+        <SetupWizard
+          startStep={setupStart}
+          onTour={() => {
+            startTour();
+          }}
+          onClose={() => setOnboarding('none')}
+          openSettings={() => {
+            setOnboarding('none');
+            setShowSettings(true);
           }}
         />
       )}

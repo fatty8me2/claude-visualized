@@ -660,6 +660,12 @@ describe('first-run welcome and tour', () => {
     const first = await open();
     try {
       const page = first.page;
+      // a first launch opens the setup wizard; skipping it leaves the welcome checklist one click away in Settings
+      await page.getByTestId('setup-wizard').waitFor({ timeout: 20_000 });
+      await page.getByTestId('setup-skip').click();
+      await page.getByTestId('setup-wizard').waitFor({ state: 'detached' });
+      await page.getByRole('button', { name: /hooks/ }).click();
+      await page.getByRole('button', { name: /Show welcome/ }).click();
       await page.getByTestId('welcome').waitFor({ timeout: 20_000 });
       await page.locator('[data-check="claude"].ok').waitFor({ timeout: 10_000 });
       expect(await page.locator('[data-check="claude"]').innerText()).toMatch(/Found \d+ session/);
@@ -698,7 +704,7 @@ describe('first-run welcome and tour', () => {
       await page.waitForTimeout(1500);
       expect(await page.getByTestId('welcome').count()).toBe(0);
       await page.getByRole('button', { name: /help/ }).click();
-      await page.getByTestId('welcome').waitFor();
+      await page.getByTestId('setup-wizard').waitFor();
     } finally {
       await second.app.close();
     }

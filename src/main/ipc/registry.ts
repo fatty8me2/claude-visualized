@@ -13,6 +13,7 @@ import { registerHistoryIpc } from './history';
 import { registerLocalIpc } from './local';
 import { registerPeersIpc } from './peers';
 import { registerSessionsIpc } from './sessions';
+import { registerSetupIpc } from './setup';
 import { registerSystemIpc } from './system';
 import { registerUpdatesIpc } from './updates';
 import { registerUsageIpc } from './usage';
@@ -63,6 +64,7 @@ export const IPC_AREAS: readonly IpcRegistrar[] = [
   registerUpdatesIpc,
   registerHistoryIpc,
   registerPeersIpc,
+  registerSetupIpc,
 ];
 
 export function registerAllIpc(ctx: IpcContext): void {
