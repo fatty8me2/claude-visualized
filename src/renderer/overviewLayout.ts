@@ -55,23 +55,28 @@ function playFlip() {
     const sx = a.width / b.width;
     const sy = a.height / b.height;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
+    const delay = Math.min(i++, 6) * 35;
+    // transform only: the panel springs from its old rect to the new one
     el.animate(
       [
-        {
-          transformOrigin: 'top left',
-          transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`,
-          filter: 'brightness(1.2)',
-          boxShadow: '0 0 0 1px var(--opus), 0 0 36px -8px var(--opus)',
-        },
-        {
-          transformOrigin: 'top left',
-          transform: 'translate(0, 0) scale(1, 1)',
-          filter: 'brightness(1)',
-          boxShadow: '0 0 0 1px transparent, 0 0 0 0 transparent',
-        },
+        { transformOrigin: 'top left', transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` },
+        { transformOrigin: 'top left', transform: 'translate(0, 0) scale(1, 1)' },
       ],
-      { duration: 620, delay: Math.min(i++, 6) * 35, easing: 'cubic-bezier(.18,1.28,.32,1)', fill: 'backwards' },
+      { duration: 620, delay, easing: 'cubic-bezier(.18,1.28,.32,1)', fill: 'backwards' },
     );
+    // a flash of the model's colour over the glass (opacity only)...
+    el.querySelector<HTMLElement>(':scope > .ov-flash')?.animate([{ opacity: 0.9 }, { opacity: 0 }], {
+      duration: 760,
+      delay,
+      easing: 'ease-out',
+      fill: 'backwards',
+    });
+    // ...and when the size changed, the content (laid out at its final size, so squashed mid-flight) fades in as the panel settles
+    if (Math.abs(sx - 1) > 0.02 || Math.abs(sy - 1) > 0.02) {
+      el.querySelectorAll<HTMLElement>(':scope > .ov-body, :scope > .ov-tool').forEach((c) =>
+        c.animate([{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }], { duration: 560, delay, easing: 'ease-out', fill: 'backwards' }),
+      );
+    }
   });
 }
 

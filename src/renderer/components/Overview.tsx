@@ -9,6 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { MAIN, type SessionView } from '@core/state';
+import { contextInfo } from '@core/context';
 import { CtxChip } from './ContextMeter';
 import { GOAL_INFO } from '@core/goal';
 import { coarseNow, panelPlan, panelTier, type PanelTier } from '@core/panelContent';
@@ -34,11 +35,11 @@ import {
   type Span,
 } from '@core/overviewGrid';
 import { GoalBadge } from './GoalBadge';
-import { StatusText } from './cardParts';
+import { seedOf, StatusText } from './cardParts';
 import { useNow, useOverview } from '../hooks';
 import { agentName, ago, clock, displayStatus, famClass } from '../util';
 import { AgentGraph } from './AgentGraph';
-import { AgentTable, InsightRail, LiveFeed, PlanStrip } from './PanelExtras';
+import { AgentTable, InsightRail, LiveFeed, PlanStrip, Roll, SideRail } from './PanelExtras';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
 import { estimateAgents, estimateTooltip, formatUSD } from '@core/pricing';
 import { Icon } from './Icon';
@@ -61,6 +62,9 @@ function SpanGlyph({ s }: { s: Span }) {
     </svg>
   );
 }
+
+/** a short, wide small-tier panel has room beside the graph: from this body width it gets a slim side rail */
+const SIDE_RAIL_W = 980;
 
 interface PanelProps {
   v: SessionView;
@@ -111,9 +115,13 @@ function Panel(p: PanelProps) {
   const hasPlan = useMemo(() => tier === 'large' && !!resolvePlan(v.plan, v.todos), [tier, v.plan, v.todos]);
   const pp = panelPlan(tier, density, body.w, body.h, hasPlan);
   const tick = coarseNow(now);
-  const logLines = pp.logLines;
+  const side = tier === 'small' && density !== 'compact' && body.w >= SIDE_RAIL_W;
+  const logLines = side ? 0 : pp.logLines;
   const recent = logLines > 0 ? v.log.filter((l) => l.kind !== 'text').slice(-logLines) : [];
   const project = v.cwd?.split(/[\\/]/).filter(Boolean).pop() ?? '';
+  const ctx = main ? contextInfo(main) : null;
+  const live = st === 'running' || running > 0;
+  const tone = st === 'waiting' ? 'waiting' : live ? 'live' : 'idle';
   const est = v.costUSD == null ? estimateAgents(v.agents) : null;
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => void (openTimer.current && clearTimeout(openTimer.current)), []);
@@ -121,6 +129,8 @@ function Panel(p: PanelProps) {
     'ov-panel',
     plan ? 'plan' : 'build',
     st === 'waiting' ? 'waiting' : '',
+    tone,
+    famClass(main?.model),
     `d-${density}`,
     pinned ? 'pinned' : '',
     hidden ? 'ghosted' : '',
@@ -131,7 +141,18 @@ function Panel(p: PanelProps) {
     .filter(Boolean)
     .join(' ');
   return (
-    <section className={cls} style={p.cellStyle} data-session={v.id} data-flip={v.id} data-size={sizeLabel(span)} data-tier={tier}>
+    <section
+      className={cls}
+      style={{ ...p.cellStyle, '--seed': seedOf(v.id) } as CSSProperties}
+      data-session={v.id}
+      data-flip={v.id}
+      data-size={sizeLabel(span)}
+      data-tier={tier}
+    >
+      <i className="ov-edge" aria-hidden />
+      <i className="ov-sheen" aria-hidden />
+      <i className="ov-flash" aria-hidden />
+      <i className="ov-ring" aria-hidden />
       <header
         className="ov-head"
         onPointerDown={(e) => p.onHeadDown(v.id, e)}
@@ -148,6 +169,9 @@ function Panel(p: PanelProps) {
         onDoubleClick={() => p.onMaximize(v.id)}
         title="Click to open, double-click to maximize, drag onto another panel to swap"
       >
+        <span className="ov-light" data-tone={tone} aria-hidden>
+          <i />
+        </span>
         <span className="ov-num">{index + 1}</span>
         <span className={`modebadge chip ${plan ? 'plan' : ''}`} data-tone={plan ? 'plan' : 'build'}>
           {plan ? 'PLAN' : 'BUILD'}
@@ -172,10 +196,15 @@ function Panel(p: PanelProps) {
             <b style={{ color: 'var(--fam)' }}>{modelLabel(main?.model)}</b> {isLocalModel(main?.model) && <LocalTag />} <StatusText st={st} />
           </span>
           <span className="ov-sub ov-meta">
+            {ctx?.windowKnown && (
+              <span className={`ov-gauge ${ctx.level}`} style={{ '--p': Math.min(1, ctx.fraction) } as CSSProperties} aria-hidden>
+                <i />
+              </span>
+            )}
             <CtxChip agent={main} />
             {main && main.contextTokens > 0 ? ' · ' : ''}
             agents {running}/{subs.length}
-            {localAgents > 0 && !isLocalModel(main?.model) ? ` · ${localAgents} local` : ''} · {formatTokens(tokens)} tok
+            {localAgents > 0 && !isLocalModel(main?.model) ? ` · ${localAgents} local` : ''} · <Roll text={formatTokens(tokens)} /> tok
             {v.costUSD != null ? (
               ` · $${v.costUSD.toFixed(2)}`
             ) : est && est.usd > 0 ? (
@@ -250,10 +279,27 @@ function Panel(p: PanelProps) {
           )}
         </div>
       )}
-      <div className="ov-body" ref={bodyRef} data-tier={tier} data-wide={pp.wide ? 1 : 0} data-testid="ov-body">
+      <div
+        className={`ov-body ${side ? 'side' : ''}`}
+        ref={bodyRef}
+        data-tier={tier}
+        data-wide={pp.wide ? 1 : 0}
+        data-side={side ? 1 : 0}
+        data-testid="ov-body"
+      >
         <div className="ov-graph">
-          <AgentGraph view={v} now={now} selectedAgent={null} onSelect={() => p.onOpen(v.id)} showFinished={!activeOnly} onToggleFinished={() => {}} embedded fill />
+          <AgentGraph
+            view={v}
+            now={now}
+            selectedAgent={null}
+            onSelect={() => p.onOpen(v.id)}
+            showFinished={!activeOnly}
+            onToggleFinished={() => {}}
+            embedded
+            fill
+          />
         </div>
+        {side && <SideRail v={v} tick={tick} feed={body.h >= 350} />}
         {pp.rail && <InsightRail v={v} tick={tick} />}
         {pp.plan && !pp.wide && <PlanStrip v={v} />}
         {pp.feed && (
@@ -522,7 +568,7 @@ export function Overview({ onOpen, onLocal, activeOnly = false }: { onOpen: (id:
   const customized = JSON.stringify(layout) !== JSON.stringify(DEFAULT_OVERVIEW) || showHidden || !!maxActive;
   const sumPx = (a: number[]) => a.reduce((x, y) => x + y, 0);
   return (
-    <div className={`overview d-${layout.density}`}>
+    <div className={`overview d-${layout.density} ${n > 8 ? 'calm' : ''}`}>
       <div className="page-head">
         <h2>
           <Icon name="overview" size="md" />
