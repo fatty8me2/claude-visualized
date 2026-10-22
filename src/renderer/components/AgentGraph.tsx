@@ -366,12 +366,17 @@ export function AgentGraph({
   const edgeMeta = useMemo(() => {
     let key = '';
     const map = new Map<string, EdgeMeta>();
-    for (const a of Object.values(view.agents)) {
-      const st = displayStatus(a, now);
+    const all = Object.values(view.agents);
+    const stat = all.map((a) => displayStatus(a, now));
+    // a tool call in flight makes the packets burn brighter; reported only while the edge layer is not calm (few running agents)
+    const showTool = stat.filter((s) => s === 'running').length <= MANY_RUNNING;
+    all.forEach((a, i) => {
+      const st = stat[i];
       const fam = modelFamily(a.model);
-      map.set(a.id, { st, fam, started: a.startedAt });
-      key += `${a.id}|${st}|${fam}|${a.startedAt}\n`;
-    }
+      const tool = showTool && st === 'running' && !!a.currentTool;
+      map.set(a.id, { st, fam, started: a.startedAt, tool });
+      key += `${a.id}|${st}|${fam}|${a.startedAt}|${tool ? 1 : 0}\n`;
+    });
     if (metaRef.current.key === key) return metaRef.current.map;
     metaRef.current = { key, map };
     return map;
