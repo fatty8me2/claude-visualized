@@ -184,13 +184,14 @@ describe('all-sessions overview (fixture data, 4 live sessions)', () => {
     expect(await page.locator('.modebox').count()).toBe(0);
   });
 
-  it('switches density: compact hides the log lines and shrinks the header', async () => {
+  it('switches density: compact forces the small tier (graph + log) and shrinks the header', async () => {
     const o = (await order()) as string[];
     const hh = (await box(`.ov-panel[data-session="${o[0]}"] .ov-head`)).height;
     expect(await page.locator('.ov-log').count()).toBeGreaterThan(0);
     await page.getByTestId('density-compact').click();
     await settle();
-    expect(await page.locator('.ov-log').count()).toBe(0);
+    expect(await page.locator('.ov-panel:not([data-tier="small"])').count()).toBe(0);
+    expect(await page.locator('.px-rail').count()).toBe(0);
     expect((await box(`.ov-panel[data-session="${o[0]}"] .ov-head`)).height).toBeLessThan(hh);
     expect(await page.locator('.ov-grid').getAttribute('data-cols')).toBe('3');
     await page.screenshot({ path: path.join(ART, 'overview-resize-7-compact.png') });

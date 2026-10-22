@@ -32,6 +32,13 @@ export function fitScale(content: Size, viewport: Size, pad: number, fitHeight: 
   return Number.isFinite(s) ? Math.max(floor, s) : max;
 }
 
+/** How many columns of cards of `nodeW` (with `gutter` between them) fit in `width` with `pad` on each side, at scale 1. */
+export function columnsForWidth(width: number, nodeW: number, gutter: number, pad: number, min = 2, max = 12): number {
+  if (!(width > 0)) return max;
+  const n = Math.floor((width - pad * 2 + gutter) / (nodeW + gutter));
+  return Math.max(min, Math.min(max, n));
+}
+
 export function clampZoom(z: number): number {
   if (!Number.isFinite(z)) return 1;
   return Math.min(ZOOM.max, Math.max(ZOOM.min, z));

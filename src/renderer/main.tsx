@@ -7,6 +7,7 @@ import '@fontsource/jetbrains-mono/600.css';
 import '@fontsource/jetbrains-mono/700.css';
 import './theme.css';
 import './overview.css';
+import './panelExtras.css';
 import './agentInfo.css';
 import './graphCards.css';
 import './local.css';

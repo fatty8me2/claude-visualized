@@ -11,6 +11,8 @@ import {
 import { MAIN, type SessionView } from '@core/state';
 import { CtxChip } from './ContextMeter';
 import { GOAL_INFO } from '@core/goal';
+import { coarseNow, panelPlan, panelTier, type PanelTier } from '@core/panelContent';
+import { resolvePlan } from '@core/plan';
 import { agentGoal, agentInsight } from '@core/insight';
 import { formatTokens, modelLabel } from '@core/summarize';
 import {
@@ -36,6 +38,7 @@ import { StatusText } from './cardParts';
 import { useNow, useOverview } from '../hooks';
 import { agentName, ago, clock, displayStatus, famClass } from '../util';
 import { AgentGraph } from './AgentGraph';
+import { AgentTable, InsightRail, LiveFeed, PlanStrip } from './PanelExtras';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
 import { estimateAgents, estimateTooltip, formatUSD } from '@core/pricing';
 import { Icon } from './Icon';
@@ -43,11 +46,10 @@ import { MachineChip } from './MachineChip';
 import { openInClaude } from '../state/toast';
 import { markFlip, useFlipPlayer, useOverviewLayout, type OverviewApi } from '../overviewLayout';
 
-const LOG_LINES: Record<Density, number> = { compact: 0, comfortable: 2, spacious: 4 };
 const DENSITY_HINT: Record<Density, string> = {
-  compact: 'Compact: more columns, a slim header, no log lines',
-  comfortable: 'Comfortable: balanced columns and two log lines',
-  spacious: 'Spacious: fewer, larger panels with more log lines',
+  compact: 'Compact: more columns, a slim header, just the graph and a short log',
+  comfortable: 'Comfortable: balanced columns; panels add insights as they grow',
+  spacious: 'Spacious: fewer, larger panels that show more sooner',
 };
 
 /** a tiny picture of a span, used on the size buttons */
@@ -91,8 +93,26 @@ function Panel(p: PanelProps) {
   const plan = v.mode === 'plan';
   const localAgents = Object.values(v.agents).filter((a) => isLocalModel(a.model)).length;
   const tokens = v.totals.in + v.totals.out + v.totals.cacheRead + v.totals.cacheWrite;
-  const logLines = LOG_LINES[density];
-  const recent = v.log.filter((l) => l.kind !== 'text').slice(-Math.max(logLines, 1));
+  // what the panel shows follows the size of its body (below the header) and the density
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [body, setBody] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const measure = () => setBody((o) => (o.w === el.clientWidth && o.h === el.clientHeight ? o : { w: el.clientWidth, h: el.clientHeight }));
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, []);
+  const prevTier = useRef<PanelTier | undefined>(undefined);
+  const tier = panelTier(body.w, body.h, density, prevTier.current);
+  prevTier.current = tier;
+  const hasPlan = useMemo(() => tier === 'large' && !!resolvePlan(v.plan, v.todos), [tier, v.plan, v.todos]);
+  const pp = panelPlan(tier, density, body.w, body.h, hasPlan);
+  const tick = coarseNow(now);
+  const logLines = pp.logLines;
+  const recent = logLines > 0 ? v.log.filter((l) => l.kind !== 'text').slice(-logLines) : [];
   const project = v.cwd?.split(/[\\/]/).filter(Boolean).pop() ?? '';
   const est = v.costUSD == null ? estimateAgents(v.agents) : null;
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -111,7 +131,7 @@ function Panel(p: PanelProps) {
     .filter(Boolean)
     .join(' ');
   return (
-    <section className={cls} style={p.cellStyle} data-session={v.id} data-flip={v.id} data-size={sizeLabel(span)}>
+    <section className={cls} style={p.cellStyle} data-session={v.id} data-flip={v.id} data-size={sizeLabel(span)} data-tier={tier}>
       <header
         className="ov-head"
         onPointerDown={(e) => p.onHeadDown(v.id, e)}
@@ -230,23 +250,40 @@ function Panel(p: PanelProps) {
           )}
         </div>
       )}
-      <div className="ov-graph">
-        <AgentGraph view={v} now={now} selectedAgent={null} onSelect={() => p.onOpen(v.id)} showFinished={!activeOnly} onToggleFinished={() => {}} embedded />
+      <div className="ov-body" ref={bodyRef} data-tier={tier} data-wide={pp.wide ? 1 : 0} data-testid="ov-body">
+        <div className="ov-graph">
+          <AgentGraph view={v} now={now} selectedAgent={null} onSelect={() => p.onOpen(v.id)} showFinished={!activeOnly} onToggleFinished={() => {}} embedded fill />
+        </div>
+        {pp.rail && <InsightRail v={v} tick={tick} />}
+        {pp.plan && !pp.wide && <PlanStrip v={v} />}
+        {pp.feed && (
+          <div className="px-lower">
+            <LiveFeed v={v} />
+            {pp.wide ? (
+              <div className="stack">
+                {pp.plan && <PlanStrip v={v} />}
+                {pp.table && <AgentTable v={v} now={now} rows={pp.tableRows} />}
+              </div>
+            ) : (
+              pp.table && <AgentTable v={v} now={now} rows={pp.tableRows} />
+            )}
+          </div>
+        )}
+        {logLines > 0 && (
+          <footer className="ov-log">
+            {recent.length === 0 && <div className="empty-note">no activity yet</div>}
+            {recent.map((l) => (
+              <div key={l.seq}>
+                <span style={{ color: 'var(--faint)' }}>{clock(l.ts)}</span>{' '}
+                <span className={famClass(v.agents[l.agentId]?.model)} style={{ color: 'var(--fam)' }}>
+                  {agentName(v.agents[l.agentId])}
+                </span>{' '}
+                {l.text}
+              </div>
+            ))}
+          </footer>
+        )}
       </div>
-      {logLines > 0 && (
-        <footer className="ov-log">
-          {recent.length === 0 && <div className="empty-note">no activity yet</div>}
-          {recent.map((l) => (
-            <div key={l.seq}>
-              <span style={{ color: 'var(--faint)' }}>{clock(l.ts)}</span>{' '}
-              <span className={famClass(v.agents[l.agentId]?.model)} style={{ color: 'var(--fam)' }}>
-                {agentName(v.agents[l.agentId])}
-              </span>{' '}
-              {l.text}
-            </div>
-          ))}
-        </footer>
-      )}
     </section>
   );
 }

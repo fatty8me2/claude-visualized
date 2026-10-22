@@ -5,9 +5,10 @@ A desktop app (Windows + macOS) that shows what your Claude Code sessions are do
 - **Agent graph**: the main agent, every subagent it spawns (including nested agents, background agents and
   workflow agents), each titled by its task, with its model, status, current tool, elapsed time, token use and an activity sparkline.
   Hold Ctrl and scroll (or pinch) to zoom around the pointer, drag empty space to pan, or use the fit / − / % / + buttons. Full cards are
-  never shrunk below a readable size: when a tree is too wide for the panel the graph switches to compact cards and scrolls instead.
+  never shrunk below a readable size: the layout wraps into as many columns as the panel is wide (`columnsForWidth`), so a wide tree grows downward instead of scrolling sideways.
   "hide finished" folds finished agents into a chip (a graph setting, remembered); open a chip to see them and fold them back with the
   fold button on their parent. Click empty space or press Esc to close an agent's details.
+- **All sessions overview**: resizable panels (1x1 to 2x2, maximize, reorder, pin, hide, three densities). Each panel picks its content from its measured size (`src/core/panelContent.ts`): small panels (and compact density) show the graph and a 2-line log; medium panels add an insight rail (30-minute activity sparkline, tokens/min and est. $/h, main context with "auto-compact in ~N min", running/waiting/done/failed counts); large panels, including maximized, add the live feed, a plan strip (only when the session has a plan) and an agent table (running first). Rates refresh every 15 s.
 - **Mode panel**: PLAN vs BUILD (and the exact permission mode), the session's task checklist, token totals and the
   cost Claude Code reports. When Claude Code reported no cost, an estimate at Anthropic API list prices is shown instead, marked
   "est." with a tooltip (prices in `src/core/pricing.ts`, `PRICES_AS_OF`). Subscription plans are not billed per token, so the estimate is a
