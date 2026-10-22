@@ -2001,6 +2001,40 @@ html[data-platform='darwin'] .mini {
 }
 .meter.stale {
   opacity: 0.6;
+  filter: grayscale(0.7);
+}
+/* a fresh reading just landed: the dot flashes once (re-keyed on every new reading) */
+.m-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--lvl);
+  opacity: 0.35;
+  flex-shrink: 0;
+  animation: m-dot-pulse 1.6s ease-out 1;
+}
+.meter.stale .m-dot {
+  background: var(--faint);
+  animation: none;
+}
+@keyframes m-dot-pulse {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--lvl) 70%, transparent);
+  }
+  100% {
+    opacity: 0.35;
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-dot {
+    animation: none;
+  }
+}
+.m-note {
+  color: var(--muted);
+  font-size: 11px;
 }
 .meter.empty {
   --lvl: var(--faint);

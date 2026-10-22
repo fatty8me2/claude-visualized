@@ -29,7 +29,7 @@ export interface IpcContext {
   getConfig: () => AppConfig;
   updateConfig: (patch: Partial<AppConfig>) => AppConfig;
   getUsage: () => UsageView;
-  pollUsageApi: () => Promise<void>;
+  pollUsageApi: () => Promise<{ ran: boolean; nextAllowedAt: number | null }>;
   systemInfo: () => SystemInfoView;
   applyHotkey: (accelerator: string) => { ok: boolean; error?: string; accelerator?: string };
   toggleMini: () => void;

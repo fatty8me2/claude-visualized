@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { app, BrowserWindow, globalShortcut, Menu, nativeImage, Notification, shell, Tray } from 'electron';
+import { app, BrowserWindow, globalShortcut, Menu, nativeImage, net, Notification, powerMonitor, shell, Tray } from 'electron';
 import { loadConfig, saveConfig, type AppConfig } from './config';
 import type { SystemInfoView } from '@core/api';
 import { loginSupport, shouldShowOnSecondInstance, shouldStartHidden, validateHotkey } from '@core/system';
@@ -7,6 +7,7 @@ import { HookServer } from './hookServer';
 import fs from 'node:fs';
 import { applyQuota, applyStatusline, applyUsageApi, emptyUsage, settleUsage, type UsageView } from '@core/usage';
 import { fetchUsage } from './usageApi';
+import { DEFAULT_CONFIG, scaleConfig, UsageScheduler, type PollOutcome } from '@core/usageScheduler';
 import { registerAllIpc } from './ipc/registry';
 import { getHookState } from './installer';
 import { writeStatusLineScript } from './statusline';
@@ -121,27 +122,47 @@ function loadUsage() {
   }
 }
 
-const USAGE_POLL_MS = 3 * 60_000;
-let usageTimer: NodeJS.Timeout | null = null;
+/** CLAUDE_VIS_USAGE_TIME_SCALE shrinks every interval (tests run the real poller against a fake server in seconds). */
+const usageScale = Number(process.env.CLAUDE_VIS_USAGE_TIME_SCALE) || 1;
+/** scheduler facts shown next to the numbers (not persisted, not shared with peers) */
+let schedulerHint: { intervalMs: number; nextAt: number | null; blockedUntil: number | null } | null = null;
+let hintForStart: number | null = null;
 
-/** Poll the plan usage API; on failure keep the last numbers but say why they may be stale. */
-async function pollUsageApi() {
-  if (usageTimer) clearTimeout(usageTimer);
-  let delay = USAGE_POLL_MS;
+/** One read of the plan usage API; on failure keeps the last numbers (the meters mark them stale) and says why. */
+async function pollUsageOnce(): Promise<PollOutcome> {
   try {
     const r = await fetchUsage();
-    if (r.ok) setUsage(applyUsageApi(usage, r.body, Date.now()));
-    else {
-      setUsage({ ...usage, api: { state: r.state, message: r.message, at: Date.now() } });
-      if (r.retryAfterMs) delay = Math.max(delay, r.retryAfterMs);
-      else if (r.state !== 'error') delay = 60_000; // pick up a fresh `claude /login` quickly
+    if (r.ok) {
+      setUsage(applyUsageApi(usage, r.body, Date.now()));
+      return { kind: 'ok' };
     }
+    setUsage({ ...usage, api: { state: r.state, message: r.message, at: Date.now() } });
+    if (r.rateLimited) return { kind: 'rate-limited', retryAfterMs: r.retryAfterMs };
+    return { kind: r.state === 'error' ? 'error' : 'auth' };
   } catch (e) {
     // a throw (unreadable login file, failed renewal write) must not stop polling; the message never contains token material
     setUsage({ ...usage, api: { state: 'error', message: `Usage check failed: ${(e as Error).message}`, at: Date.now() } });
-  } finally {
-    usageTimer = setTimeout(() => void pollUsageApi(), delay);
+    return { kind: 'error' };
   }
+}
+
+const usageScheduler = new UsageScheduler(
+  {
+    poll: pollUsageOnce,
+    // after each finished read: publish when the next one is due / whether a Retry-After is pending
+    onChange: (st) => {
+      if (st.inFlight || st.lastStartAt === hintForStart) return;
+      hintForStart = st.lastStartAt;
+      schedulerHint = { intervalMs: st.intervalMs, nextAt: st.nextAt, blockedUntil: st.blockedUntil };
+      setImmediate(broadcastUsage);
+    },
+  },
+  usageScale === 1 ? {} : scaleConfig(DEFAULT_CONFIG, usageScale),
+);
+
+/** Click on the meters: read now if allowed, otherwise say when it will be. */
+function pollUsageApi() {
+  return process.env.CLAUDE_VIS_NO_USAGE_API ? Promise.resolve({ ran: false, nextAllowedAt: null }) : usageScheduler.request();
 }
 
 function setUsage(next: UsageView) {
@@ -159,7 +180,8 @@ function setUsage(next: UsageView) {
 /** What the meters show: per window, the freshest reading from this machine or a paired one (same account). */
 function shownUsage(): UsageView {
   const remote = peers?.remoteUsage() ?? [];
-  return remote.length ? settleUsage(mergeUsage(usage, remote), Date.now()) : usage;
+  const merged = remote.length ? settleUsage(mergeUsage(usage, remote), Date.now()) : usage;
+  return schedulerHint && merged.api ? { ...merged, api: { ...merged.api, ...schedulerHint } } : merged;
 }
 
 let lastUsageJson = '';
@@ -175,7 +197,10 @@ function broadcastUsage() {
 
 const hookServer = new HookServer(
   (payload) => manager.ingestHook(payload),
-  (payload) => setUsage(applyStatusline(usage, payload, Date.now())),
+  (payload) => {
+    setUsage(applyStatusline(usage, payload, Date.now()));
+    usageScheduler.activity();
+  },
   (status) => broadcast('hookserver', status),
 );
 
@@ -648,10 +673,25 @@ if (!app.requestSingleInstanceLock()) {
     });
     manager.on('notify', notify);
     manager.on('quota', (q) => setUsage(applyQuota(usage, q, Date.now())));
+    // assistant output in any watched session is what moves the meters: read the API shortly after a burst (not for the startup backlog)
+    const usageGrace = Date.now() + 10_000;
+    manager.on('changed', () => {
+      if (Date.now() > usageGrace) usageScheduler.activity();
+    });
     loadUsage();
     // windows that reset while the app was closed, and countdowns crossing a reset
-    setInterval(() => setUsage(usage), 30_000);
-    if (!process.env.CLAUDE_VIS_NO_USAGE_API) void pollUsageApi();
+    let wasOnline = net.isOnline();
+    setInterval(() => {
+      setUsage(usage);
+      const online = net.isOnline();
+      if (online && !wasOnline) usageScheduler.wake();
+      wasOnline = online;
+    }, 30_000 * usageScale);
+    if (!process.env.CLAUDE_VIS_NO_USAGE_API) {
+      usageScheduler.start();
+      powerMonitor.on('resume', () => usageScheduler.wake());
+      powerMonitor.on('unlock-screen', () => usageScheduler.wake());
+    }
     // keep the status-line forwarder in sync with the configured port
     void getHookState(config.port).then((h) => {
       if (h.statusLine === 'ours') void writeStatusLineScript(config.port);

@@ -45,6 +45,7 @@ Claude Code can run against local models through a gateway or proxy (LiteLLM, Ol
 On first launch the app shows a welcome screen with a live setup checklist:
 
 - **Claude Code data**: it found `~/.claude/projects` and N sessions. If not, install Claude Code (the Code tab in the Claude desktop app, or the `claude` CLI) and run one session.
+- **Usage meters, freshness**: the numbers come from the newest reading of four sources: the status-line forwarder (terminal sessions, real time), Anthropic's usage endpoint, a transcript "limit hit", and paired machines. The endpoint is strictly rate limited, so it is read about every minute while any session is active and every 5 minutes when idle (a burst of activity triggers one extra read 7 s later; a 429 is waited out, and the cadence slows down until it stops happening). The hover text says how old each reading is and when the next read is due; a reading older than two intervals is greyed out, and a small dot pulses when a new one lands. Click to force a read when allowed. The scheduler is `src/core/usageScheduler.ts`; `CLAUDE_VIS_USAGE_URL` and `CLAUDE_VIS_USAGE_TIME_SCALE` point it at a fake server for tests.
 - **Usage meters**: if they say "login needed", open a terminal (Windows Terminal is recommended), run `claude /login` (the welcome screen has a copy button) and paste the code with Ctrl+Shift+V.
 - **Live hooks** (optional): without them the app is about a second behind. The button opens the hooks dialog, which shows a preview before writing anything.
 
