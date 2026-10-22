@@ -3,8 +3,11 @@ import { describeActivity, firstLine } from '@core/activity';
 import { agentGoal } from '@core/insight';
 import { GoalBadge } from './GoalBadge';
 import { GraphBackdrop } from './GraphBackdrop';
+import { GraphCamera, targetFor } from './GraphCamera';
+import { CAMERA, intersects } from '@core/graphCamera';
+import { CameraAnimator } from '../graphCamera';
 import { COMPACT_LAYOUT, DEFAULT_LAYOUT, layoutAgents, type LayoutOptions } from '@core/layout';
-import { clampZoom, columnsForWidth, fitScale, nextCardMode, revealDelta, zoomAnchor, ZOOM, type CardMode } from '@core/graphZoom';
+import { clampZoom, columnsForWidth, fitScale, nextCardMode, zoomAnchor, ZOOM, type CardMode } from '@core/graphZoom';
 import { MAIN, type AgentNode, type SessionView } from '@core/state';
 import { formatDuration, formatTokens, modeLabel, modelFamily, modelLabel } from '@core/summarize';
 import { CtxChip } from './ContextMeter';
@@ -244,6 +247,12 @@ const FILL_MAX_SCALE = 1.2;
 const FILL_MAX_GAP = 34;
 const NO_GROUPS: ReadonlySet<string> = new Set();
 
+/** the card is fully inside the free part of the panel */
+function fullyIn(box: { x: number; y: number; w: number; h: number }, wrap: HTMLElement, obscured: number): boolean {
+  const m = 8;
+  return box.x >= wrap.scrollLeft + m && box.y >= wrap.scrollTop + m && box.x + box.w <= wrap.scrollLeft + wrap.clientWidth - obscured - m && box.y + box.h <= wrap.scrollTop + wrap.clientHeight - m;
+}
+
 export function AgentGraph({
   view,
   now,
@@ -280,6 +289,7 @@ export function AgentGraph({
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [motion] = useState(() => new MotionTracker());
+  const [cam] = useState(() => new CameraAnimator());
   const [wrapW, setWrapW] = useState(0);
   const [wrapH, setWrapH] = useState(600);
   const [prefs, setPrefs] = useGraphPrefs();
@@ -367,6 +377,8 @@ export function AgentGraph({
   const compact = cardMode === 'compact' && !!layoutCompact;
   const layout = compact ? layoutCompact! : layoutFull;
 
+  const mainNode = layout.nodes.find((n) => n.id === MAIN);
+
   const kidStats = useMemo(() => {
     const m = new Map<string, KidStats>();
     for (const c of Object.values(view.agents)) {
@@ -449,10 +461,11 @@ export function AgentGraph({
     const a = anchor.current;
     if (!el || !a || a.scale === scale) return;
     anchor.current = null;
+    cam.cancel();
     const next = zoomAnchor({ scale: a.scale, scrollLeft: a.left, scrollTop: a.top }, scale, a, pad);
     el.scrollLeft = next.scrollLeft;
     el.scrollTop = next.scrollTop;
-  }, [scale, pad]);
+  }, [scale, pad, cam]);
   useEffect(() => {
     const el = wrapRef.current;
     if (!el || embedded) return;
@@ -495,15 +508,65 @@ export function AgentGraph({
     suppressClick.current = !!d?.moved;
   };
 
-  // a selected card hidden under the drawer or off-screen scrolls into view (only when the selection changes)
+  // ---- the camera: eased moves, fly to the selected agent, follow a new agent that spawns out of view ----
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el || embedded) return;
+    cam.attach(el);
+    return () => cam.detach();
+  }, [cam, embedded]);
+  const geom = useRef({ layout, scale, pad });
+  geom.current = { layout, scale, pad };
+  const drawerPx = () => Math.min(DRAWER_W, (wrapRef.current?.clientWidth ?? 0) / 2);
+  /** fly the camera to centre agent `id`; `onlyIfHidden` leaves it alone when it is already in view */
+  const flyTo = useCallback(
+    (id: string, obscured: number, onlyIfHidden: boolean) => {
+      const wrap = wrapRef.current;
+      const canvas = canvasRef.current;
+      if (!wrap || !canvas) return false;
+      const g = geom.current;
+      const t = targetFor(wrap, canvas, g.layout, g.scale, g.pad, id, obscured);
+      if (!t) return false;
+      const view = { w: wrap.clientWidth, h: wrap.clientHeight };
+      if (onlyIfHidden && intersects(t.box, { left: wrap.scrollLeft, top: wrap.scrollTop }, view, obscured, 12) && fullyIn(t.box, wrap, obscured)) return false;
+      cam.moveTo(t.to.left, t.to.top);
+      return true;
+    },
+    [cam],
+  );
+  // a selected card hidden under the drawer or off-screen is flown to (only when the selection changes)
   useEffect(() => {
     if (embedded || !selectedAgent) return;
-    const el = wrapRef.current;
-    const card = el?.querySelector<HTMLElement>(`[data-agent="${CSS.escape(selectedAgent)}"]`);
-    if (!el || !card) return;
-    const d = revealDelta(card.getBoundingClientRect(), el.getBoundingClientRect(), Math.min(DRAWER_W, el.clientWidth / 2));
-    if (d) el.scrollBy({ left: d.dx, top: d.dy, behavior: 'smooth' });
-  }, [selectedAgent, embedded]);
+    flyTo(selectedAgent, drawerPx(), true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAgent, embedded, flyTo]);
+
+  // new agents: the main node pulses when it spawns a child; one that appears out of view is followed when the user is hands-off
+  const haloRef = useRef<HTMLDivElement>(null);
+  const seenAgents = useRef<{ id: string; ids: Set<string> } | null>(null);
+  useEffect(() => {
+    if (embedded) return;
+    const ids = new Set(Object.keys(view.agents));
+    const prev = seenAgents.current;
+    seenAgents.current = { id: view.id, ids };
+    if (!prev || prev.id !== view.id) return;
+    const fresh = [...ids].filter((i) => !prev.ids.has(i));
+    if (!fresh.length || fresh.length > 6) return;
+    if (fresh.some((i) => view.agents[i]?.parentId === MAIN)) {
+      const h = haloRef.current;
+      if (h) {
+        h.classList.remove('fire');
+        void h.offsetWidth;
+        h.classList.add('fire');
+      }
+    }
+    const first = fresh.find((i) => view.agents[i]?.status === 'running');
+    if (first && !selectedAgent && cam.idleFor(CAMERA.idleBeforeFollowMs) && !document.hidden) {
+      // after layout has placed the new card
+      requestAnimationFrame(() => flyTo(first, 0, true));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.agents, view.id, embedded]);
 
   const onFold = groups.fold;
 
@@ -529,6 +592,24 @@ export function AgentGraph({
       }}
     >
       {!embedded && <GraphBackdrop layout={layout} meta={edgeMeta} resetKey={motionKey} paused={!!replaying} />}
+      {!embedded && (
+        <GraphCamera
+          wrapRef={wrapRef}
+          canvasRef={canvasRef}
+          cam={cam}
+          layout={layout}
+          scale={scale}
+          pad={pad}
+          agents={view.agents}
+          meta={edgeMeta}
+          selected={selectedAgent}
+          obscuredRight={selectedAgent ? Math.min(DRAWER_W, wrapW / 2) : 0}
+          onGo={(id) => {
+            flyTo(id, Math.min(DRAWER_W, wrapW / 2), false);
+            onSelect(id);
+          }}
+        />
+      )}
       {!embedded && (
         <div className="graph-tools">
           <div className="seg zoom-seg">
@@ -593,6 +674,20 @@ export function AgentGraph({
           }}
         >
           <GraphEdges layout={layout} meta={edgeMeta} focus={focus} resetKey={motionKey} />
+          {!embedded && mainNode && (
+            <div
+              ref={haloRef}
+              className={`core-halo ${famClass(view.agents[MAIN]?.model)} ${edgeMeta.get(MAIN)?.st === 'running' ? 'live' : ''}`}
+              style={{ left: mainNode.x, top: mainNode.y, width: mainNode.w, height: mainNode.h }}
+              aria-hidden
+            >
+              <i className="core-glow" />
+              <i className="core-pulse" />
+              <i className="core-ring">
+                <i />
+              </i>
+            </div>
+          )}
           {layout.nodes.map((n) => {
             if (n.collapsed) {
               return (

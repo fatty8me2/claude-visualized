@@ -8,6 +8,8 @@ export interface HookServerStatus {
   lastAt: number | null;
 }
 
+const LOCAL_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+
 /**
  * Receives Claude Code "http" hooks. Always answers 200 with an empty body right away, so a hook
  * can never block, deny or slow down a tool call; payloads are processed after responding.
@@ -26,6 +28,13 @@ export class HookServer {
     this.stop();
     this.status = { ...this.status, port, listening: false, error: null };
     const server = http.createServer((req, res) => {
+      // This port is for local tools only. A web page (it sends an Origin header) or a DNS-rebinding trick (a foreign Host)
+      // must not be able to feed events in.
+      if (req.headers.origin || !LOCAL_HOST.test(req.headers.host ?? '')) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
       if (req.method === 'GET' && req.url?.startsWith('/health')) {
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ ok: true, app: 'claude-visualized' }));

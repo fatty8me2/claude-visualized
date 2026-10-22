@@ -1,0 +1,251 @@
+/* The graph's camera layer: minimap, edge chips, and the main node's "core" halo. Transform/opacity only; reduced motion and calm
+   mode (many running agents) keep it still. */
+
+/* a zero-height sticky overlay at the top-left of the scrolling panel; --vh (set by GraphCamera) is the visible height */
+.gcam {
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* ---- minimap: glass, bottom-right (clear of the drawer), only when the graph is bigger than the panel ---- */
+.gcam-map {
+  position: absolute;
+  right: calc(14px + var(--obs, 0px));
+  top: calc(var(--vh, 600px) - 14px);
+  translate: 0 -100%;
+  padding: 5px;
+  box-sizing: content-box;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  backdrop-filter: blur(10px) saturate(1.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 24px -10px rgba(0, 0, 0, 0.85);
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
+  transform-origin: bottom right;
+  transition:
+    opacity 0.28s,
+    transform 0.28s cubic-bezier(0.2, 0.8, 0.3, 1),
+    border-color 0.2s,
+    right 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+  cursor: crosshair;
+  touch-action: none;
+}
+.gcam-map:not(.on) {
+  visibility: hidden;
+  pointer-events: none;
+}
+.gcam-map.on {
+  opacity: 0.94;
+  transform: none;
+  pointer-events: auto;
+}
+.gcam-map.on:hover,
+.gcam-map.drag {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--opus) 55%, var(--line-2));
+}
+.gcam-map canvas {
+  display: block;
+  border-radius: 6px;
+}
+.gcam-vp {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  box-sizing: border-box;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--text) 78%, transparent);
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.0);
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ---- edge chips: running agents that are out of view, pointing the way ---- */
+.gcam-chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 190px;
+  padding: 3px 10px 3px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--fam) 45%, var(--line-2));
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  -webkit-backdrop-filter: blur(8px) saturate(1.3);
+  backdrop-filter: blur(8px) saturate(1.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 6px 16px -8px rgba(0, 0, 0, 0.85),
+    0 0 18px -8px var(--fam);
+  color: var(--text-2, var(--text));
+  font: 500 11px/1.2 var(--font-ui, inherit);
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  animation: gcam-chip-in 0.3s cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+}
+.gcam-chip:hover {
+  border-color: var(--fam);
+  color: var(--text);
+}
+.gcam-chip .arrow {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  rotate: var(--ang, 0rad);
+  fill: none;
+  stroke: var(--fam);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.gcam-chip .dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fam);
+  box-shadow: 0 0 8px var(--fam);
+  animation: gcam-beat 1.6s ease-in-out infinite;
+}
+.gcam-chip.waiting .dot {
+  background: var(--warn, #f5c451);
+  box-shadow: 0 0 8px var(--warn, #f5c451);
+}
+.gcam-chip .lbl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+@keyframes gcam-beat {
+  50% {
+    opacity: 0.45;
+    scale: 0.78;
+  }
+}
+@keyframes gcam-chip-in {
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
+}
+
+/* ---- the main node as a core: a halo with a light that circles it, a breathing glow, and a pulse when it spawns a child ---- */
+.core-halo {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+}
+.core-halo > i {
+  position: absolute;
+  display: block;
+}
+.core-glow {
+  inset: -26px -34px;
+  border-radius: 40px;
+  background: radial-gradient(60% 60% at 50% 50%, color-mix(in srgb, var(--fam) 26%, transparent), transparent 72%);
+  opacity: 0.35;
+}
+.core-halo.live .core-glow {
+  animation: core-breathe 4.2s ease-in-out infinite;
+}
+@keyframes core-breathe {
+  50% {
+    opacity: 0.8;
+    scale: 1.06;
+  }
+}
+/* the ring is a static mask; the light inside it is what turns (compositor only) */
+.core-ring {
+  inset: -7px;
+  border-radius: 20px;
+  padding: 1.5px;
+  overflow: hidden;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  opacity: 0.55;
+}
+.core-ring > i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 240%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: conic-gradient(
+    from 0deg,
+    color-mix(in srgb, var(--fam) 25%, transparent) 0 40%,
+    color-mix(in srgb, var(--fam) 85%, transparent) 70%,
+    color-mix(in srgb, var(--fam) 30%, #fff) 88%,
+    color-mix(in srgb, var(--fam) 25%, transparent) 100%
+  );
+}
+.core-halo.live .core-ring {
+  opacity: 1;
+}
+.core-halo.live .core-ring > i {
+  animation: core-spin 9s linear infinite;
+}
+@keyframes core-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+.core-pulse {
+  inset: -7px;
+  border-radius: 20px;
+  border: 1.5px solid var(--fam);
+  opacity: 0;
+}
+.core-halo.fire .core-pulse {
+  animation: core-pulse 1.1s cubic-bezier(0.15, 0.7, 0.3, 1);
+}
+@keyframes core-pulse {
+  0% {
+    opacity: 0.85;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.28 1.5;
+  }
+}
+/* calm mode: many agents are running, nothing turns */
+.graph-canvas.calm .core-halo.live .core-ring > i,
+.graph-canvas.calm .core-halo.live .core-glow {
+  animation: none;
+}
+.graph-canvas.calm .core-halo.live .core-glow {
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gcam-map,
+  .gcam-chip {
+    transition: none;
+    animation: none;
+  }
+  .gcam-chip .dot,
+  .core-halo.live .core-glow,
+  .core-halo.live .core-ring > i,
+  .core-halo.fire .core-pulse {
+    animation: none;
+  }
+}

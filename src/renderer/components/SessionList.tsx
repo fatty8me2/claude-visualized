@@ -10,6 +10,21 @@ import { Icon } from './Icon';
 import { localMachineName, MachineChip } from './MachineChip';
 import { PAGES, type PageId } from '../views/pages';
 import '../sidebar.css';
+import '../emptyStates.css';
+
+/** Shown when Claude Code has written no sessions yet (a fresh install): say how to start one. */
+function NoSessionsCard() {
+  return (
+    <div className="glass-empty" data-testid="sessions-empty">
+      <Icon name="session" size="md" />
+      <div className="ge-title">No Claude Code sessions yet</div>
+      <p>
+        Start one in the Claude desktop app (the Code tab), or run <code>claude</code> in a terminal and ask it something. It shows up here within a second or
+        two.
+      </p>
+    </div>
+  );
+}
 
 /** FLIP: rows that moved (a session went live, was pinned, the order changed) glide from where they were. Transform only, no state. */
 function useFlip(listRef: React.RefObject<HTMLDivElement | null>) {
@@ -366,6 +381,8 @@ export function SessionList({
           <div className="list-loading">
             <span className="loading">loading sessions…</span>
           </div>
+        ) : sessions?.length === 0 ? (
+          <NoSessionsCard />
         ) : hosts.length === 0 ? (
           <>
             <div className="group-label gl-live">
@@ -419,7 +436,7 @@ export function SessionList({
             })}
           </>
         )}
-        {sessions !== null && !activeOnly && (
+        {sessions !== null && sessions.length > 0 && !activeOnly && (
           <>
             {grouped.pinned.length > 0 && (
               <>
@@ -455,7 +472,7 @@ export function SessionList({
             )}
           </>
         )}
-        {activeOnly && <div className="empty-note list-note">recent sessions hidden · untick “live sessions only” to see them</div>}
+        {activeOnly && sessions?.length !== 0 && <div className="empty-note list-note">recent sessions hidden · untick “live sessions only” to see them</div>}
       </div>
       <div className="sidebar-foot">
         <button className="ghost" data-tour="help" onClick={onHelp} title="Welcome guide and tour">
