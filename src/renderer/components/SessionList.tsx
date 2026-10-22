@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { PeersView } from '@core/api';
 import { groupRecent, matchSession, type ProjectGroup } from '@core/sessionGroups';
 import type { SessionSummary } from '@core/state';
@@ -9,6 +9,29 @@ import { ContextMenu, type MenuItem } from './ContextMenu';
 import { Icon } from './Icon';
 import { localMachineName, MachineChip } from './MachineChip';
 import { PAGES, type PageId } from '../views/pages';
+import '../sidebar.css';
+
+/** FLIP: rows that moved (a session went live, was pinned, the order changed) glide from where they were. Transform only, no state. */
+function useFlip(listRef: React.RefObject<HTMLDivElement | null>) {
+  const prev = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const next = new Map<string, number>();
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const origin = list.getBoundingClientRect().top - list.scrollTop;
+    list.querySelectorAll<HTMLElement>('.session-row[data-session]').forEach((el) => {
+      const id = el.dataset.session!;
+      const top = el.getBoundingClientRect().top - origin;
+      next.set(id, top);
+      const was = prev.current.get(id);
+      if (!reduce && was !== undefined && Math.abs(was - top) > 2 && Math.abs(was - top) < 600 && el.animate) {
+        el.animate([{ transform: `translateY(${was - top}px)` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+      }
+    });
+    prev.current = next;
+  });
+}
 
 type OpenMenu = (s: SessionSummary, x: number, y: number) => void;
 
@@ -39,6 +62,7 @@ function Row({
   const client = s.entrypoint === 'claude-desktop' ? 'desktop app' : s.entrypoint === 'cli' ? 'claude CLI' : s.entrypoint;
   return (
     <div
+      data-state={dot || 'idle'}
       className={`session-row ${sel ? 'sel' : ''} ${s.machine ? 'remote' : ''} ${hidden ? 'is-hidden' : ''}`}
       onClick={() => onSelect(s.id)}
       onContextMenu={(e) => {
@@ -50,6 +74,7 @@ function Row({
         .join('\n')}
       data-session={s.id}
     >
+      <span className="edge" aria-hidden />
       <span className={`dot ${dot}`} aria-label={state} />
       <span className="t">
         {pinned && <Icon name="pin" size="xs" className="pin-mark" />}
@@ -62,9 +87,21 @@ function Row({
           </span>
         )}
         {s.mode === 'plan' && s.live && <span className="badge plan">plan</span>}
+        {dot === 'active' && (
+          <span className="eq" aria-hidden>
+            <i />
+            <i />
+            <i />
+          </span>
+        )}
         {!!s.running && (
           <span className="badge run" title={`${s.running} subagent${s.running === 1 ? '' : 's'} running`}>
-            {s.running}▸
+            <span className="pips" aria-hidden>
+              {Array.from({ length: Math.min(s.running, 4) }, (_, i) => (
+                <i key={i} style={{ animationDelay: `${i * 140}ms` }} />
+              ))}
+            </span>
+            {s.running}
           </span>
         )}
       </span>
@@ -93,6 +130,7 @@ function Row({
           <Icon name="more" size="xs" />
         </button>
       </span>
+      {sel && <span className="brk" aria-hidden />}
       <span className="sub">
         {s.machine && !s.live && <MachineChip machine={s.machine} offline={s.offlineSince != null} />}
         <span className="proj">
@@ -196,6 +234,8 @@ export function SessionList({
   onHelp: () => void;
 }) {
   const [q, setQ] = useState('');
+  const listRef = useRef<HTMLDivElement>(null);
+  useFlip(listRef);
   const [showHidden, setShowHidden] = useState(false);
   const [menu, setMenu] = useState<{ s: SessionSummary; x: number; y: number } | null>(null);
   const { prefs, togglePin, toggleHidden, toggleGroup } = useSidebarPrefs();
@@ -321,14 +361,18 @@ export function SessionList({
           live sessions only
         </label>
       </div>
-      <div className="session-list">
+      <div className="session-list" ref={listRef}>
         {sessions === null ? (
           <div className="list-loading">
             <span className="loading">loading sessions…</span>
           </div>
         ) : hosts.length === 0 ? (
           <>
-            <div className="group-label">live · {live.length}</div>
+            <div className="group-label gl-live">
+              <span>live</span>
+              <span className="gl-n">{live.length}</span>
+              <i className="gl-rule" />
+            </div>
             {live.length === 0 && <div className="empty-note list-note">{q ? 'no live session matches' : 'no session active in the last 10 min'}</div>}
             {live.map((s) => (
               <Row key={s.id} s={s} sel={s.id === selected} {...rowProps} />
@@ -339,7 +383,9 @@ export function SessionList({
             <div className="machine-group" data-testid="machine-group" data-machine="local">
               <div className="group-label machine-label">
                 <span className="mdot on" />
-                {localMachineName()} · {localLive.length} live
+                <span className="ml-name">{localMachineName()}</span>
+                <span className="gl-n">{localLive.length} live</span>
+                <i className="gl-rule" />
               </div>
               {localLive.length === 0 && <div className="empty-note list-note">no session active in the last 10 min</div>}
               {localLive.map((s) => (
@@ -361,7 +407,9 @@ export function SessionList({
                 <div className="machine-group" key={h.key} data-testid="machine-group" data-machine={h.name} data-online={h.online}>
                   <div className="group-label machine-label" title={h.error ?? `${h.host}:${h.port}`}>
                     <span className={`mdot ${h.online ? 'on' : 'off'}`} />
-                    {h.name} · {state}
+                    <span className="ml-name">{h.name}</span>
+                    <span className="gl-n">{state}</span>
+                    <i className="gl-rule" />
                   </div>
                   {rows.map((s) => (
                     <Row key={s.id} s={s} sel={s.id === selected} {...rowProps} />
@@ -375,13 +423,22 @@ export function SessionList({
           <>
             {grouped.pinned.length > 0 && (
               <>
-                <div className="group-label pinned">pinned · {grouped.pinned.length}</div>
+                <div className="group-label pinned">
+                  <Icon name="pin" size="xs" />
+                  <span>pinned</span>
+                  <span className="gl-n">{grouped.pinned.length}</span>
+                  <i className="gl-rule" />
+                </div>
                 {grouped.pinned.map((s) => (
                   <Row key={s.id} s={s} sel={s.id === selected} {...rowProps} pinned />
                 ))}
               </>
             )}
-            <div className="group-label">recent</div>
+            <div className="group-label">
+              <span>recent</span>
+              <span className="gl-n">{grouped.groups.reduce((n, g) => n + g.sessions.length, 0)}</span>
+              <i className="gl-rule" />
+            </div>
             {grouped.groups.length === 0 && <div className="empty-note list-note">{q ? 'no recent session matches' : 'nothing yet'}</div>}
             {grouped.groups.map((g) => (
               <ProjectGroupView key={g.key} g={g} now={now} selected={selected} onSelect={onSelect} onMenu={openMenu} onToggle={() => toggleGroup(g.key)} />
