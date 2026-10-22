@@ -55,7 +55,7 @@ export interface SetupStatusView {
   projectsDir: string;
   projectsDirExists: boolean;
   sessionCount: number;
-  /** tests set CLAUDE_VIS_SKIP_ONBOARDING so the welcome screen doesn't cover the app */
+  /** tests set CLAUDE_VIS_SKIP_ONBOARDING so the setup wizard doesn't cover the app */
   skipOnboarding: boolean;
 }
 
@@ -199,7 +199,7 @@ export interface VisApi {
   setupOpenTerminal(): Promise<{ ok: boolean; error?: string }>;
   /** open the Claude Code download page in the browser */
   setupOpenDownload(): Promise<{ ok: boolean; url: string; error?: string }>;
-  /** the tray menu asks the window to show the welcome screen */
+  /** the tray menu asks the window to open the setup wizard */
   onShowOnboarding(cb: () => void): () => void;
   /** local model servers (Ollama, LM Studio, OpenAI-compatible), polled by the main process */
   getLocalModels(): Promise<LocalModelsView>;

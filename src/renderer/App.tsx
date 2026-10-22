@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Tour, Welcome } from './components/Onboarding';
+import { Tour } from './components/Onboarding';
 import { SetupWizard } from './components/SetupWizard';
 import { SessionList } from './components/SessionList';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -44,7 +44,6 @@ export function App() {
   const {
     onboarding,
     setOnboarding,
-    openWelcome,
     openSetup,
     setupStart,
     finish: finishOnboarding,
@@ -114,7 +113,7 @@ export function App() {
           showAgent,
           setPage,
           openSettings: () => setShowSettings(true),
-          openWelcome: () => openSetup(false),
+          openSetup: () => openSetup(false),
           activeOnly,
           session: view
             ? {
@@ -145,10 +144,6 @@ export function App() {
           config={config}
           hookSrv={hookSrv}
           onClose={() => setShowSettings(false)}
-          onWelcome={() => {
-            setShowSettings(false);
-            openWelcome();
-          }}
           onSetup={() => {
             setShowSettings(false);
             openSetup(true);
@@ -163,16 +158,6 @@ export function App() {
           }}
           onClose={() => setOnboarding('none')}
           openSettings={() => {
-            setOnboarding('none');
-            setShowSettings(true);
-          }}
-        />
-      )}
-      {onboarding === 'welcome' && (
-        <Welcome
-          onTour={startTour}
-          onSkip={finishOnboarding}
-          onOpenSettings={() => {
             setOnboarding('none');
             setShowSettings(true);
           }}

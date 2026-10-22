@@ -138,19 +138,14 @@ describe('visual check: devices, local models, settings and the tour', () => {
     await page.locator('.dialog').first().waitFor({ state: 'detached', timeout: 5_000 });
   });
 
-  it('onboarding: the welcome checklist and the tour spotlight', async () => {
+  it('onboarding: the tour spotlight', async () => {
     await app.close();
     const tourUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-vis-tour-'));
     try {
       ({ app, page } = await launch({ CLAUDE_VIS_HOME: home, CLAUDE_VIS_SKIP_ONBOARDING: '' }, tourUserData));
       await page.getByTestId('setup-wizard').waitFor({ timeout: 20_000 });
-      await page.getByTestId('setup-skip').click();
-      await page.getByRole('button', { name: /hooks/ }).click();
-      await page.getByRole('button', { name: /Show welcome/ }).click();
-      await page.getByTestId('welcome').waitFor({ timeout: 20_000 });
-      await page.waitForTimeout(400);
-      await page.screenshot({ path: path.join(ART, 'vis-dialogs-welcome.png') });
-      await page.getByTestId('take-tour').click();
+      for (let i = 0; i < 4; i++) await page.getByTestId('setup-next').click();
+      await page.getByTestId('setup-tour').click();
       await page.getByTestId('tour').waitFor();
       await page.locator('.tour-spot').waitFor({ timeout: 10_000 });
       await page.waitForTimeout(500);

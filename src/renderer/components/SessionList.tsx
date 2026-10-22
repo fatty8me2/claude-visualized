@@ -278,7 +278,7 @@ export function SessionList({
             </button>
           ))}
           <span className="col-spacer" />
-          <button className="btn-icon ghost" onClick={onHelp} title="Welcome guide and tour" aria-label="help">
+          <button className="btn-icon ghost" onClick={onHelp} title="Setup and tour" aria-label="help">
             <Icon name="help" />
           </button>
         </div>
@@ -475,7 +475,7 @@ export function SessionList({
         {activeOnly && sessions?.length !== 0 && <div className="empty-note list-note">recent sessions hidden · untick “live sessions only” to see them</div>}
       </div>
       <div className="sidebar-foot">
-        <button className="ghost" data-tour="help" onClick={onHelp} title="Welcome guide and tour">
+        <button className="ghost" data-tour="help" onClick={onHelp} title="Setup and tour">
           <Icon name="help" size="xs" />
           help & tour
         </button>

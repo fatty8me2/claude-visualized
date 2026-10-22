@@ -26,7 +26,7 @@ export interface PageContext {
   showAgent: (sessionId: string, agentId: string | null) => void;
   setPage: (id: PageId) => void;
   openSettings: () => void;
-  openWelcome: () => void;
+  openSetup: () => void;
   activeOnly: boolean;
   /** props for the one-session view; null while no session is loaded */
   session: SessionViewProps | null;
@@ -48,7 +48,7 @@ export interface PageDef {
   render: (ctx: PageContext) => ReactNode;
 }
 
-function EmptySession({ selected, known, onWelcome }: { selected: string | null; known: boolean | undefined; onWelcome: () => void }) {
+function EmptySession({ selected, known, onSetup }: { selected: string | null; known: boolean | undefined; onSetup: () => void }) {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     setSlow(false);
@@ -91,8 +91,8 @@ function EmptySession({ selected, known, onWelcome }: { selected: string | null;
         <p className="ge-note">
           Optional: run <code>claude /login</code> once so the usage meters work.
         </p>
-        <button className="primary ge-action" onClick={onWelcome}>
-          open the welcome guide
+        <button className="primary ge-action" data-testid="empty-run-setup" onClick={onSetup}>
+          run setup
         </button>
       </div>
     </div>
@@ -117,7 +117,7 @@ export const PAGES: readonly PageDef[] = [
     collapsedTitle: 'One session',
     group: 'switch',
     render: (ctx) =>
-      ctx.session ? <SessionView {...ctx.session} /> : <EmptySession selected={ctx.selected} known={ctx.haveSessions} onWelcome={ctx.openWelcome} />,
+      ctx.session ? <SessionView {...ctx.session} /> : <EmptySession selected={ctx.selected} known={ctx.haveSessions} onSetup={ctx.openSetup} />,
   },
   {
     id: 'inbox',

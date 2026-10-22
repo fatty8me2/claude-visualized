@@ -19,13 +19,11 @@ export function SettingsDialog({
   config,
   hookSrv,
   onClose,
-  onWelcome,
   onSetup,
 }: {
   config: AppConfigView;
   hookSrv: HookServerStatusView | null;
   onClose: () => void;
-  onWelcome: () => void;
   onSetup: () => void;
 }) {
   const [hs, setHs] = useState<HookStateView | null>(null);
@@ -229,7 +227,6 @@ export function SettingsDialog({
           <button data-testid="settings-run-setup" onClick={onSetup}>
             Run setup again
           </button>
-          <button onClick={onWelcome}>Show welcome &amp; tour</button>
         </div>
         <div className="row">
           <span>Receiver port</span>

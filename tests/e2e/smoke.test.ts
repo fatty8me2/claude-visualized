@@ -637,7 +637,7 @@ describe('local models: nothing running', () => {
   });
 });
 
-describe('first-run welcome and tour', () => {
+describe('first-run setup and tour', () => {
   let home: string;
   let userData: string;
 
@@ -656,24 +656,14 @@ describe('first-run welcome and tour', () => {
 
   const open = () => launch({ CLAUDE_VIS_HOME: home, CLAUDE_VIS_SKIP_ONBOARDING: '' }, userData);
 
-  it('shows the welcome checklist, walks the tour, and stays away after finishing', async () => {
+  it('walks the setup wizard into the tour, and stays away after finishing', async () => {
     const first = await open();
     try {
       const page = first.page;
-      // a first launch opens the setup wizard; skipping it leaves the welcome checklist one click away in Settings
+      // a first launch opens the setup wizard; its last step starts the tour
       await page.getByTestId('setup-wizard').waitFor({ timeout: 20_000 });
-      await page.getByTestId('setup-skip').click();
-      await page.getByTestId('setup-wizard').waitFor({ state: 'detached' });
-      await page.getByRole('button', { name: /hooks/ }).click();
-      await page.getByRole('button', { name: /Show welcome/ }).click();
-      await page.getByTestId('welcome').waitFor({ timeout: 20_000 });
-      await page.locator('[data-check="claude"].ok').waitFor({ timeout: 10_000 });
-      expect(await page.locator('[data-check="claude"]').innerText()).toMatch(/Found \d+ session/);
-      for (const id of ['usage', 'hooks', 'mini']) expect(await page.locator(`[data-check="${id}"]`).count(), id).toBe(1);
-      await page.waitForTimeout(400);
-      await page.screenshot({ path: path.join(ART, 'welcome.png') });
-
-      await page.getByTestId('take-tour').click();
+      for (let i = 0; i < 4; i++) await page.getByTestId('setup-next').click();
+      await page.getByTestId('setup-tour').click();
       await page.getByTestId('tour').waitFor();
       let n = 0;
       for (;;) {
@@ -692,7 +682,7 @@ describe('first-run welcome and tour', () => {
       expect(n).toBeGreaterThanOrEqual(6);
       await page.getByTestId('tour-next').click();
       await page.getByTestId('tour').waitFor({ state: 'detached' });
-      expect(await page.getByTestId('welcome').count()).toBe(0);
+      expect(await page.getByTestId('setup-wizard').count()).toBe(0);
     } finally {
       await first.app.close();
     }
@@ -702,7 +692,7 @@ describe('first-run welcome and tour', () => {
       const page = second.page;
       await page.locator('.session-row').first().waitFor({ timeout: 20_000 });
       await page.waitForTimeout(1500);
-      expect(await page.getByTestId('welcome').count()).toBe(0);
+      expect(await page.getByTestId('setup-wizard').count()).toBe(0);
       await page.getByRole('button', { name: /help/ }).click();
       await page.getByTestId('setup-wizard').waitFor();
     } finally {

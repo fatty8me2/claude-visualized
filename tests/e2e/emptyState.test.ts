@@ -56,7 +56,7 @@ describe('empty state (fresh install, no transcripts)', () => {
     await main.waitFor({ timeout: 20_000 });
     expect(await main.innerText()).toContain('No Claude Code sessions yet');
     expect(await main.innerText()).toContain('claude');
-    expect(await main.getByRole('button', { name: 'open the welcome guide' }).count()).toBe(1);
+    expect(await main.getByTestId('empty-run-setup').count()).toBe(1);
     await page.waitForTimeout(400);
     await page.screenshot({ path: path.join(ART, 'empty-main.png') });
 

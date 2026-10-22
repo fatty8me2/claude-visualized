@@ -1,4 +1,4 @@
-/* settings dialog, welcome checklist and the tour: glass panels, scale+fade open and close, section headers, glowing switches,
+/* settings dialog and the tour: glass panels, scale+fade open and close, section headers, glowing switches,
    a pulsing spotlight. Loaded by SettingsDialog.tsx and Onboarding.tsx (after theme.css, which these override). */
 
 /* ---- overlay: a scrim that blurs what is behind the dialog ---- */
@@ -134,61 +134,6 @@
 .dialog .diff pre {
   background: color-mix(in srgb, var(--bg) 70%, transparent);
   border-radius: var(--r-2);
-}
-
-/* ---- welcome checklist ---- */
-.dialog.dlg.welcome {
-  width: min(660px, 94vw);
-}
-.dlg-overlay.welcome-overlay {
-  z-index: 60;
-}
-.welcome .w-brand {
-  text-shadow: 0 0 14px color-mix(in srgb, var(--opus) 50%, transparent);
-}
-.welcome .w-sub {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.welcome .w-sub::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, var(--line-2), transparent);
-}
-.welcome .checks {
-  border: 1px solid color-mix(in srgb, var(--line-2) 80%, transparent);
-  border-radius: var(--r-3);
-  background: color-mix(in srgb, var(--bg) 45%, transparent);
-  overflow: hidden;
-}
-.welcome .check {
-  padding: 10px 14px;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
-  transition: background var(--dur-2) var(--ease-out);
-}
-.welcome .check:hover {
-  background: color-mix(in srgb, var(--text) 2.5%, transparent);
-}
-.welcome .check .glyph {
-  width: 18px;
-  display: flex;
-  justify-content: center;
-}
-.welcome .check.ok .glyph {
-  text-shadow: 0 0 10px var(--ok);
-}
-.welcome .check.warn .glyph {
-  text-shadow: 0 0 10px var(--warn);
-}
-.welcome .check .ttl {
-  font-family: var(--font-ui);
-}
-.welcome .check .cmdrow code {
-  font-family: var(--font-mono);
-  border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--bg) 80%, transparent);
 }
 
 /* ---- tour: a spotlight with a glow and a pulsing ring; the card eases in per step ---- */

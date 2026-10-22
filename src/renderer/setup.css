@@ -1,5 +1,5 @@
 /* first-run setup wizard: one glass panel with a step rail, a body that eases in per step, and a footer.
-   Same language as the settings dialog and welcome checklist (dialogs.css): dark glass, model-colour glows. Loaded by SetupWizard.tsx. */
+   Same language as the settings dialog (dialogs.css): dark glass, model-colour glows. Loaded by SetupWizard.tsx. */
 
 .setup-overlay {
   background: color-mix(in srgb, var(--bg) 70%, transparent);

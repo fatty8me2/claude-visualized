@@ -33,14 +33,15 @@ The Mac build is not signed or notarized yet, so macOS blocks it the first time.
 
 ## First launch
 
-The first time you open Claude Visualized, a welcome screen shows a checklist of what it found on this computer:
+The first time you open Claude Visualized, a short setup wizard walks you through it:
 
-- **Claude Code data**: whether it found your Claude Code transcripts (`~/.claude/projects`) and how many sessions they hold. If there are none yet, start one: open the **Code** tab in the Claude desktop app, or run `claude` in a terminal. It appears within a second or two.
-- **Usage meters**: the 5-hour and weekly limits, read with the login Claude Code already saved on this computer. If it says login is needed, run `claude /login` once in a terminal.
-- **Live hooks** (optional): without them the app reads the transcripts, about a second behind. Installing hooks makes updates instant. The hooks dialog shows exactly what it will change before it writes anything.
-- **Mini view**: a small always-on-top window with the current mode and running agents.
+1. **Welcome**: what the app does, and that your sessions stay on your computer.
+2. **Claude Code**: whether it found Claude Code and your sessions (`~/.claude`, or `CLAUDE_CONFIG_DIR` if you set it). If not, it shows how to install it and notices by itself once you have.
+3. **Your account**: which Claude account Claude Code is signed in with, your plan, and your live 5-hour and weekly usage as proof it works. Signed out? It shows the `claude /login` command and can open a terminal for you. API-key users: usage meters aren't available for API billing; everything else works.
+4. **Live updates** (optional): installs Claude Code hooks and the status line so updates are instant. It shows exactly what changes, backs up your settings first, and never replaces a status line you already have.
+5. **All set**: take the tour, or finish.
 
-Take the tour from the welcome screen, or reopen it any time with **help & tour** at the bottom of the sidebar. Nothing leaves your machine except the calls listed in [docs/PRIVACY.md](docs/PRIVACY.md).
+Skip it any time; **help & tour** at the bottom of the sidebar picks up where you left off, and **Settings → Run setup again** starts over. Nothing leaves your machine except the calls listed in [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ## Privacy
 
@@ -144,14 +145,11 @@ Claude Code can run against local models through a gateway or proxy (LiteLLM, Ol
 
 ### First run
 
-On first launch the app shows a welcome screen with a live setup checklist:
+On first launch the app opens the setup wizard (`src/renderer/components/SetupWizard.tsx`, detection in `src/main/setup.ts`).
 
-- **Claude Code data**: it found `~/.claude/projects` and N sessions. If not, install Claude Code (the Code tab in the Claude desktop app, or the `claude` CLI) and run one session.
 - **Usage meters, freshness**: the numbers come from the newest reading of four sources: the status-line forwarder (terminal sessions, real time), Anthropic's usage endpoint, a transcript "limit hit", and paired machines. The endpoint is strictly rate limited, so it is read about every minute while any session is active and every 5 minutes when idle (a burst of activity triggers one extra read 7 s later; a 429 is waited out, and the cadence slows down until it stops happening). The hover text says how old each reading is and when the next read is due; a reading older than two intervals is greyed out, and a small dot pulses when a new one lands. Click to force a read when allowed. The scheduler is `src/core/usageScheduler.ts`; `CLAUDE_VIS_USAGE_URL` and `CLAUDE_VIS_USAGE_TIME_SCALE` point it at a fake server for tests.
-- **Usage meters**: if they say "login needed", open a terminal (Windows Terminal is recommended), run `claude /login` (the welcome screen has a copy button) and paste the code with Ctrl+Shift+V.
-- **Live hooks** (optional): without them the app is about a second behind. The button opens the hooks dialog, which shows a preview before writing anything.
 
-Then "Take the tour" walks through the sidebar, the agent graph, the mode panel, the log, the usage meters and the buttons in the title bar. Reopen it any time with **help & tour** at the bottom of the sidebar, **Show welcome & tour** in the tray menu, or the button in the settings dialog. Tour versions are tracked in `src/core/onboarding.ts` (`ONBOARDING_VERSION`); bumping it shows the welcome screen again to existing users.
+"Take the tour" on its last step walks through the sidebar, the agent graph, the mode panel, the log, the usage meters and the buttons in the title bar. Reopen it any time with **help & tour** at the bottom of the sidebar, **Run setup** in the tray menu, or **Run setup again** in Settings. The wizard version is `SETUP_VERSION` in `src/core/setupWizard.ts`; bumping it shows the wizard again to existing users.
 
 ### Window and keys
 
@@ -260,7 +258,7 @@ Environment overrides (mainly for tests):
 | `CLAUDE_VIS_PORT` | hook receiver port |
 | `CLAUDE_VIS_NO_HOOK_SERVER` | don't start the hook receiver |
 | `CLAUDE_VIS_NO_TRAY` | don't create a tray icon |
-| `CLAUDE_VIS_SKIP_ONBOARDING` | don't show the first-run welcome screen (tests) |
+| `CLAUDE_VIS_SKIP_ONBOARDING` | don't show the first-run setup wizard (tests) |
 | `CLAUDE_VIS_PEER_PORT` | peer link port while sharing (default 47830) |
 | `CLAUDE_VIS_PEER_BIND` | interface to share on, e.g. `127.0.0.1` (default: all interfaces; the e2e tests stay on loopback) |
 | `CLAUDE_VIS_NO_DISCOVERY` | no LAN discovery beacon / listener |

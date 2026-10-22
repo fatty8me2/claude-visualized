@@ -469,7 +469,7 @@ function rebuildTrayMenu() {
     })),
     { type: 'separator' },
     { label: 'Show window', click: showMain },
-    { label: 'Show welcome & tour', click: showWelcome },
+    { label: 'Run setup', click: showWelcome },
     { label: `${miniWin ? 'Close mini view' : 'Mini view'}${registeredHotkey ? ` (${registeredHotkey})` : ''}`, click: toggleMini },
     { label: 'Open settings', click: openSettings },
     {
