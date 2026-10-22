@@ -11,6 +11,7 @@ import './graphCards.css';
 import './local.css';
 import './inbox.css';
 import './peers.css';
+import './insights.css';
 import './graphFlow.css';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
