@@ -7,8 +7,19 @@ import { isLocalModel, LocalTag } from './LocalBits';
 import { estimateAgents, estimateTooltip, formatUSD } from '@core/pricing';
 import { Icon } from './Icon';
 import { Insights } from './insights/Insights';
+import '../modePanel.css';
 
-export function ModePanel({ view, now, hookSrv, onSelectAgent }: { view: SessionView; now: number; hookSrv: HookServerStatusView | null; onSelectAgent?: (id: string) => void }) {
+export function ModePanel({
+  view,
+  now,
+  hookSrv,
+  onSelectAgent,
+}: {
+  view: SessionView;
+  now: number;
+  hookSrv: HookServerStatusView | null;
+  onSelectAgent?: (id: string) => void;
+}) {
   const m = modeLabel(view.mode);
   const plan = m.short === 'PLAN';
   const main = view.agents[MAIN];
@@ -28,16 +39,24 @@ export function ModePanel({ view, now, hookSrv, onSelectAgent }: { view: Session
     <div className="modepanel" data-tour="mode">
       <div
         className={`modebox ${plan ? 'plan' : 'build'}`}
-        title={`${plan ? 'Plan mode: Claude reads and designs, nothing is changed.' : 'Build mode: Claude may edit files.'}\nIn Claude Code, shift+tab switches modes.`}
+        data-mode={plan ? 'plan' : 'build'}
+        title={`${plan ? 'Plan mode: Claude reads and designs, nothing is changed.' : 'Build mode: Claude may edit files.'}
+In Claude Code, shift+tab switches modes.`}
       >
+        {/* keyed so a mode flip replays the sweep and the text swap */}
+        <i className="mode-sweep" key={`sw-${plan ? 'p' : 'b'}`} aria-hidden />
         <span className="mode-ic">
-          <Icon name={plan ? 'plan' : 'edit'} size="md" />
+          <i className="mode-ring" aria-hidden />
+          <span className="mode-glyph" key={`ic-${plan ? 'p' : 'b'}`}>
+            <Icon name={plan ? 'plan' : 'edit'} size="md" />
+          </span>
         </span>
-        <div className="mode-tx">
+        <div className="mode-tx" key={`tx-${plan ? 'p' : 'b'}`}>
           <div className="big">{plan ? 'PLAN MODE' : 'BUILD MODE'}</div>
           <div className="detail">{plan ? 'reads and designs, no edits' : m.detail}</div>
         </div>
         <div className="flip" aria-hidden>
+          <i className="flip-thumb" />
           <span className={plan ? 'cur' : ''}>plan</span>
           <span className={plan ? '' : 'cur'}>build</span>
         </div>
@@ -57,7 +76,7 @@ export function ModePanel({ view, now, hookSrv, onSelectAgent }: { view: Session
         ) : (
           <>
             <div className="progress">
-              <i style={{ width: `${(done / view.todos.length) * 100}%` }} />
+              <i style={{ transform: `scaleX(${done / view.todos.length})` }} />
             </div>
             {view.todos.map((td) => (
               <div key={td.id} className={`todo ${td.status}`}>
