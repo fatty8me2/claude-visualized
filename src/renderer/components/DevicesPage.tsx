@@ -21,7 +21,17 @@ function countdown(ms: number): string {
 function ShareSection({ p, now }: { p: PeersView; now: number }) {
   const [port, setPort] = useState(String(p.port));
   const [copied, setCopied] = useState(false);
+  // optimistic: the box flips at once and settles on what main reports (a failed start reverts it)
+  const [pending, setPending] = useState<boolean | null>(null);
   useEffect(() => setPort(String(p.port)), [p.port]);
+  useEffect(() => setPending(null), [p.sharing]);
+  const toggle = (on: boolean) => {
+    setPending(on);
+    window.api.setSharing(on).then(
+      (v) => v.sharing !== on && setPending(null),
+      () => setPending(null),
+    );
+  };
   const left = p.code ? p.code.expiresAt - now : 0;
   const viewers = p.devices.filter((d) => d.role === 'viewer');
   const watching = viewers.filter((d) => d.online).length;
@@ -29,7 +39,7 @@ function ShareSection({ p, now }: { p: PeersView; now: number }) {
     <section className="dev-card" data-testid="share-section">
       <header>
         <label className="dev-toggle">
-          <input type="checkbox" data-testid="share-toggle" checked={p.sharing} onChange={(e) => void window.api.setSharing(e.target.checked)} />
+          <input type="checkbox" data-testid="share-toggle" checked={pending ?? p.sharing} onChange={(e) => toggle(e.target.checked)} />
           <b>Share with my other computers</b>
         </label>
         {p.sharing ? (
