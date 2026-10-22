@@ -1,0 +1,258 @@
+/* all-sessions overview: resizable grid, panel controls, density, maximize, reorder */
+.overview {
+  position: relative;
+}
+.ov-scroll {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+.ov-grid {
+  position: relative;
+  height: 100%;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+/* ---------- top bar controls ---------- */
+.ov-density {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  overflow: hidden;
+  background: var(--panel);
+}
+.ov-density button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 10px;
+  font: 500 var(--fs-sm) var(--font-ui, inherit);
+  cursor: pointer;
+}
+.ov-density button + button {
+  border-left: 1px solid var(--line);
+}
+.ov-density button:hover {
+  color: var(--text);
+}
+.ov-density button.on {
+  background: color-mix(in srgb, var(--opus) 22%, var(--panel));
+  color: var(--text);
+}
+.ov-tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--panel);
+  color: var(--text-2);
+  font: 500 var(--fs-sm) var(--font-ui, inherit);
+  cursor: pointer;
+}
+.ov-tbtn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--opus);
+}
+.ov-tbtn.on {
+  color: var(--text);
+  border-color: var(--opus);
+}
+.ov-tbtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---------- panels ---------- */
+.ov-panel {
+  container-type: inline-size;
+  position: relative;
+}
+.ov-panel.dragging {
+  opacity: 0.55;
+}
+.ov-panel.drop-target {
+  outline: 2px solid var(--opus);
+  outline-offset: -2px;
+  box-shadow: 0 0 28px -6px var(--opus);
+}
+.ov-panel.ghosted {
+  opacity: 0.5;
+  filter: saturate(0.6);
+}
+.ov-panel.pinned {
+  border-top-color: var(--warn);
+}
+.ov-head {
+  touch-action: none;
+}
+.ov-head:active {
+  cursor: grabbing;
+}
+.ov-ctl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  cursor: default;
+}
+.ov-sizes {
+  display: inline-flex;
+  gap: 1px;
+  padding: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+}
+.ov-ibtn {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-1, 4px);
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+.ov-ibtn:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+.ov-ibtn.on {
+  color: var(--opus);
+  background: color-mix(in srgb, var(--opus) 16%, transparent);
+}
+.ov-ibtn:focus-visible,
+.ov-rz:focus-visible {
+  outline: 2px solid var(--opus);
+  outline-offset: 1px;
+}
+.ov-ctl .ov-claude {
+  margin-left: 2px;
+}
+
+/* narrow panels drop the stats and the size group before the title gets squeezed */
+@container (max-width: 560px) {
+  .ov-stats .ov-meta {
+    display: none;
+  }
+}
+@container (max-width: 430px) {
+  .ov-stats,
+  .ov-claude {
+    display: none;
+  }
+}
+@container (max-width: 340px) {
+  .ov-sizes {
+    display: none;
+  }
+}
+
+/* compact: slim header, nothing but the graph */
+.ov-panel.d-compact .ov-head {
+  padding: 4px 8px;
+  gap: 6px;
+}
+.ov-panel.d-compact .ov-sub {
+  display: none;
+}
+.ov-panel.d-compact .ov-stats .ov-meta {
+  display: none;
+}
+.ov-panel.d-compact .modebadge {
+  display: none;
+}
+.ov-panel.d-spacious .ov-head {
+  padding: 10px 14px;
+}
+
+/* ---------- maximized: one panel fills the page, the rest wait behind it ---------- */
+.ov-grid.has-max > .ov-panel:not(.maximized) {
+  display: none;
+}
+.ov-panel.maximized {
+  z-index: 3;
+  box-shadow:
+    0 0 0 1px var(--opus),
+    var(--shadow-1);
+}
+
+/* ---------- resize handles: an 8px hit area, a thin line on hover ---------- */
+.ov-rz {
+  position: absolute;
+  z-index: 8;
+  background: transparent;
+}
+.ov-rz::after {
+  content: '';
+  position: absolute;
+  background: var(--opus);
+  opacity: 0;
+  border-radius: 2px;
+  transition: opacity 0.15s;
+}
+.ov-rz:hover::after,
+.ov-rz:focus-visible::after,
+body.resizing .ov-rz:active::after {
+  opacity: 0.9;
+}
+.ov-rz-col {
+  width: 8px;
+  cursor: col-resize;
+}
+.ov-rz-col::after {
+  left: 3px;
+  width: 2px;
+  top: 12px;
+  bottom: 12px;
+}
+.ov-rz-row {
+  height: 8px;
+  cursor: row-resize;
+}
+.ov-rz-row::after {
+  top: 3px;
+  height: 2px;
+  left: 12px;
+  right: 12px;
+}
+body.resizing .ov-rz-col {
+  cursor: col-resize;
+}
+body.resizing .ov-rz-row {
+  cursor: row-resize;
+}
+
+/* ---------- drag ghost ---------- */
+.ov-ghost {
+  position: fixed;
+  z-index: 70;
+  pointer-events: none;
+  transform: translate(12px, 12px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--opus);
+  border-radius: var(--r-2);
+  background: var(--panel);
+  box-shadow: var(--shadow-1);
+  font-size: var(--fs-sm);
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ov-rz::after,
+  .ov-ibtn,
+  .ov-tbtn {
+    transition: none;
+  }
+}
