@@ -4,7 +4,7 @@ import { agentGoal } from '@core/insight';
 import { GoalBadge } from './GoalBadge';
 import { GraphBackdrop } from './GraphBackdrop';
 import { COMPACT_LAYOUT, DEFAULT_LAYOUT, layoutAgents, type LayoutOptions } from '@core/layout';
-import { clampZoom, fitScale, nextCardMode, revealDelta, zoomAnchor, ZOOM, type CardMode } from '@core/graphZoom';
+import { clampZoom, columnsForWidth, fitScale, nextCardMode, revealDelta, zoomAnchor, ZOOM, type CardMode } from '@core/graphZoom';
 import { MAIN, type AgentNode, type SessionView } from '@core/state';
 import { formatDuration, formatTokens, modeLabel, modelFamily, modelLabel } from '@core/summarize';
 import { CtxChip } from './ContextMeter';
@@ -239,6 +239,9 @@ const NodeCard = memo(function NodeCard({
 
 /** above this many running agents the cards' running effects stand still */
 const MANY_RUNNING = 16;
+/** overview `fill`: compact cards may grow to this scale, and the gap between generations by this many px */
+const FILL_MAX_SCALE = 1.2;
+const FILL_MAX_GAP = 34;
 const NO_GROUPS: ReadonlySet<string> = new Set();
 
 export function AgentGraph({
@@ -252,6 +255,7 @@ export function AgentGraph({
   onHoverAgent,
   extraTools,
   embedded = false,
+  fill = false,
   replaying = false,
 }: {
   view: SessionView;
@@ -268,6 +272,8 @@ export function AgentGraph({
   extraTools?: ReactNode;
   /** overview panels: no toolbar, compact cards, scaled to fit both width and height */
   embedded?: boolean;
+  /** overview panels with spare height: let the rows of the tree spread out a little (capped) */
+  fill?: boolean;
   /** replaying: the backdrop stands still */
   replaying?: boolean;
 }) {
@@ -304,22 +310,39 @@ export function AgentGraph({
     for (const a of Object.values(view.agents)) k += `${a.id}|${a.parentId}|${a.status}|${a.startedAt}\n`;
     return k;
   }, [view.agents]);
-  const build = (base: LayoutOptions, rows: number) =>
-    layoutAgents(view.agents, { ...base, nodeH: base.nodeH + rows, mainH: base.mainH + (rows ? rows + 22 : 0), showFinished, expanded, folded });
+  // columns follow the real width: a wide tree wraps into more rows (and fits at a readable scale) instead of scrolling sideways
+  const pad = embedded ? 14 : 36;
+  const colsFor = (o: LayoutOptions) => columnsForWidth(wrapW || 1000, o.nodeW, Math.max(o.gapX, 20), pad);
+  const colsFull = colsFor(DEFAULT_LAYOUT);
+  const colsCompact = colsFor(COMPACT_LAYOUT);
+  const build = (base: LayoutOptions, rows: number, maxCols: number) =>
+    layoutAgents(view.agents, { ...base, maxCols, nodeH: base.nodeH + rows, mainH: base.mainH + (rows ? rows + 22 : 0), showFinished, expanded, folded });
   const layoutFull = useMemo(
-    () => build(DEFAULT_LAYOUT, extra),
+    () => build(DEFAULT_LAYOUT, extra, colsFull),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [structureKey, extra, showFinished, expanded, folded],
+    [structureKey, extra, showFinished, expanded, folded, colsFull],
   );
   const wantCompact = embedded || cardMode === 'compact';
-  const layoutCompact = useMemo(
-    () => (wantCompact ? build(COMPACT_LAYOUT, 0) : null),
+  const layoutCompact0 = useMemo(
+    () => (wantCompact ? build(COMPACT_LAYOUT, 0, colsCompact) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wantCompact, structureKey, showFinished, expanded, folded],
+    [wantCompact, structureKey, showFinished, expanded, folded, colsCompact],
+  );
+  // fill: spend spare panel height on the gaps between generations (a little: capped), so the tree does not float in a tall panel
+  const spareGap = useMemo(() => {
+    if (!embedded || !fill || !layoutCompact0 || !wrapW) return 0;
+    const s = Math.min(FILL_MAX_SCALE, Math.max(0.6, (wrapW - pad * 2) / layoutCompact0.width));
+    const levels = new Set(layoutCompact0.nodes.map((n) => n.y)).size - 1;
+    const spare = (wrapH - pad * 2) / s - layoutCompact0.height;
+    return levels > 0 && spare > 0 ? Math.min(FILL_MAX_GAP, Math.floor(spare / levels)) : 0;
+  }, [embedded, fill, layoutCompact0, wrapW, wrapH, pad]);
+  const layoutCompact = useMemo(
+    () => (spareGap > 0 ? build({ ...COMPACT_LAYOUT, gapY: COMPACT_LAYOUT.gapY + spareGap }, 0, colsCompact) : layoutCompact0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layoutCompact0, spareGap, colsCompact],
   );
 
   // scale and card variant: full cards never shrink below the readable floor; past it the graph switches to compact cards
-  const pad = embedded ? 14 : 36;
   const viewport = { w: wrapW || 1000, h: wrapH };
   const fitFull = fitScale({ w: layoutFull.width, h: layoutFull.height }, viewport, pad, false, 0);
   let nextMode: CardMode;
@@ -327,7 +350,7 @@ export function AgentGraph({
   if (embedded) {
     nextMode = 'compact';
     const l = layoutCompact ?? layoutFull;
-    scale = fitScale({ w: l.width, h: l.height }, viewport, pad, true, 0.6);
+    scale = fitScale({ w: l.width, h: l.height }, viewport, pad, true, 0.6, fill ? FILL_MAX_SCALE : 1);
   } else if (prefs.zoom === 'fit') {
     nextMode = nextCardMode(cardMode, fitFull, prefs.compact);
     scale =
@@ -391,7 +414,8 @@ export function AgentGraph({
 
   // what changed since the last commit, seen from here: new cards, moved cards, status changes. Bulk changes (a session switch, a
   // card-variant switch, loading hundreds of agents, replay scrubbing) plan nothing.
-  const motionKey = `${view.id}|${compact ? 'c' : 'f'}`;
+  // (a change of column count, from a resize, re-flows the whole tree: not a move of individual cards)
+  const motionKey = `${view.id}|${compact ? 'c' : 'f'}|${compact ? colsCompact : colsFull}`;
   motion.plan(motionKey, view.agents, layout);
   useLayoutEffect(() => {
     const moves = motion.take();
