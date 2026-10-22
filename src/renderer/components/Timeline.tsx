@@ -200,6 +200,29 @@ export function Timeline({ view, now, selectedAgent, onSelect, highlight, onHove
 
   const nowX = scale.x(now);
 
+  // activity density across every agent: tool-call times binned to ~5px cells, drawn as a heat strip under the axis
+  const heatCells = Math.max(1, Math.floor(plotW / 5));
+  const heat = useMemo(() => {
+    const span = range.t1 - range.t0;
+    const out: { x: number; v: number; fail: boolean }[] = [];
+    if (!(span > 0)) return out;
+    const bins = new Float32Array(heatCells);
+    const fails = new Uint8Array(heatCells);
+    for (const a of Object.values(view.agents)) {
+      const failed = new Set(a.recent.filter((r) => r.ok === false).map((r) => r.ts));
+      for (const t of toolTimes(a)) {
+        if (t < range.t0 || t > range.t1) continue;
+        const i = Math.min(heatCells - 1, Math.floor(((t - range.t0) / span) * heatCells));
+        bins[i]++;
+        if (failed.has(t)) fails[i] = 1;
+      }
+    }
+    let max = 0;
+    for (const v of bins) if (v > max) max = v;
+    for (let i = 0; i < heatCells; i++) if (bins[i]) out.push({ x: i * (plotW / heatCells), v: Math.min(1, 0.25 + (0.75 * bins[i]) / max), fail: !!fails[i] });
+    return out;
+  }, [view.agents, range.t0, range.t1, plotW, heatCells]);
+
   const tipFor = (el: HTMLElement): string | null => {
     const bar = el.closest<HTMLElement>('[data-bar]');
     const tick = el.closest<HTMLElement>('[data-tick-agent]');
@@ -284,6 +307,11 @@ export function Timeline({ view, now, selectedAgent, onSelect, highlight, onHove
               {t.label}
             </span>
           ))}
+          <svg className="tl-heat" width={plotW} height={5} aria-hidden data-testid="tl-heat">
+            {heat.map((h) => (
+              <rect key={h.x} x={h.x} y={0} width={Math.max(2, plotW / heatCells - 0.5)} height={5} className={h.fail ? 'f' : ''} opacity={h.v} />
+            ))}
+          </svg>
           {nowX >= 0 && nowX <= plotW && (
             <span className="tl-nowtag" style={{ left: nowX, transform: nowX > plotW - 40 ? 'translateX(-100%)' : undefined }}>
               {replaying ? 'replay' : 'now'}
@@ -369,7 +397,7 @@ export function Timeline({ view, now, selectedAgent, onSelect, highlight, onHove
                   {buckets.map((b) => (
                     <i
                       key={b.t}
-                      className={`tl-tick ${b.fail ? 'fail' : ''} ${b.n > 1 ? 'multi' : ''}`}
+                      className={`tl-tick ${famClass(a.model)} ${b.fail ? 'fail' : ''} ${b.n > 1 ? 'multi' : ''}`}
                       style={{ left: scale.x(b.t) }}
                       data-tick-agent={a.id}
                       data-tick-t={b.t}
