@@ -786,6 +786,10 @@ describe.skipIf(!process.env.SHOT_REAL)('real data screenshot', () => {
       await page.locator('.node').first().waitFor({ timeout: 20_000 });
       await page.waitForTimeout(1500);
       await page.screenshot({ path: path.join(ART, 'real.png') });
+      await page.setViewportSize({ width: 1440, height: 1500 });
+      await page.waitForTimeout(400);
+      await page.locator('.modepanel').screenshot({ path: path.join(ART, 'modepanel-insights-real.png') });
+      await page.setViewportSize({ width: 1440, height: 920 });
       await page.locator('.graph-views button', { hasText: 'timeline' }).click();
       await page.locator('[data-testid="tl-bar"]').first().waitFor({ timeout: 10_000 });
       await page.waitForTimeout(500);

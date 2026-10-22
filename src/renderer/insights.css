@@ -1,0 +1,327 @@
+/* mode panel insight sections (loaded after theme.css) */
+.ins-sec h4 {
+  align-items: center;
+}
+.ins-fold {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  border-radius: var(--r-1);
+}
+.ins-fold:hover {
+  color: var(--text-2);
+}
+.ins-fold:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ins-chev {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin: 0 2px 0 1px;
+  position: relative;
+  top: 1px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  transition: transform var(--dur-1) var(--ease-out);
+}
+.ins-sec.closed .ins-chev {
+  transform: rotate(-90deg);
+}
+.ins-aside {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--faint);
+}
+.ins-sec .kv .v {
+  font-family: var(--font-mono);
+}
+.ins-sec .kv .k {
+  font-family: var(--font-ui);
+}
+.empty-note {
+  font-family: var(--font-ui);
+}
+
+/* activity strip */
+.ins-strip {
+  display: block;
+  width: 100%;
+  height: 44px;
+}
+.ins-axis {
+  stroke: var(--line-2);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.ins-bar {
+  fill: color-mix(in srgb, var(--opus) 60%, var(--panel));
+}
+.ins-bar.now {
+  fill: var(--opus);
+}
+.ins-axis-l {
+  display: flex;
+  justify-content: space-between;
+  margin: 2px 0 8px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  color: var(--faint);
+}
+
+/* forecast */
+.ins-forecast {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: var(--r-2);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+}
+.ins-forecast b {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.ins-forecast.warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 50%, var(--line));
+  background: color-mix(in srgb, var(--warn) 10%, var(--panel));
+}
+
+/* agent state bar */
+.ins-seg {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+}
+.ins-seg i {
+  min-width: 4px;
+  border-radius: 2px;
+}
+.s-running {
+  background: var(--ok);
+}
+.s-waiting {
+  background: var(--warn);
+}
+.s-done {
+  background: color-mix(in srgb, var(--text-2) 45%, var(--panel));
+}
+.s-error {
+  background: var(--err);
+}
+.ins-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 6px 0 10px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.ins-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ins-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+.ins-legend b {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text);
+}
+.ins-legend .zero {
+  opacity: 0.5;
+}
+
+/* goal mix */
+.ins-goals,
+.ins-tools {
+  display: grid;
+  gap: 4px;
+}
+.ins-goal {
+  display: grid;
+  grid-template-columns: 76px 1fr 18px;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-xs);
+}
+.ins-goal .gl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--g, var(--muted));
+  font-family: var(--font-ui);
+}
+.ins-goal .gb {
+  display: flex;
+  gap: 1px;
+  height: 6px;
+  min-width: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ins-goal .gb i {
+  background: var(--g, var(--muted));
+}
+.ins-goal .gb i.done {
+  opacity: 0.45;
+}
+.ins-goal .gb i.err {
+  background: var(--err);
+}
+.ins-goal .gn {
+  text-align: right;
+  font-family: var(--font-mono);
+  color: var(--text-2);
+}
+
+/* top tools */
+.ins-tool {
+  display: grid;
+  grid-template-columns: 84px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-xs);
+}
+.ins-tool .tn {
+  font-family: var(--font-mono);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ins-tool .tb {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.ins-tool .tb i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--haiku) 75%, var(--panel));
+}
+.ins-tool .tc {
+  text-align: right;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+
+/* file and error lists */
+.ins-list {
+  display: grid;
+  gap: 1px;
+  margin: 0 -6px;
+}
+.ins-row {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 8px minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 3px 6px;
+  border-radius: var(--r-1);
+  font-size: var(--fs-sm);
+  min-width: 0;
+}
+.ins-row:hover {
+  background: var(--sel);
+}
+.ins-row:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -1px;
+}
+.ins-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fam, var(--muted));
+  flex-shrink: 0;
+}
+.ins-row .fn {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ins-row .fd {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--faint);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+.ins-row .fd.copied {
+  color: var(--ok);
+  direction: ltr;
+}
+.ins-row.err {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'et en'
+    'ex ex';
+  gap: 1px 8px;
+  padding: 4px 6px;
+}
+.ins-row.err .et {
+  grid-area: et;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+}
+.ins-row.err .en {
+  grid-area: en;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.ins-row.err .ex {
+  grid-area: ex;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--err);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ins-chev {
+    transition: none;
+  }
+}

@@ -166,7 +166,7 @@ export function SessionView({ view, summary, now, replay: replayApi, hookSrv, la
         api={layoutApi}
         editing={editingLayout}
         panels={{
-          mode: <ModePanel view={view} now={now} hookSrv={hookSrv} />,
+          mode: <ModePanel view={view} now={now} hookSrv={hookSrv} onSelectAgent={setAgentSel} />,
           graph: (
             <div className={`graph-host ${plan && planPrefs.prefs.open ? `plan-${planPrefs.prefs.side}` : ''}`}>
               <div className="graph-main">

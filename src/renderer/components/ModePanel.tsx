@@ -6,8 +6,9 @@ import { tokensByProvider } from '@core/localModels';
 import { isLocalModel, LocalTag } from './LocalBits';
 import { estimateAgents, estimateTooltip, formatUSD } from '@core/pricing';
 import { Icon } from './Icon';
+import { Insights } from './insights/Insights';
 
-export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: number; hookSrv: HookServerStatusView | null }) {
+export function ModePanel({ view, now, hookSrv, onSelectAgent }: { view: SessionView; now: number; hookSrv: HookServerStatusView | null; onSelectAgent?: (id: string) => void }) {
   const m = modeLabel(view.mode);
   const plan = m.short === 'PLAN';
   const main = view.agents[MAIN];
@@ -160,6 +161,8 @@ export function ModePanel({ view, now, hookSrv }: { view: SessionView; now: numb
           </span>
         </div>
       </div>
+
+      <Insights view={view} now={now} onSelectAgent={onSelectAgent} />
     </div>
   );
 }
