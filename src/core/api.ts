@@ -9,6 +9,7 @@ import type { HistoryStatus, HistorySummary, SearchArgs, SearchResult, SummaryAr
 import type { OverviewMsg, ViewMsg } from './sync';
 import type { LocalModelsConfig, LocalModelsView } from './localModels';
 import type { AccountView } from './setupWizard';
+import type { SyncChoice, SyncDetectView, SyncEnableResult, SyncStatusView } from './settingsSync';
 
 export interface AppConfigView {
   port: number;
@@ -233,4 +234,18 @@ export interface VisApi {
   pairWith(args: { host: string; port: number; code: string }): Promise<PairResult>;
   unpairDevice(key: string): Promise<PeersView>;
   setPeerPort(port: number): Promise<PeersView>;
+  /** settings sync through a synced folder (Google Drive for desktop ...): see src/main/settingsSync.ts */
+  syncStatus(): Promise<SyncStatusView>;
+  onSyncStatus(cb: (s: SyncStatusView) => void): () => void;
+  syncDetect(): Promise<SyncDetectView>;
+  /** ask for a folder with the system dialog (null when cancelled) */
+  syncPickFolder(): Promise<string | null>;
+  syncEnable(root: string, choice?: SyncChoice): Promise<SyncEnableResult>;
+  syncDisable(): Promise<void>;
+  syncNow(): Promise<SyncStatusView>;
+  syncOpenFolder(): Promise<void>;
+  /** the renderer's synced localStorage values (`all`: first report after the window loaded) */
+  syncReport(values: Record<string, string | null>, all?: boolean): Promise<void>;
+  /** values that arrived from another computer, to be written to localStorage */
+  onSyncApply(cb: (values: Record<string, string>) => void): () => void;
 }

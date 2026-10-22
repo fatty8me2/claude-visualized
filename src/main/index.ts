@@ -21,12 +21,15 @@ import { RELEASES_URL } from '@core/updates';
 import { mergeUsage } from '@core/remote';
 import { PeerService, type ShareSource } from './peer/service';
 import { deviceName } from './peer/name';
+import { SettingsSync } from './settingsSync';
+import { testOverride } from './paths';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 
 // test hooks: isolated profile dir and receiver port
 if (process.env.CLAUDE_VIS_USER_DATA) app.setPath('userData', process.env.CLAUDE_VIS_USER_DATA);
 
+let settingsSync: SettingsSync;
 let mainWin: BrowserWindow | null = null;
 let miniWin: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -554,6 +557,7 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
   if (miniWin && patch.miniAlwaysOnTop !== undefined) miniWin.setAlwaysOnTop(config.miniAlwaysOnTop, 'floating');
   broadcast('config', config);
   rebuildTrayMenu();
+  settingsSync?.reportConfig(config as unknown as Record<string, unknown>);
   return config;
 }
 
@@ -587,6 +591,7 @@ function registerIpc() {
     showInbox,
     updater,
     peers,
+    sync: settingsSync,
     setSharing,
     setPeerPort,
     takePendingOpenSettings: () => {
@@ -649,6 +654,18 @@ if (!app.requestSingleInstanceLock()) {
       discovery: !process.env.CLAUDE_VIS_NO_DISCOVERY,
     });
     manager.setRemote(peers);
+    // "Sync my settings": allowlisted preferences through a Google Drive (or any) folder; see src/main/settingsSync.ts
+    settingsSync = new SettingsSync({
+      stateFile: path.join(app.getPath('userData'), 'sync-state.json'),
+      deviceName: deviceName(),
+      platform: process.platform,
+      getConfig: () => config as unknown as Record<string, unknown>,
+      applyConfig: (patch) => updateConfig(patch),
+      pushToRenderer: (values) => broadcast('sync:apply', values),
+      onStatus: (s) => broadcast('sync', s),
+      pollMs: Number(testOverride('CLAUDE_VIS_SYNC_POLL_MS')) || undefined,
+      debounceMs: Number(testOverride('CLAUDE_VIS_SYNC_DEBOUNCE_MS')) || undefined,
+    });
     peers.on('status', (st) => {
       broadcast('peers', st);
       rebuildTrayMenu();
@@ -711,6 +728,7 @@ if (!app.requestSingleInstanceLock()) {
     localMonitor.start();
     updater.start();
     peers.start();
+    settingsSync.start();
     if (config.shareEnabled) void peers.setSharing(true);
     if (!process.env.CLAUDE_VIS_NO_HOOK_SERVER) hookServer.start(config.port);
     if (!process.env.CLAUDE_VIS_NO_TRAY) createTray();
@@ -728,6 +746,7 @@ if (!app.requestSingleInstanceLock()) {
     updater?.stop();
     hookServer.stop();
     void peers?.stop();
+    settingsSync?.stop();
   });
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin' && (!tray || quitting)) app.quit();

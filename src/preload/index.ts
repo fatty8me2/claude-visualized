@@ -76,6 +76,16 @@ const api: VisApi = {
   pairWith: (a) => ipcRenderer.invoke('peers:pair', a),
   unpairDevice: (key) => ipcRenderer.invoke('peers:unpair', key),
   setPeerPort: (port) => ipcRenderer.invoke('peers:port', port),
+  syncStatus: () => ipcRenderer.invoke('sync:status'),
+  onSyncStatus: (cb) => on('sync', cb),
+  syncDetect: () => ipcRenderer.invoke('sync:detect'),
+  syncPickFolder: () => ipcRenderer.invoke('sync:pick'),
+  syncEnable: (root, choice) => ipcRenderer.invoke('sync:enable', root, choice),
+  syncDisable: () => ipcRenderer.invoke('sync:disable'),
+  syncNow: () => ipcRenderer.invoke('sync:now'),
+  syncOpenFolder: () => ipcRenderer.invoke('sync:openFolder'),
+  syncReport: (values, all) => ipcRenderer.invoke('sync:report', values, !!all),
+  onSyncApply: (cb) => on('sync:apply', cb),
 };
 
 contextBridge.exposeInMainWorld('api', api);

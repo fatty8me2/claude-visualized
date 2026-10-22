@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from './Icon';
 import { useDialogFocus } from '../state/dialogFocus';
 import { LocalModelsSettings } from './LocalModelsSettings';
+import { SyncSettings } from './SyncSettings';
 import { UpdatesSettings } from './UpdatesSettings';
 import type { AppConfigView, HookPreviewView, HookServerStatusView, HookStateView, SystemInfoView } from '@core/api';
 import '../dialogs.css';
@@ -238,6 +239,8 @@ export function SettingsDialog({
           </button>
           <span className="note">after changing the port, reinstall hooks</span>
         </div>
+
+        <SyncSettings />
 
         <UpdatesSettings config={config} />
 
