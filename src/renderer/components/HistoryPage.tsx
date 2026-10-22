@@ -98,7 +98,7 @@ function SearchResults({ q, res, busy, onOpen }: { q: string; res: SearchResult 
       {res?.hits.map((h, i) => (
         <button
           key={`${h.sessionId}:${i}`}
-          className="hist-hit"
+          className={`hist-hit kind-${h.kind}`}
           data-testid="history-hit"
           data-session={h.sessionId}
           onClick={() => onOpen(h.sessionId)}

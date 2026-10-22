@@ -1,4 +1,6 @@
-/* attention inbox: sidebar badge, the Inbox page and the mini view line */
+/* attention inbox: sidebar badge, the Inbox page and the mini view line.
+   Items are glass cards with an energy edge coloured by kind; motion is transform / opacity only and
+   every animation is gated behind prefers-reduced-motion: no-preference. */
 .nav-badge {
   display: inline-block;
   min-width: 17px;
@@ -34,52 +36,107 @@
   max-width: 980px;
 }
 .inbox-group {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 .inbox-group-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 9px;
 }
 .inbox-group-title .t {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-2);
 }
+/* a hairline after the session title, fading out, so groups read as sections */
+.inbox-group-title::after {
+  content: '';
+  flex: 1;
+  min-width: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line-2), transparent);
+}
+
 .inbox-item {
+  --sev: var(--line-2);
+  position: relative;
   display: grid;
   grid-template-columns: 26px 1fr auto;
   gap: 4px 10px;
   align-items: start;
-  padding: 10px 14px;
+  padding: 10px 14px 10px 16px;
   margin-bottom: 8px;
-  background: var(--panel);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--sev) 9%, transparent), transparent 46%),
+    color-mix(in srgb, var(--panel) 82%, transparent);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--sev, var(--line-2));
+  border-left: 3px solid var(--sev);
   border-radius: var(--r-3);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 2px 10px -6px rgb(0 0 0 / 0.7);
   transition:
-    border-color var(--dur-1),
-    background-color var(--dur-1);
+    border-color var(--dur-2),
+    box-shadow var(--dur-2),
+    transform var(--dur-1) var(--ease-out);
 }
 .inbox-item:hover {
-  background: color-mix(in srgb, var(--text) 2%, var(--panel));
   border-color: var(--line-2);
-  border-left-color: var(--sev, var(--line-2));
+  border-left-color: var(--sev);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 6px 18px -8px color-mix(in srgb, var(--sev) 45%, transparent);
 }
-.inbox-item.sev-critical {
-  --sev: var(--err);
-}
-.inbox-item.sev-warn {
+
+/* energy edge by kind: permission amber (pulses while open), failures red, finished turns green, input blue */
+.inbox-item.kind-permission {
   --sev: var(--warn);
 }
-.inbox-item.sev-info {
+.inbox-item.kind-reply {
+  --sev: var(--ok);
+}
+.inbox-item.kind-input {
   --sev: var(--run);
+}
+.inbox-item.kind-agent-failed,
+.inbox-item.kind-api-error,
+.inbox-item.kind-tool-errors {
+  --sev: var(--err);
+}
+.inbox-item.kind-usage {
+  --sev: var(--sonnet);
+}
+.inbox-item.kind-notice {
+  --sev: var(--other);
 }
 .inbox-item.resolved {
   opacity: 0.55;
   --sev: var(--faint);
 }
+
+/* a glowing bead along the energy edge; the permission one breathes while it waits for you */
+.inbox-item::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--sev);
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--sev) 70%, transparent);
+  pointer-events: none;
+}
+.inbox-item.resolved::before {
+  box-shadow: none;
+}
+
 .inbox-item .ico {
   grid-row: 1 / span 2;
   display: grid;
@@ -88,7 +145,8 @@
   height: 26px;
   border-radius: var(--r-2);
   color: var(--sev, var(--muted));
-  background: color-mix(in srgb, var(--sev, var(--muted)) 12%, transparent);
+  background: color-mix(in srgb, var(--sev, var(--muted)) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sev, var(--muted)) 30%, transparent);
 }
 .inbox-item .ttl {
   display: flex;
@@ -102,11 +160,13 @@
 }
 .inbox-item .count {
   color: var(--muted);
+  font-family: var(--font-mono);
   font-size: 11px;
 }
 
 .inbox-item .time {
   color: var(--muted);
+  font-family: var(--font-mono);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -131,18 +191,85 @@
   font-size: var(--fs-xs);
   padding: 2px 9px;
 }
+
+/* empty state: a calm glyph with two slow rings, and the reason it is quiet */
 .inbox-page > .inbox-empty {
   margin: 70px auto;
   text-align: center;
+  color: var(--muted);
 }
 .inbox-empty .big {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 14px;
   border-radius: 50%;
   color: var(--ok);
   background: color-mix(in srgb, var(--ok) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 35%, transparent), 0 0 24px -6px color-mix(in srgb, var(--ok) 55%, transparent);
+}
+.inbox-empty .big::before,
+.inbox-empty .big::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ok) 55%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.inbox-empty .empty-title {
+  color: var(--text);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .inbox-item {
+    animation: inbox-in var(--dur-3) var(--ease-out) backwards;
+  }
+  .inbox-item.kind-permission:not(.resolved)::before {
+    animation: inbox-breathe 1.8s ease-in-out infinite;
+  }
+  .inbox-empty .big::before {
+    animation: inbox-ring 2.8s var(--ease-out) infinite;
+  }
+  .inbox-empty .big::after {
+    animation: inbox-ring 2.8s var(--ease-out) 1.4s infinite;
+  }
+}
+
+@keyframes inbox-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes inbox-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes inbox-ring {
+  0% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
 }
 
 .mini-need {
