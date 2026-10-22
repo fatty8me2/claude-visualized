@@ -167,6 +167,10 @@ describe('agent card motion (fixture data)', () => {
     await page.waitForTimeout(1500);
     await shot('spawn-settled');
     await shot('running-card', '[data-agent="a10"]');
+    await page.waitForTimeout(900);
+    await shot('running-card-b', '[data-agent="a10"]');
+    await page.waitForTimeout(900);
+    await shot('running-card-c', '[data-agent="a10"]');
     expect(await page.locator('[data-agent="a10"]').evaluate((el) => getComputedStyle(el.querySelector('.orbit')!, '::before').animationName)).toBe('orbit-spin');
     await shot('running-main', '[data-agent="main"]');
   });
