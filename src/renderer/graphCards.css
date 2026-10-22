@@ -1,13 +1,18 @@
-/* Agent cards in the graph: layout, typography, status looks and motion.
-   Motion is split in two: CSS here for looks that hold while a state lasts (sheen, shimmer, breathing border),
-   and the Web Animations API (cardFx.ts) for one-shots (spawn, glide, check, shake). Both honour prefers-reduced-motion. */
+/* Agent cards in the graph: a small command console. Glass bodies, energy borders, scanlines, targeting brackets.
+   Motion is split in two: CSS here for looks that hold while a state lasts (orbiting border, scan sweep, glow, beacon, reticle),
+   and the Web Animations API (cardFx.ts) for one-shots (materialize, shockwave and sparks, glitch, beacon ping).
+   Everything animated is transform / opacity (compositor). Calm mode (many running agents) and prefers-reduced-motion freeze it. */
 
 .node {
-  --edge: color-mix(in srgb, var(--fam, var(--line-2)) 62%, var(--line-2));
+  --edge: color-mix(in srgb, var(--fam, var(--line-2)) 55%, var(--line-2));
+  --glass: color-mix(in srgb, var(--panel) 80%, transparent);
   position: absolute;
   border: 1px solid var(--edge);
-  border-radius: 6px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--fam, var(--line-2)) 6%, var(--panel)) 0, var(--panel) 52px);
+  border-top-color: color-mix(in srgb, var(--fam, var(--line-2)) 70%, var(--text-2));
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fam, var(--line-2)) 10%, transparent) 0, transparent 58px),
+    var(--glass);
   padding: 9px 11px 8px;
   display: flex;
   flex-direction: column;
@@ -15,98 +20,275 @@
   line-height: 1.4;
   overflow: hidden;
   cursor: pointer;
-  box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 10px -4px rgba(0, 0, 0, 0.75);
   transition:
     border-color 0.3s,
     opacity 0.3s,
     box-shadow 0.25s,
+    transform 0.16s ease-out,
     translate 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
-.node.node:hover {
-  translate: 0 -2px;
-  box-shadow:
-    0 10px 20px -10px rgba(0, 0, 0, 0.85),
-    0 0 0 1px color-mix(in srgb, var(--fam, var(--line-2)) 28%, transparent);
+/* the frosted-glass blur is only worth its cost on the cards that are alive (at most a handful, calm mode drops it); finished
+   and idle cards get a more opaque body instead, so 300 of them stay cheap */
+.node.running,
+.node.waiting,
+.node.main,
+.node.sel,
+.node:hover {
+  -webkit-backdrop-filter: blur(9px) saturate(1.3);
+  backdrop-filter: blur(9px) saturate(1.3);
 }
-.node.node.sel {
-  outline: 2px solid var(--fam, var(--text-2));
-  outline-offset: 3px;
-  box-shadow:
-    0 12px 24px -10px rgba(0, 0, 0, 0.9),
-    0 0 22px -8px var(--fam, var(--text-2));
+.node.done,
+.node.idle-agent {
+  --glass: color-mix(in srgb, var(--panel) 90%, transparent);
+}
+/* the layers inside a card: effects sit under the text, never over it */
+.node > i {
+  position: absolute;
+  pointer-events: none;
+  display: block;
+}
+.node > :not(i) {
+  position: relative;
+  z-index: 1;
 }
 
-/* one-shot glow layer, driven by cardFx.ts (opacity only) */
-.node > .fx {
+/* hover: lift, tilt toward the cursor (--rx/--ry set by cardFx.trackTilt, max 4deg) and a specular highlight that follows it */
+.node.node:hover {
+  translate: 0 -2px;
+  transform: perspective(720px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 12px 22px -10px rgba(0, 0, 0, 0.85),
+    0 0 0 1px color-mix(in srgb, var(--fam, var(--line-2)) 30%, transparent);
+}
+.node:hover::after {
+  content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
+  background: radial-gradient(190px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.17), transparent 62%);
+  animation: spec-in 0.25s ease-out;
+}
+@keyframes spec-in {
+  from {
+    opacity: 0;
+  }
+}
+/* selected: a crisp outline and the targeting reticle (see .brackets) */
+.node.node.sel {
+  outline: 1.5px solid var(--fam, var(--text-2));
+  outline-offset: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 24px -10px rgba(0, 0, 0, 0.9),
+    0 0 24px -8px var(--fam, var(--text-2));
+}
+
+/* one-shot glow layer, driven by cardFx.ts (opacity only) */
+.node > .fx {
+  inset: 0;
+  border-radius: inherit;
   opacity: 0;
+  z-index: 2;
   box-shadow:
     inset 0 0 0 1px var(--fxc, var(--fam, var(--line-2))),
     inset 0 0 26px -6px var(--fxc, var(--fam, var(--line-2)));
 }
 
-/* ---- states ---- */
-.node.running {
-  border-color: color-mix(in srgb, var(--fam) 80%, var(--line-2));
-  box-shadow:
-    0 2px 8px -4px rgba(0, 0, 0, 0.7),
-    0 0 16px -9px var(--fam);
+/* ---- targeting reticle (selected) and attention beacon (waiting): corner brackets ---- */
+.node > .brackets {
+  inset: 3px;
+  --bc: var(--fam, var(--text-2));
+  --bl: 10px;
+  --bt: 1.5px;
+  background:
+    linear-gradient(var(--bc), var(--bc)) top left / var(--bl) var(--bt),
+    linear-gradient(var(--bc), var(--bc)) top left / var(--bt) var(--bl),
+    linear-gradient(var(--bc), var(--bc)) top right / var(--bl) var(--bt),
+    linear-gradient(var(--bc), var(--bc)) top right / var(--bt) var(--bl),
+    linear-gradient(var(--bc), var(--bc)) bottom left / var(--bl) var(--bt),
+    linear-gradient(var(--bc), var(--bc)) bottom left / var(--bt) var(--bl),
+    linear-gradient(var(--bc), var(--bc)) bottom right / var(--bl) var(--bt),
+    linear-gradient(var(--bc), var(--bc)) bottom right / var(--bt) var(--bl);
+  background-repeat: no-repeat;
+  animation: lock-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
 }
-/* the working sheen: a bright band travels along the top edge in the model colour (transform only, so it stays on the compositor) */
-.node.running::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 55%;
-  height: 2px;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fam) 55%, #fff) 50%, transparent);
-  transform: translateX(-100%);
-  animation: sheen 2.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+.node.waiting > .brackets {
+  --bc: var(--warn);
+  --bl: 13px;
+  --bt: 2px;
+  animation:
+    lock-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1) backwards,
+    brk-pulse 1.5s ease-in-out 0.32s infinite;
 }
-@keyframes sheen {
+@keyframes lock-in {
+  from {
+    opacity: 0;
+    transform: scale(1.09);
+  }
   to {
-    transform: translateX(185%);
+    opacity: 1;
+    transform: scale(1);
   }
 }
-.node.waiting {
-  border-color: var(--warn);
+@keyframes brk-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.972);
+  }
 }
-/* needs the user: the border breathes (opacity of an inset ring) */
-.node.waiting::after {
+
+/* ---- states ---- */
+.node.running {
+  border-color: color-mix(in srgb, var(--fam) 45%, var(--line-2));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 10px -4px rgba(0, 0, 0, 0.75),
+    0 0 18px -9px var(--fam);
+}
+/* inner glow + faint scanline texture; brighter and pulsing while a tool call is in flight */
+.node.running::before,
+.node.error::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
+  --gc: var(--fam);
+  background: repeating-linear-gradient(0deg, color-mix(in srgb, var(--gc) 6%, transparent) 0 1px, transparent 1px 3px);
+  box-shadow: inset 0 0 22px -7px var(--gc);
+  opacity: 0.55;
+  transition: opacity 0.5s;
+}
+.node.running.tool::before {
+  opacity: 1;
+  box-shadow: inset 0 0 28px -6px var(--gc);
+  animation: tool-pulse 1.7s ease-in-out infinite;
+}
+.node.error::before {
+  --gc: var(--err);
+  opacity: 0.85;
+}
+@keyframes tool-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* energy border: a comet orbits the edge in the model colour. A rotating square (transform, compositor) seen through a 1.5px ring mask */
+.node > .orbit {
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  overflow: hidden;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  opacity: 0.9;
+  background: color-mix(in srgb, var(--fam) 26%, transparent);
+  transition: opacity 0.4s;
+}
+.node.tool > .orbit {
+  opacity: 1;
+}
+.node > .orbit::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190%;
+  aspect-ratio: 1;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 40deg,
+    color-mix(in srgb, var(--fam) 35%, transparent) 95deg,
+    transparent 150deg 170deg,
+    color-mix(in srgb, var(--fam) 50%, transparent) 235deg,
+    var(--fam) 322deg,
+    color-mix(in srgb, var(--fam) 40%, #fff) 352deg,
+    #fff 358deg,
+    transparent 360deg
+  );
+  transform: translate(-50%, -50%) rotate(var(--r0, 0deg));
+  animation: orbit-spin 3.4s linear infinite;
+  animation-delay: calc(var(--seed, 0) * -3.4s);
+}
+@keyframes orbit-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* holographic scan sweep: a soft band drifts down through the card, under the text */
+.node > .scan {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 38%;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--fam) 11%, transparent) 70%, color-mix(in srgb, var(--fam) 34%, transparent) 99%, transparent 100%);
+  transform: translateY(-110%);
+  animation: scan-sweep 5.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation-delay: calc(var(--seed, 0) * -5.2s);
+}
+@keyframes scan-sweep {
+  0% {
+    transform: translateY(-110%);
+  }
+  62%,
+  100% {
+    transform: translateY(290%);
+  }
+}
+
+.node.waiting {
+  border-color: var(--warn);
+}
+/* needs the user: the border breathes (opacity of an inset ring) and the brackets pulse */
+.node > .ring {
+  inset: 0;
+  border-radius: inherit;
   box-shadow:
     inset 0 0 0 1px var(--warn),
-    inset 0 0 20px -4px var(--warn);
-  animation: breathe 2.6s ease-in-out infinite;
+    inset 0 0 22px -4px var(--warn);
+  animation: breathe 3.2s ease-in-out infinite;
 }
 @keyframes breathe {
   0%,
   100% {
-    opacity: 0.12;
+    opacity: 0.14;
   }
   50% {
-    opacity: 0.9;
+    opacity: 0.95;
   }
 }
 .node.done,
 .node.idle-agent {
   opacity: 0.72;
 }
-/* finishing: the card dims after the bar and check have played */
+/* finishing: the card cools (dims) after the bar, check and sparks have played */
 .node.done {
   transition:
     border-color 0.3s,
     opacity 0.9s ease 0.8s,
     box-shadow 0.25s,
+    transform 0.16s ease-out,
     translate 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 .node.done:hover,
@@ -116,7 +298,9 @@
 }
 .node.error {
   border-color: var(--err);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--err) 7%, var(--panel)) 0, var(--panel) 60px);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--err) 11%, transparent) 0, transparent 64px),
+    var(--glass);
 }
 
 /* ---- header ---- */
@@ -140,6 +324,7 @@
   color: var(--fam);
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -156,7 +341,7 @@
   align-items: center;
   gap: 4px;
   font-size: 10.5px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   flex-shrink: 0;
 }
 .status .st-running {
@@ -190,6 +375,7 @@
   overflow: hidden;
   position: relative;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 .bar.full > i {
   position: absolute;
@@ -230,6 +416,10 @@
 .node .now .dur {
   color: var(--muted);
 }
+.node .now .dur {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
 .node .now.finished,
 .node .now.idle,
 .node .now.quiet {
@@ -257,7 +447,9 @@
 }
 .node .meta {
   color: var(--muted);
-  font-size: 10.5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.01em;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -283,22 +475,60 @@
   opacity: 0.7;
 }
 
-/* ---- main agent: a header stripe in its model colour and a little more presence ---- */
+/* ---- main agent: an animated header stripe and a slow gradient mesh ---- */
 .node.main {
   text-align: center;
   border-width: 1px;
-  padding-top: 11px;
+  padding-top: 12px;
   background:
-    linear-gradient(90deg, transparent, var(--fam) 20%, var(--fam) 80%, transparent) top / 100% 3px no-repeat,
-    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--fam) 13%, var(--panel)), var(--panel) 70%);
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--fam) 14%, transparent), transparent 70%),
+    var(--glass);
   box-shadow:
-    0 4px 14px -6px rgba(0, 0, 0, 0.8),
-    0 0 26px -16px var(--fam);
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 4px 16px -6px rgba(0, 0, 0, 0.8),
+    0 0 28px -16px var(--fam);
 }
 .node.main.running {
   box-shadow:
-    0 4px 14px -6px rgba(0, 0, 0, 0.8),
-    0 0 22px -9px var(--fam);
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 4px 16px -6px rgba(0, 0, 0, 0.8),
+    0 0 24px -9px var(--fam);
+}
+.node > .mesh {
+  inset: -45%;
+  opacity: 0.3;
+  background:
+    radial-gradient(34% 34% at 32% 38%, color-mix(in srgb, var(--fam) 34%, transparent), transparent 70%),
+    radial-gradient(30% 30% at 68% 62%, color-mix(in srgb, var(--fam) 22%, #4cc9f0), transparent 70%),
+    radial-gradient(26% 26% at 55% 25%, color-mix(in srgb, var(--fam) 28%, #ff5ea8), transparent 70%);
+  animation: mesh-drift 26s linear infinite;
+}
+@keyframes mesh-drift {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.node > .stripe {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  overflow: hidden;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fam) 60%, transparent) 18%, color-mix(in srgb, var(--fam) 60%, transparent) 82%, transparent);
+}
+.node > .stripe::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fam) 30%, #fff) 50%, transparent);
+  transform: translateX(-100%);
+  animation: stripe-run 3.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes stripe-run {
+  to {
+    transform: translateX(250%);
+  }
 }
 .node.main .row1 {
   justify-content: center;
@@ -317,7 +547,7 @@
   border-top-color: transparent;
 }
 
-/* ---- the "N finished" chip: finished cards fold into it, and fan back out when it is opened ---- */
+/* ---- the "N finished" chip: a holographic stack that rises on hover; revealed cards fan out of it with a stagger (cardFx) ---- */
 .node.collapsed {
   border-style: dashed;
   font-size: 11px;
@@ -326,9 +556,11 @@
   justify-content: center;
   align-items: center;
   color: var(--muted);
-  background: color-mix(in srgb, var(--panel) 80%, transparent);
   --fam: var(--line-2);
   --edge: var(--line-2);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
   /* a stack of cards peeking out below */
   box-shadow:
     0 4px 0 -1px var(--panel),
@@ -336,10 +568,41 @@
     0 8px 0 -2px var(--panel),
     0 8px 0 -1px var(--line);
   overflow: visible;
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.28s cubic-bezier(0.2, 0.9, 0.3, 1),
+    translate 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+/* the holographic film: a faint iridescent diagonal that glides across on hover */
+.node.collapsed::after,
+.node.collapsed:hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: none;
+  opacity: 0.55;
+  background: linear-gradient(115deg, transparent 20%, rgba(76, 201, 240, 0.13) 38%, rgba(180, 156, 255, 0.16) 50%, rgba(255, 94, 168, 0.12) 62%, transparent 80%) -60% 0 / 220% 100% no-repeat;
+  transition:
+    background-position 0.7s cubic-bezier(0.2, 0.8, 0.3, 1),
+    opacity 0.25s;
 }
 .node.collapsed:hover {
   color: var(--text-2);
   border-color: var(--muted);
+  transform: none;
+  box-shadow:
+    0 6px 0 -1px var(--panel),
+    0 6px 0 0 var(--muted),
+    0 12px 0 -2px var(--panel),
+    0 12px 0 -1px var(--line-2),
+    0 16px 22px -10px rgba(0, 0, 0, 0.7);
+}
+.node.collapsed:hover::after {
+  opacity: 1;
+  background-position: 160% 0;
 }
 
 /* ---- agent card lit by hovering a plan step ---- */
@@ -355,11 +618,40 @@
   display: inline;
 }
 
-/* ---- many running agents: keep it cheap. the sheen and shimmer stand still ---- */
+/* ---- many running agents (calm): keep it cheap. Orbit and glow hold still, no sweeps, no backdrop blur ---- */
+.graph-canvas.calm .node {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  --glass: color-mix(in srgb, var(--panel) 94%, transparent);
+}
+/* a static ring instead of the masked comet: masks make every card its own render surface */
+.graph-canvas.calm .node > .orbit {
+  -webkit-mask: none;
+  mask: none;
+  background: none;
+  padding: 0;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--fam) 75%, transparent);
+}
+.graph-canvas.calm .node > .orbit::before {
+  display: none;
+}
+.graph-canvas.calm .node > .scan,
+.graph-canvas.calm .node > .mesh,
+.graph-canvas.calm .node > .stripe::before {
+  display: none;
+}
 .graph-canvas.calm .node.running::before {
+  background: none;
+}
+.graph-canvas.calm .node.running.tool::before {
   animation: none;
-  transform: translateX(45%);
-  opacity: 0.7;
+  opacity: 0.9;
+}
+.graph-canvas.calm .node.waiting > .ring {
+  animation-duration: 6s;
+}
+.graph-canvas.calm .node.waiting > .brackets {
+  animation: lock-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
 }
 .graph-canvas.calm .bar.indet > i {
   animation: none;
@@ -368,30 +660,39 @@
 .graph-canvas.calm .status .st-running {
   animation: none;
 }
-.graph-canvas.calm .node.waiting::after {
-  animation-duration: 5s;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .node,
-  .node.done {
+  .node.done,
+  .node.collapsed {
     transition: none;
   }
   .node.node:hover {
     translate: none;
+    transform: none;
   }
   .status .st-running {
     animation: none;
   }
-  .node.running::before {
+  .node > .orbit::before {
     animation: none;
-    transform: translateX(45%);
+    transform: translate(-50%, -50%) rotate(35deg);
+  }
+  .node > .scan,
+  .node > .stripe::before {
+    display: none;
+  }
+  .node > .mesh,
+  .node.running.tool::before,
+  .node > .brackets,
+  .node.waiting > .brackets {
+    animation: none;
   }
   .bar.indet > i {
     animation: none;
     transform: translateX(35%);
   }
-  .node.waiting::after {
+  .node > .ring {
     animation: none;
     opacity: 0.6;
   }
@@ -459,4 +760,73 @@
   width: 11px;
   height: 11px;
   vertical-align: -1px;
+}
+
+/* ---- overlays made by cardFx (outside the card, so they can spill past its edge): wireframe, shockwave, sparks, ping ---- */
+.fx-overlay {
+  position: absolute;
+  pointer-events: none;
+  z-index: 6;
+  overflow: visible;
+}
+.fx-overlay > * {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+.fx-wire {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.fx-wire rect {
+  fill: none;
+  stroke: var(--fam, var(--opus));
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 3px var(--fam, var(--opus)));
+}
+.fx-wipe {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: linear-gradient(180deg, transparent, var(--fam, var(--opus)) 20%, #fff 50%, var(--fam, var(--opus)) 80%, transparent);
+  box-shadow: 0 0 10px 1px var(--fam, var(--opus));
+}
+.fx-ring {
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  border: 2px solid var(--fam, var(--opus));
+  box-shadow:
+    0 0 10px var(--fam, var(--opus)),
+    inset 0 0 8px var(--fam, var(--opus));
+}
+.fx-spark {
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fam, var(--opus)) 60%, #fff);
+  box-shadow: 0 0 6px 1px var(--fam, var(--opus));
+}
+.fx-ping {
+  inset: 0;
+  border-radius: 7px;
+  border: 2px solid var(--warn);
+  box-shadow: 0 0 14px var(--warn);
+}
+.node > .fx-errline {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  z-index: 3;
+  background: var(--err);
+  box-shadow:
+    0 0 10px 2px var(--err),
+    0 0 26px 6px color-mix(in srgb, var(--err) 40%, transparent);
 }

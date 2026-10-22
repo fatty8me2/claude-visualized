@@ -41,6 +41,32 @@ export function StatusLabel({ st, extra, enabled }: { st: DisplayStatus; extra?:
   );
 }
 
+/** a stable 0..1 number per agent, so a hundred running cards do not sweep and orbit in lockstep */
+export function seedOf(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 997;
+  return h / 997;
+}
+
+/**
+ * The effect layers inside a card. Empty `<i>` elements, all behind the text (graphCards.css): the one-shot glow (.fx), the orbiting
+ * energy border and scan sweep while running, the breathing ring and corner brackets while waiting, the targeting reticle when
+ * selected, and the mesh and stripe on the main card. Only the layers a state needs are mounted.
+ */
+export function FxLayers({ st, selected, main }: { st: DisplayStatus; selected: boolean; main: boolean }) {
+  return (
+    <>
+      <i className="fx" aria-hidden />
+      {main && <i className="mesh" aria-hidden />}
+      {main && <i className="stripe" aria-hidden />}
+      {st === 'running' && <i className="orbit" aria-hidden />}
+      {st === 'running' && <i className="scan" aria-hidden />}
+      {st === 'waiting' && <i className="ring" aria-hidden />}
+      {(selected || st === 'waiting') && <i className="brackets" aria-hidden />}
+    </>
+  );
+}
+
 /** Icon + word for a display status. "done" draws its check as a stroked path so cardFx can animate it. */
 export function StatusText({ st }: { st: DisplayStatus }) {
   return (

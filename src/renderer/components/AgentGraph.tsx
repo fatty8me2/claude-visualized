@@ -12,8 +12,8 @@ import { GraphEdges, type EdgeMeta } from './GraphEdges';
 import { isLocalModel, LocalLinkLine } from './LocalBits';
 import { createClock, useClockKey, type Clock } from '../clockStore';
 import { agentName, displayStatus, famClass, type DisplayStatus } from '../util';
-import { MotionTracker, playMoves } from '../cardFx';
-import { Fade, StatusLabel } from './cardParts';
+import { MotionTracker, playMoves, trackTilt } from '../cardFx';
+import { Fade, FxLayers, StatusLabel, seedOf } from './cardParts';
 import { Icon } from './Icon';
 import { useGraphPrefs, useGroupFolds } from '../state/graphPrefs';
 
@@ -160,12 +160,13 @@ const NodeCard = memo(function NodeCard({
       <Icon name="fold" size="xs" />
     </button>
   ) : null;
-  const cls = `node ${famClass(a.model)} ${st === 'idle' && !isMain ? 'idle-agent' : st} ${isMain ? 'main' : ''} ${selected ? 'sel' : ''}${hl ? ' hl' : ''}${compact ? ' compact' : ''}`;
+  const cls = `node ${famClass(a.model)} ${st === 'idle' && !isMain ? 'idle-agent' : st} ${isMain ? 'main' : ''} ${selected ? 'sel' : ''}${hl ? ' hl' : ''}${compact ? ' compact' : ''}${st === 'running' && a.currentTool ? ' tool' : ''}`;
+  const style = { left: x, top: y, width: w, height: h, ['--seed' as string]: seedOf(a.id) };
 
   if (compact) {
     return (
-      <div className={cls} style={{ left: x, top: y, width: w, height: h }} onClick={() => onSelect(a.id)} data-agent={a.id} title={a.description || undefined}>
-        <i className="fx" aria-hidden />
+      <div className={cls} style={style} onClick={() => onSelect(a.id)} data-agent={a.id} title={a.description || undefined}>
+        <FxLayers st={st} selected={selected} main={isMain} />
         <div className="row1">
           <GoalBadge goal={goal} glyphOnly />
           <span className="name">{title}</span>
@@ -185,8 +186,8 @@ const NodeCard = memo(function NodeCard({
   }
 
   return (
-    <div className={cls} style={{ left: x, top: y, width: w, height: h }} onClick={() => onSelect(a.id)} data-agent={a.id}>
-      <i className="fx" aria-hidden />
+    <div className={cls} style={style} onClick={() => onSelect(a.id)} data-agent={a.id}>
+      <FxLayers st={st} selected={selected} main={isMain} />
       <div className="row1">
         <span className="name" title={a.description || undefined}>
           {title}
@@ -396,6 +397,13 @@ export function AgentGraph({
     const moves = motion.take();
     if (!embedded && canvasRef.current) playMoves(canvasRef.current, moves);
   }, [motion, view.id, view.agents, layout, embedded]);
+
+  // hover tilt and specular highlight: written straight to the hovered card's CSS variables, never through React
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el || embedded) return;
+    return trackTilt(el);
+  }, [embedded]);
 
   // ---- zoom around the cursor (ctrl+wheel / pinch), drag to pan ----
   const scaleRef = useRef(scale);
