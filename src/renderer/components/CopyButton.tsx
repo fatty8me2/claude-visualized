@@ -20,7 +20,7 @@ export function CopyButton({ text, label, testId, title = 'Copy' }: { text: stri
   };
   return (
     <button
-      className={label ? 'copy-btn' : 'copy-btn btn-icon ghost'}
+      className={`${label ? 'copy-btn' : 'copy-btn btn-icon ghost'}${done ? ' done' : ''}`}
       data-testid={testId}
       onClick={(e) => {
         e.stopPropagation();

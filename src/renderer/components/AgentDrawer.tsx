@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { describeActivity } from '@core/activity';
 import { toolCategory, type ToolCategory } from '@core/goal';
+import { contextInfo } from '@core/context';
 import { childCounts, agentGoal } from '@core/insight';
 import { estimateCostUSD, estimateTooltip, formatUSD } from '@core/pricing';
 import type { AgentNode, SessionView } from '@core/state';
@@ -37,6 +38,61 @@ const MIX_NAME: Record<ToolCategory, string> = {
   other: 'other',
 };
 const MAX_CHILDREN = 12;
+const SPARK_BINS = 32;
+
+/** a number that slides in when it changes (keyed remount, CSS animation only) */
+function Roll({ text }: { text: string }) {
+  return (
+    <span className="tv" key={text}>
+      {text}
+    </span>
+  );
+}
+
+/** the task text, clamped to a few lines with a "show more" toggle (the full text stays in the DOM) */
+function Task({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 260 || text.split('\n').length > 4;
+  return (
+    <div className={`task-wrap ${open || !long ? 'open' : ''}`}>
+      <div className="task" data-testid="task">
+        {text}
+      </div>
+      {long && (
+        <button className="task-more" onClick={() => setOpen(!open)} aria-expanded={open}>
+          {open ? 'show less' : 'show more'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** tool starts over the agent's life as a bar sparkline (heights are scaleY, so it stays on the compositor) */
+function Spark({ a, end }: { a: AgentNode; end: number }) {
+  if (a.activity.length < 2) return null;
+  const span = Math.min(10 * 60_000, Math.max(60_000, end - a.startedAt));
+  const t0 = end - span;
+  const bins = new Array<number>(SPARK_BINS).fill(0);
+  for (const t of a.activity) {
+    if (t < t0 || t > end) continue;
+    bins[Math.min(SPARK_BINS - 1, Math.floor(((t - t0) / span) * SPARK_BINS))]++;
+  }
+  const max = Math.max(1, ...bins);
+  return (
+    <div className="d-spark" data-testid="drawer-spark" title={`tool starts, last ${formatDuration(span)}`}>
+      <div className="bars">
+        {bins.map((n, i) => (
+          <i key={i} className={n ? 'on' : ''} style={{ transform: `scaleY(${n ? 0.18 + (0.82 * n) / max : 0.08})` }} />
+        ))}
+      </div>
+      <div className="cap">
+        <span>{formatDuration(span)} ago</span>
+        <span>tool activity</span>
+        <span>now</span>
+      </div>
+    </div>
+  );
+}
 
 function base(p: string): string {
   const parts = p.split(/[\\/]/).filter(Boolean);
@@ -108,6 +164,9 @@ export function AgentDrawer({
   const act = describeActivity(a, { now, runningChildren: kids.running, totalChildren: kids.total });
   const task = a.prompt || a.description;
   const timeline = [...a.recent].reverse();
+  // time until the next call started (or until now for the newest): a rough "how long it held the agent"
+  const gaps = timeline.map((r, i) => (i === 0 ? now : timeline[i - 1].ts) - r.ts);
+  const maxGap = Math.max(1, ...gaps);
   const newestErr = timeline.find((r) => r.error)?.id;
   const children = Object.values(view.agents)
     .filter((c) => c.parentId === a.id && c.id !== a.id)
@@ -120,87 +179,112 @@ export function AgentDrawer({
       else n.add(rid);
       return n;
     });
+  const ctx = contextInfo(a);
+  const end = a.endedAt ?? now;
+  const live = st === 'running' || st === 'waiting';
+  const tokIn = a.tokens.in + a.tokens.cacheRead + a.tokens.cacheWrite;
   return (
-    <div className={`drawer panel-raised ${famClass(a.model)}`} data-testid="drawer" role="dialog" aria-label={`Agent ${agentName(a)}`}>
-      <div className="hd">
-        <b>{agentName(a)}</b>
-        <GoalBadge goal={goal} />
-        <button className="btn-icon ghost" onClick={onClose} aria-label="close" title="Close (Esc)">
-          <Icon name="close" />
-        </button>
-      </div>
-      {a.kind !== 'main' && a.description && <div className="dtitle">{a.description}</div>}
-      <div className="because" data-testid="because">
-        {goal.because} <span className="conf">· {goal.confidence} confidence</span>
-      </div>
-      <div className="nowbox" data-testid="drawer-now">
-        <span className="lbl">now:</span> {act.phrase}
-        {act.since != null && <span className="dur"> · {formatDuration(now - act.since)}</span>}
-      </div>
-      <div className="kv">
-        <span className="k">status</span>
-        <span className={`v status ${st}`}>
-          <StatusText st={st} />
-        </span>
-        <span className="k">model</span>
-        <span className="v">{modelLabel(a.model)}</span>
-        {isLocalModel(a.model) && (
-          <>
-            <span className="k">runs on</span>
-            <span className="v">
-              <LocalLinkLine agent={a} />
-            </span>
-          </>
-        )}
-        {a.kind !== 'main' && (
-          <>
-            <span className="k">id</span>
-            <span className="v" title={a.id}>
-              {a.id}
-            </span>
-            <span className="k">parent</span>
-            <span className="v">
-              {parent ? (
-                <button className="link" onClick={() => onSelect(parent.id)} data-testid="drawer-parent" title="Show the parent agent">
-                  {agentName(parent)}
-                </button>
-              ) : (
-                '—'
-              )}
-            </span>
-          </>
-        )}
-        <span className="k">started</span>
-        <span className="v">{clock(a.startedAt)}</span>
-        <span className="k">elapsed</span>
-        <span className="v">{formatDuration((a.endedAt ?? now) - a.startedAt)}</span>
-        <span className="k">tools</span>
-        <span className="v">
-          {a.toolCount}
-          {a.errorCount ? ` (${a.errorCount} failed)` : ''}
-        </span>
-        <span className="k">tokens in/out</span>
-        <span className="v">
-          {formatTokens(a.tokens.in + a.tokens.cacheRead + a.tokens.cacheWrite)} / {formatTokens(a.tokens.out)}
-        </span>
-        {cost !== null && (
-          <>
-            <span className="k">cost est.</span>
-            <span className="v" title={estimateTooltip()} data-testid="drawer-cost">
-              ~{formatUSD(cost)}
-            </span>
-          </>
-        )}
-      </div>
+    <div className={`drawer panel-raised ${famClass(a.model)} d-${st} ${live ? 'live' : ''}`} data-testid="drawer" role="dialog" aria-label={`Agent ${agentName(a)}`}>
+      <span className="d-orbit" aria-hidden />
+      <div className="d-scroll">
+        <div className="d-body" key={a.id}>
+          <header className="d-hero">
+            <div className="hd">
+              <b>{agentName(a)}</b>
+              <GoalBadge goal={goal} />
+              <button className="btn-icon ghost" onClick={onClose} aria-label="close" title="Close (Esc)">
+                <Icon name="close" />
+              </button>
+            </div>
+            {a.kind !== 'main' && a.description && <div className="dtitle">{a.description}</div>}
+            <div className="d-chips">
+              <span className="d-model" title={a.model ?? undefined}>
+                <i className="d-dot" />
+                {modelLabel(a.model)}
+              </span>
+              <span className={`v status d-status ${st}`}>
+                <StatusText st={st} />
+                <span className="d-elapsed" title={`started ${clock(a.startedAt)}`}>
+                  {formatDuration(end - a.startedAt)}
+                </span>
+              </span>
+            </div>
+          </header>
+          <div className="because" data-testid="because">
+            {goal.because} <span className="conf">· {goal.confidence} confidence</span>
+          </div>
+          <div className="nowbox" data-testid="drawer-now">
+            <span className="lbl">now:</span> {act.phrase}
+            {act.since != null && <span className="dur"> · {formatDuration(now - act.since)}</span>}
+          </div>
+          <div className="d-tiles">
+            <div className="d-tile" data-k="tools">
+              <span className="tk">tools</span>
+              <Roll text={String(a.toolCount)} />
+              <span className={`ts ${a.errorCount ? 'bad' : ''}`}>{a.errorCount ? `${a.errorCount} failed` : 'all ok'}</span>
+            </div>
+            <div className="d-tile" data-k="tokens" title={`in ${formatTokens(tokIn)} / out ${formatTokens(a.tokens.out)}`}>
+              <span className="tk">tokens</span>
+              <Roll text={formatTokens(tokIn + a.tokens.out)} />
+              <span className="ts">
+                {formatTokens(tokIn)} in · {formatTokens(a.tokens.out)} out
+              </span>
+            </div>
+            {ctx && (
+              <div className={`d-tile lv-${ctx.level}`} data-k="ctx" title={ctx.windowKnown ? `${formatTokens(ctx.tokens)} of ${formatTokens(ctx.size)} context` : `${formatTokens(ctx.tokens)} context`}>
+                <span className="tk">context</span>
+                <Roll text={ctx.windowKnown ? `${ctx.pct}%` : formatTokens(ctx.tokens)} />
+                <span className="ts d-meter">
+                  <i style={{ transform: `scaleX(${ctx.windowKnown ? Math.min(1, ctx.fraction) : 0})` }} />
+                </span>
+              </div>
+            )}
+            {cost !== null && (
+              <div className="d-tile" data-k="cost" title={estimateTooltip()} data-testid="drawer-cost">
+                <span className="tk">cost est.</span>
+                <Roll text={`~${formatUSD(cost)}`} />
+                <span className="ts">estimate</span>
+              </div>
+            )}
+          </div>
+          <Spark a={a} end={end} />
+          <div className="kv">
+            {isLocalModel(a.model) && (
+              <>
+                <span className="k">runs on</span>
+                <span className="v">
+                  <LocalLinkLine agent={a} />
+                </span>
+              </>
+            )}
+            {a.kind !== 'main' && (
+              <>
+                <span className="k">id</span>
+                <span className="v" title={a.id}>
+                  {a.id}
+                </span>
+                <span className="k">parent</span>
+                <span className="v">
+                  {parent ? (
+                    <button className="link" onClick={() => onSelect(parent.id)} data-testid="drawer-parent" title="Show the parent agent">
+                      {agentName(parent)}
+                    </button>
+                  ) : (
+                    '—'
+                  )}
+                </span>
+              </>
+            )}
+            <span className="k">started</span>
+            <span className="v">{clock(a.startedAt)}</span>
+          </div>
       {task && (
         <section>
           <h4>
             {a.kind === 'main' ? 'latest prompt' : 'task'}
             <CopyButton text={task} title="Copy the task" />
           </h4>
-          <div className="task" data-testid="task">
-            {task}
-          </div>
+          <Task text={task} />
         </section>
       )}
       {children.length > 0 && (
@@ -229,7 +313,7 @@ export function AgentDrawer({
         <section>
           <h4>recent activity</h4>
           <div className="dtl" data-testid="timeline">
-            {timeline.map((r) => {
+            {timeline.map((r, ri) => {
               const open = !!r.error && toggled.has(r.id) !== (r.id === newestErr);
               return (
                 <div key={r.id} className="tl-wrap">
@@ -244,6 +328,9 @@ export function AgentDrawer({
                     </span>
                     <span className="tx">
                       <b>{toolLabel(r.name)}</b> {r.summary}
+                    </span>
+                    <span className="gap" title={`about ${formatDuration(gaps[ri])} until the next call`}>
+                      <i style={{ transform: `scaleX(${Math.max(0.04, gaps[ri] / maxGap)})` }} />
                     </span>
                     <span className="ok">
                       <Icon name={r.ok === null ? 'running' : r.ok ? 'done' : 'error'} size="xs" />
@@ -305,6 +392,8 @@ export function AgentDrawer({
             show in timeline
           </button>
         )}
+      </div>
+        </div>
       </div>
     </div>
   );
