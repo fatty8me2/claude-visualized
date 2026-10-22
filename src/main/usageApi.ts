@@ -1,8 +1,5 @@
-import { execFile } from 'node:child_process';
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import { readCredentials, usesApiKey } from './claudeLogin';
 import { lastRefreshProblem, refreshIfNeeded } from './oauthRefresh';
-import { claudeHome } from './paths';
 
 /**
  * Reads 5-hour / weekly plan usage the same way Claude Code's /usage does: with the OAuth login
@@ -23,34 +20,16 @@ interface Login {
   expiresAt: number | null;
 }
 
-function fromJson(raw: string): Login | null {
-  try {
-    const j = JSON.parse(raw);
-    const o = j?.claudeAiOauth;
-    if (o && typeof o.accessToken === 'string' && o.accessToken)
-      return { token: o.accessToken, expiresAt: typeof o.expiresAt === 'number' ? o.expiresAt : null };
-  } catch {
-    /* not JSON */
-  }
+async function readLogin(): Promise<Login | null> {
+  const c = await readCredentials();
+  const o = c?.json.claudeAiOauth;
+  if (o && typeof o.accessToken === 'string' && o.accessToken) return { token: o.accessToken, expiresAt: typeof o.expiresAt === 'number' ? o.expiresAt : null };
   return null;
 }
 
-async function readLogin(): Promise<Login | null> {
-  try {
-    const l = fromJson(await fs.readFile(path.join(claudeHome(), '.credentials.json'), 'utf8'));
-    if (l) return l;
-  } catch {
-    /* no file */
-  }
-  // macOS keeps Claude Code's login in the login keychain
-  if (process.platform === 'darwin') {
-    const raw = await new Promise<string | null>((resolve) =>
-      execFile('security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'], { timeout: 5000 }, (err, out) => resolve(err ? null : out.trim())),
-    );
-    if (raw) return fromJson(raw);
-  }
-  return null;
-}
+const MAC_EXPIRED = 'The Claude Code login has expired. Open Claude Code (run `claude`) once; it renews the login and this app picks it up on the next check.';
+const API_KEY_ONLY =
+  'Claude Code is using an API key here, not a Claude subscription login, so there are no plan usage meters. Run `claude /login` to sign in with a subscription if you have one.';
 
 const DEAD_LOGIN = 'Claude Code is signed out on this computer. Run `claude /login` in a terminal once; after that the app keeps the login fresh by itself.';
 
@@ -58,8 +37,12 @@ export async function fetchUsage(retried = false): Promise<UsageApiResult> {
   const renewal = await refreshIfNeeded(retried);
   if (renewal === 'dead') return { ok: false, state: 'expired', message: DEAD_LOGIN };
   const login = await readLogin();
-  if (!login) return { ok: false, state: 'no-login', message: 'No Claude Code login found. Run `claude` once and sign in (claude /login).' };
+  if (!login) {
+    if (await usesApiKey()) return { ok: false, state: 'no-login', message: API_KEY_ONLY };
+    return { ok: false, state: 'no-login', message: 'No Claude Code login found. Run `claude` once and sign in (claude /login).' };
+  }
   if (login.expiresAt && login.expiresAt < Date.now()) {
+    if (renewal === 'readonly') return { ok: false, state: 'expired', message: MAC_EXPIRED };
     const transient = renewal === 'failed' || renewal === 'busy';
     return {
       ok: false,
@@ -75,7 +58,7 @@ export async function fetchUsage(retried = false): Promise<UsageApiResult> {
     if (res.status === 401 || res.status === 403) {
       // the pass may have been revoked early: renew once and try again
       if (!retried) return fetchUsage(true);
-      return { ok: false, state: 'expired', message: DEAD_LOGIN };
+      return { ok: false, state: 'expired', message: renewal === 'readonly' ? MAC_EXPIRED : DEAD_LOGIN };
     }
     if (res.status === 429) {
       // Retry-After is seconds (or an HTTP date). The real endpoint often answers `0`, which says nothing; the scheduler then backs off by itself.
