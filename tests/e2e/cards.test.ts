@@ -40,11 +40,12 @@ describe('agent card motion (fixture data)', () => {
 
   /** a 2x screenshot of an element (CDP clip with scale), so the details are readable */
   const shot = async (name: string, sel = '.graph-wrap') => {
+    if (sel !== '.graph-wrap') await page.locator(sel).first().evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'center' }));
     const box = (await page.locator(sel).first().boundingBox())!;
     const pad = sel === '.graph-wrap' ? 0 : 14;
     const clip = { x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.width + pad * 2, height: box.height + pad * 2, scale: 2 };
     const r = await cdp.send('Page.captureScreenshot', { format: 'png', clip });
-    fs.writeFileSync(path.join(ART, `cards-${name}.png`), Buffer.from(r.data, 'base64'));
+    fs.writeFileSync(path.join(ART, `fx-cards-${name}.png`), Buffer.from(r.data, 'base64'));
   };
   /** every element.animate() call on a card since `mark()`: which card, and which properties */
   const animated = () => page.evaluate(() => (window as unknown as { __anims: string[] }).__anims.slice());
@@ -86,6 +87,7 @@ describe('agent card motion (fixture data)', () => {
       } as Record<string, string>,
     });
     page = await app.firstWindow();
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1500, 1000)).catch(() => {});
     await page.setViewportSize({ width: 1440, height: 920 }).catch(() => {});
     // these tests are about the full cards' motion: keep the graph from switching to compact cards in a narrow panel
     await page.evaluate(() => localStorage.setItem('cvis.graph.v1', JSON.stringify({ zoom: 'fit', compact: 'off', hideFinished: false })));
@@ -99,10 +101,10 @@ describe('agent card motion (fixture data)', () => {
       const orig = Element.prototype.animate;
       Element.prototype.animate = function (this: Element, kf: Keyframe[] | PropertyIndexedKeyframes | null, opt?: number | KeyframeAnimationOptions) {
         const a = orig.call(this, kf, opt);
-        const card = this.closest('[data-agent],[data-chip]') as HTMLElement | null;
+        const card = this.closest('[data-agent],[data-chip],[data-fx-for]') as HTMLElement | null;
         if (card) {
           const props = Array.isArray(kf) ? Object.keys(kf[0] ?? {}).filter((k) => k !== 'offset' && k !== 'easing') : Object.keys(kf ?? {});
-          w.__anims.push(`${card.dataset.agent ?? card.dataset.chip}:${props.join('+')}`);
+          w.__anims.push(`${card.dataset.agent ?? card.dataset.chip ?? card.dataset.fxFor}:${props.join('+')}`);
           if (w.__freeze !== null) {
             a.pause();
             a.currentTime = w.__freeze;
@@ -128,36 +130,50 @@ describe('agent card motion (fixture data)', () => {
   });
 
   it('lifts a hovered card and outlines the selected one', async () => {
-    await page.locator('[data-agent="a1"]').hover();
-    await page.waitForTimeout(350);
-    expect(await page.locator('[data-agent="a1"]').evaluate((el) => getComputedStyle(el).translate)).toBe('0px -2px');
+    const a1 = page.locator('[data-agent="a1"]');
+    const b = (await a1.boundingBox())!;
+    await page.mouse.move(b.x + b.width * 0.5, b.y + b.height * 0.5);
+    await page.mouse.move(b.x + b.width * 0.85, b.y + b.height * 0.2, { steps: 6 });
+    await page.waitForTimeout(450);
+    expect(await a1.evaluate((el) => getComputedStyle(el).translate)).toBe('0px -2px');
+    // tilts toward the cursor (a few degrees at most) and the highlight follows it
+    const tilt = await a1.evaluate((el) => ({ rx: el.style.getPropertyValue('--rx'), ry: el.style.getPropertyValue('--ry'), mx: el.style.getPropertyValue('--mx') }));
+    expect(parseFloat(tilt.ry)).toBeGreaterThan(1);
+    expect(Math.abs(parseFloat(tilt.rx))).toBeLessThanOrEqual(4);
+    expect(parseFloat(tilt.mx)).toBeGreaterThan(70);
     await shot('hover');
+    await shot('hover-card', '[data-agent="a1"]');
     await page.locator('[data-agent="a1"]').click();
     await page.getByTestId('drawer').waitFor();
-    await page.waitForTimeout(350);
+    await page.waitForTimeout(450);
+    expect(await page.locator('[data-agent="a1"] > .brackets').count()).toBe(1);
     await shot('selected');
+    await shot('selected-card', '[data-agent="a1"]');
     await page.getByTestId('drawer').getByRole('button', { name: 'close' }).click();
     await page.mouse.move(5, 5);
   });
 
   it('a new subagent springs in from its parent, glowing in its model colour', async () => {
     await mark();
-    await freeze(260);
+    await freeze(300);
     spawn('a10', 'review the retry module', 'claude-sonnet-5-5', 'Read', { file_path: 'C:\\demo\\app\\src\\retry.ts' });
     await page.locator('[data-agent="a10"]').waitFor({ timeout: 15_000 });
     await page.waitForTimeout(150);
     expect((await animated()).filter((a) => a.startsWith('a10:'))).toEqual(expect.arrayContaining(['a10:transform', 'a10:opacity']));
+    expect(await page.locator('.fx-overlay[data-fx-for="a10"]').count()).toBe(1);
     await shot('spawn-mid');
+    await shot('spawn-mid-card', '[data-agent="a10"]');
     await freeze(null);
     await page.waitForTimeout(1500);
     await shot('spawn-settled');
     await shot('running-card', '[data-agent="a10"]');
-    expect(await page.locator('[data-agent="a10"]').evaluate((el) => getComputedStyle(el, '::before').animationName)).toBe('sheen');
+    expect(await page.locator('[data-agent="a10"]').evaluate((el) => getComputedStyle(el.querySelector('.orbit')!, '::before').animationName)).toBe('orbit-spin');
+    await shot('running-main', '[data-agent="main"]');
   });
 
   it('finishing fills the bar, draws the check, then dims', async () => {
     await mark();
-    await freeze(560);
+    await freeze(640);
     await hook({ session_id: SID, hook_event_name: 'SubagentStop', agent_id: 'a10' });
     await page.locator('[data-agent="a10"].done').waitFor({ timeout: 15_000 });
     await page.waitForTimeout(150);
@@ -166,6 +182,7 @@ describe('agent card motion (fixture data)', () => {
     );
     await shot('done-mid');
     await shot('done-mid-card', '[data-agent="a10"]');
+    expect(await page.locator('.fx-overlay[data-fx-for="a10"] .fx-spark').count()).toBeGreaterThanOrEqual(8);
     await freeze(null);
     await page.waitForTimeout(2200);
     await shot('done-settled');
@@ -179,6 +196,7 @@ describe('agent card motion (fixture data)', () => {
     await page.locator('[data-agent="w2"].error').waitFor({ timeout: 15_000 });
     await page.waitForTimeout(150);
     expect((await animated()).filter((a) => a.startsWith('w2:'))).toContain('w2:translate');
+    expect(await page.locator('[data-agent="w2"] > .fx-errline').count()).toBe(1);
     await shot('error-mid', '[data-agent="w2"]');
     await freeze(null);
     await page.waitForTimeout(1500);
@@ -188,9 +206,11 @@ describe('agent card motion (fixture data)', () => {
   it('a permission request makes the main card breathe amber', async () => {
     await hook({ session_id: SID, hook_event_name: 'PermissionRequest', tool_name: 'Bash' });
     await page.locator('[data-agent="main"].waiting').waitFor({ timeout: 10_000 });
-    expect(await page.locator('[data-agent="main"]').evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('breathe');
+    expect(await page.locator('[data-agent="main"]').evaluate((el) => getComputedStyle(el.querySelector('.ring')!).animationName)).toBe('breathe');
+    expect(await page.locator('[data-agent="main"] > .brackets').count()).toBe(1);
     await page.waitForTimeout(1300);
     await shot('waiting');
+    await shot('waiting-main', '[data-agent="main"]');
   });
 
   it('finished cards fold into the chip and fan back out of it', async () => {
