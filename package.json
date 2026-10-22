@@ -69,7 +69,10 @@
     },
     "files": [
       "out/**/*",
-      "package.json"
+      "package.json",
+      "!**/*.map",
+      "!node_modules/lucide-react/**",
+      "!node_modules/@fontsource/**"
     ],
     "extraResources": [
       {
