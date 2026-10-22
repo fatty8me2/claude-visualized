@@ -108,3 +108,18 @@ full cards below 0.8, the graph lays out compact cards instead (`COMPACT_LAYOUT`
 0.9 so it does not flip back and forth); a variant switch counts as a bulk change, so no card or edge animation plays. Compact cards show
 less time-dependent text, so they re-render less often. Benchmark after the change (same machine, `PERF_LABEL=after-0.4`): synthetic-live
 0 long tasks, 8.3 ms average frame (p95 8.4); synthetic-live-expanded (301 cards) 0 long tasks, 8.9 ms average frame (p95 16.6).
+
+## Card effects (command-console look)
+
+Running cards get an orbiting energy border (a rotating conic-gradient square seen through a 2px ring mask, so it is a transform animation), a scan
+band and, while a tool call is in flight, a brighter pulsing inner glow. Spawn is a ~520 ms "materialize" (wireframe, clip-path scan reveal, line-by-line
+fade, a 150 ms chromatic-aberration flash); done adds a shockwave and 8 to 12 sparks (an overlay in the scaled canvas, removed when its animations
+end); errors glitch; waiting pings and pulses corner brackets; hover tilts at most 4 degrees (`trackTilt` writes CSS variables on the hovered card, once
+per frame, no React state). All of it is transform / opacity.
+
+What measurably cost frame time in the benchmark (40 running = calm mode): an always-present `::after` highlight layer and the `::before` scanline
+texture on every card (+20 % average frame), and masked orbit rings. So the highlight pseudo-element exists only on `:hover`, calm mode swaps the masked
+comet for a static box-shadow ring and drops the texture, and `backdrop-filter` is only applied to running, waiting, main, selected and hovered cards
+(never in calm mode), so 300 finished cards never blur. Same machine, `PERF_LABEL=fxfinal`: synthetic-live 8.7 ms average frame (baseline 8.3 to 8.4),
+expanded 10.3 to 10.5 ms (baseline 9.3 to 11.8), 0 long tasks. The benchmark runs in calm mode, so the animated look (16 or fewer running) is not
+covered by it.
