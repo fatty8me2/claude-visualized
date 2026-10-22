@@ -131,6 +131,8 @@ describe('agent card motion (fixture data)', () => {
 
   it('lifts a hovered card and outlines the selected one', async () => {
     const a1 = page.locator('[data-agent="a1"]');
+    // the graph wraps to the window width and scrolls: bring the card out from under the log first
+    await a1.scrollIntoViewIfNeeded();
     const b = (await a1.boundingBox())!;
     await page.mouse.move(b.x + b.width * 0.5, b.y + b.height * 0.5);
     await page.mouse.move(b.x + b.width * 0.85, b.y + b.height * 0.2, { steps: 6 });
