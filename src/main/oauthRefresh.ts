@@ -1,7 +1,7 @@
-import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { applyRefresh, isDeadRefresh, needsRefresh, oauthOf, refreshRequestBody, TOKEN_URL } from '@core/oauth';
+import { readCredentials, type LoginDeps } from './claudeLogin';
 import { claudeHome } from './paths';
 
 /**
@@ -16,7 +16,8 @@ import { claudeHome } from './paths';
 /** why the last renewal failed (status / error code only, never token material), for the UI and diagnosis */
 export let lastRefreshProblem: string | null = null;
 
-export type RefreshOutcome = 'fresh' | 'refreshed' | 'dead' | 'failed' | 'no-login' | 'busy';
+export type RefreshOutcome = 'fresh' | 'refreshed' | 'dead' | 'failed' | 'no-login' | 'busy' | 'readonly';
+// 'readonly': the login lives in the macOS keychain; writing it back would put the secret in argv, so only Claude Code renews it
 
 interface Store {
   read(): Promise<string | null>;
@@ -41,35 +42,6 @@ function fileStore(): Store {
       await fs.rename(tmp, file);
     },
   };
-}
-
-const KEYCHAIN_SERVICE = 'Claude Code-credentials';
-
-function run(cmd: string, args: string[]): Promise<{ ok: boolean; out: string }> {
-  return new Promise((resolve) => execFile(cmd, args, { timeout: 8000 }, (err, out) => resolve({ ok: !err, out: String(out ?? '') })));
-}
-
-/** macOS: Claude Code keeps the login in the login keychain under this service name. */
-function keychainStore(): Store {
-  return {
-    lockPath: path.join(claudeHome(), '.credentials.claude-visualized.lock'),
-    async read() {
-      const r = await run('security', ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-w']);
-      return r.ok ? r.out.trim() : null;
-    },
-    async write(raw) {
-      const info = await run('security', ['find-generic-password', '-s', KEYCHAIN_SERVICE]);
-      const account = /"acct"<blob>="([^"]*)"/.exec(info.out)?.[1] ?? process.env.USER ?? '';
-      const r = await run('security', ['add-generic-password', '-U', '-s', KEYCHAIN_SERVICE, '-a', account, '-w', raw]);
-      if (!r.ok) throw new Error('keychain write failed');
-    },
-  };
-}
-
-async function activeStore(): Promise<Store> {
-  const f = fileStore();
-  if ((await f.read()) !== null || process.platform !== 'darwin') return f;
-  return keychainStore();
 }
 
 async function withLock<T>(lockPath: string, fn: () => Promise<T>): Promise<T | 'busy'> {
@@ -104,9 +76,9 @@ function tokenUrl(): string {
 let failures = 0;
 let retryAfter = 0;
 
-export async function refreshIfNeeded(force = false): Promise<RefreshOutcome> {
+export async function refreshIfNeeded(force = false, deps: LoginDeps = {}): Promise<RefreshOutcome> {
   if (Date.now() < retryAfter) return 'failed';
-  const out = await refreshOnce(force);
+  const out = await refreshOnce(force, deps);
   if (out === 'failed') {
     failures++;
     retryAfter = Date.now() + Math.min(30, 2 ** failures) * 60_000;
@@ -123,10 +95,11 @@ export function resetRefreshBackoff() {
   retryAfter = 0;
 }
 
-async function refreshOnce(force: boolean): Promise<RefreshOutcome> {
-  const store = await activeStore();
-  const first = await store.read();
-  if (first === null) return 'no-login';
+async function refreshOnce(force: boolean, deps: LoginDeps): Promise<RefreshOutcome> {
+  const store = fileStore();
+  const found = await readCredentials(deps);
+  if (!found) return 'no-login';
+  const first = found.raw;
   let creds: Record<string, any>;
   try {
     creds = JSON.parse(first);
@@ -134,6 +107,7 @@ async function refreshOnce(force: boolean): Promise<RefreshOutcome> {
     return 'failed';
   }
   if (!needsRefresh(oauthOf(creds), Date.now(), force)) return oauthOf(creds)?.refreshToken ? 'fresh' : oauthOf(creds) ? 'dead' : 'no-login';
+  if (found.source === 'keychain') return 'readonly';
 
   const result = await withLock(store.lockPath, async (): Promise<RefreshOutcome> => {
     // the CLI may have renewed while we waited
