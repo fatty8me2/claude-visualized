@@ -1,7 +1,7 @@
 // Tree layout for the agent graph: main on top, subagents below, nested by parent.
 // Leaf-only sibling groups wrap into a grid so a 20-agent workflow stays readable.
 
-import { edgePath, treeGeom, trunkY } from './edgePath';
+import { edgePath, gridGeom, treeGeom, trunkY } from './edgePath';
 import type { EdgeGeom } from './edgePath';
 import { MAIN, type AgentNode } from './state';
 
@@ -89,6 +89,10 @@ interface Box {
   sh: number;
 }
 
+/** Narrowest vertical gutter between grid columns: a connector runs down its middle, so it needs clear margin on both sides. */
+const MIN_GUTTER = 20;
+const gutterW = (opt: LayoutOptions) => Math.max(opt.gapX, MIN_GUTTER);
+
 const isFinished = (a: AgentNode) => a.status === 'done' || a.status === 'error';
 
 export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptions = DEFAULT_LAYOUT): Layout {
@@ -149,7 +153,7 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
       w: isMain ? opt.mainW : opt.nodeW,
       h: isMain ? opt.mainH : opt.nodeH,
       children: childBoxes,
-      grid: childBoxes.length > opt.maxCols && childBoxes.every((c) => c.children.length === 0),
+      grid: opt.maxCols >= 2 && childBoxes.length > opt.maxCols && childBoxes.every((c) => c.children.length === 0),
       sw: 0,
       sh: 0,
     };
@@ -173,8 +177,9 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
       const rows = Math.ceil(b.children.length / cols);
       const cw = opt.nodeW;
       const rowH = Math.max(...b.children.map((c) => c.h));
-      b.sw = Math.max(b.w, cols * cw + (cols - 1) * opt.gapX);
-      b.sh = b.h + opt.gapY + rows * rowH + (rows - 1) * (opt.gapY * 0.45);
+      b.sw = Math.max(b.w, cols * cw + (cols - 1) * gutterW(opt));
+      // each row gap holds a connector lane with clearance above and below
+      b.sh = b.h + opt.gapY + rows * rowH + (rows - 1) * opt.gapY;
       return;
     }
     const cw = b.children.reduce((s, c) => s + c.sw, 0) + (b.children.length - 1) * opt.gapX;
@@ -202,17 +207,29 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
     const ctop = top + b.h + opt.gapY;
     if (b.grid) {
       const cols = opt.maxCols;
-      const gridW = cols * opt.nodeW + (cols - 1) * opt.gapX;
+      const gw = gutterW(opt);
+      const step = opt.nodeW + gw;
+      const gridW = cols * opt.nodeW + (cols - 1) * gw;
       const gx = left + (b.sw - gridW) / 2;
       const rowH = Math.max(...b.children.map((c) => c.h));
+      const lane0 = trunkY(py, ctop);
+      // vertical gutter between columns nearest the parent (every row above the last is full, so they line up)
+      let trunkX = gx + opt.nodeW + gw / 2;
+      for (let k = 1; k < cols - 1; k++) {
+        const g = gx + k * step + opt.nodeW + gw / 2;
+        if (Math.abs(g - px) < Math.abs(trunkX - px)) trunkX = g;
+      }
       b.children.forEach((c, i) => {
         const r = Math.floor(i / cols);
         const inRow = Math.min(cols, b.children.length - r * cols);
-        const rowOffset = ((cols - inRow) * (opt.nodeW + opt.gapX)) / 2;
-        const cx = gx + rowOffset + (i % cols) * (opt.nodeW + opt.gapX);
-        const cy = ctop + r * (rowH + opt.gapY * 0.45);
+        const rowOffset = ((cols - inRow) * step) / 2;
+        const cx = gx + rowOffset + (i % cols) * step;
+        const cy = ctop + r * (rowH + opt.gapY);
         place({ ...c, sw: c.w }, cx, cy);
-        edge({ id: c.id, x: cx, y: cy, w: c.w });
+        const ex = cx + c.w / 2;
+        const st = statusOf(c.id);
+        const geom: EdgeGeom = r === 0 ? treeGeom(px, py, ex, cy, lane0) : gridGeom(px, py, ex, cy, lane0, trunkX, cy - opt.gapY / 2);
+        edges.push({ from: b.id, to: c.id, d: edgePath(geom), active: st === 'running' || st === 'waiting', geom });
       });
       return;
     }
@@ -236,7 +253,10 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
     root.children.push(build(o, 1, seen));
     added = true;
   }
-  if (added) measure(root);
+  if (added) {
+    root.grid = opt.maxCols >= 2 && root.children.length > opt.maxCols && root.children.every((c) => c.children.length === 0);
+    measure(root);
+  }
   place(root, 0, 0);
   return { nodes, edges, width: root.sw, height: root.sh };
 }

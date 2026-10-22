@@ -77,6 +77,21 @@ export function treeGeom(sx: number, sy: number, ex: number, ey: number, ty: num
   ]);
 }
 
+/**
+ * Connector for a child in a lower grid row: parent stub down to the first lane (lane0), along it to a vertical gutter
+ * between columns (gx), down the gutter to the lane above the child's row (laneY), across to the child, down into it.
+ */
+export function gridGeom(sx: number, sy: number, ex: number, ey: number, lane0: number, gx: number, laneY: number): EdgeGeom {
+  return geomFromPoints([
+    [sx, sy],
+    [sx, lane0],
+    [gx, lane0],
+    [gx, laneY],
+    [ex, laneY],
+    [ex, ey],
+  ]);
+}
+
 /** Kept for callers that only need the classic three-segment shape. */
 export function roundedPath(sx: number, sy: number, ex: number, ey: number, ty: number, r = CORNER_R): string {
   return roundedPolyline(treeGeom(sx, sy, ex, ey, ty).pts, r);
