@@ -3,6 +3,7 @@ import { computeStepStatus, ORIGIN_LABEL, planProgress, resolvePlan, type Parsed
 import type { SessionView } from '@core/state';
 import { displayStatus, famClass } from '../util';
 import { Icon } from './Icon';
+import '../modePanel.css';
 
 // ---------- preferences (same pattern as layout.tsx: localStorage, never required) ----------
 
@@ -102,6 +103,7 @@ export function PlanToggle({ plan, prefs }: { plan: PlanModel; prefs: PlanPrefsA
   );
 }
 
+const i_last = (i: number, n: number) => i === n - 1;
 const NODE_ICON = { done: 'done', in_progress: 'running', pending: null } as const;
 const STATE_LABEL = { done: 'done', in_progress: 'in progress', pending: 'pending' } as const;
 
@@ -194,6 +196,11 @@ export function PlanRail({
         onClick={() => st.linkedAgents[0] && onSelect(st.linkedAgents[0])}
         title={`${step.text}\n\n${STATE_LABEL[st.status]}\n${evidence}`}
       >
+        {st.status === 'in_progress' && !i_last(i, parsed.steps.length) && (
+          <span className="pr-spark" aria-hidden>
+            <i />
+          </span>
+        )}
         <span className="pr-node" aria-label={STATE_LABEL[st.status]}>
           {NODE_ICON[st.status] && <Icon name={NODE_ICON[st.status]!} size="xs" strokeWidth={3} />}
         </span>
@@ -247,6 +254,10 @@ export function PlanRail({
             {plan.done}/{plan.total} steps
           </span>
           <span className="pr-spacer" />
+          <span className="pr-pct" aria-hidden>
+            {pct}
+            <small>%</small>
+          </span>
           <button
             className="btn-icon ghost"
             onClick={() => prefs.set((p) => ({ ...p, side: p.side === 'left' ? 'right' : 'left' }))}

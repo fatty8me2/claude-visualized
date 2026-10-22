@@ -55,11 +55,22 @@ function splitPath(p: string): { base: string; dir: string } {
   return { base, dir: parts.slice(-3).join('/') };
 }
 
+/** A number that rolls in when its value changes (keyed remount + CSS transform/opacity animation). */
+function Roll({ v }: { v: string | number }) {
+  return (
+    <span className="roll" key={v}>
+      {v}
+    </span>
+  );
+}
+
 function Strip({ data }: { data: number[] }) {
   const max = Math.max(1, ...data);
   const W = 240;
   const H = 38;
   const step = W / data.length;
+  // a smoothed ridge over the bar tops gives the strip a live "signal" outline
+  const pts = data.map((c, i) => `${(i * step + step / 2).toFixed(1)},${(H - (c / max) * (H - 4)).toFixed(1)}`);
   return (
     <svg
       className="ins-strip"
@@ -71,13 +82,22 @@ function Strip({ data }: { data: number[] }) {
     >
       <line className="ins-axis" x1={0} x2={W} y1={H + 0.5} y2={H + 0.5} />
       {data.map((c, i) => {
-        const h = c ? Math.max(2, (c / max) * (H - 2)) : 0;
+        const s = c ? Math.max(2 / H, c / max) : 0;
         return (
-          <rect key={i} className={`ins-bar ${i === data.length - 1 ? 'now' : ''}`} x={i * step + 0.5} y={H - h} width={step - 1.5} height={h}>
+          <rect
+            key={i}
+            className={`ins-bar ${i === data.length - 1 ? 'now' : ''}`}
+            x={i * step + 0.5}
+            y={0}
+            width={step - 1.5}
+            height={H}
+            style={{ transform: `scaleY(${s})`, animationDelay: `${i * 14}ms` }}
+          >
             <title>{`${data.length - 1 - i === 0 ? 'this minute' : `${data.length - 1 - i} min ago`}: ${c} calls`}</title>
           </rect>
         );
       })}
+      <polyline className="ins-ridge" points={pts.join(' ')} vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
@@ -127,6 +147,7 @@ export function Insights({ view, now, onSelectAgent }: { view: SessionView; now:
   const cur = ins.toolsPerMin[ins.toolsPerMin.length - 1] ?? 0;
   const ag = ins.agents;
   const maxTool = Math.max(1, ...ins.topTools.map((t) => t.count));
+  const pips = STATES.flatMap((k) => Array<(typeof STATES)[number]>(ag[k]).fill(k)).slice(0, 28);
   const goals = ins.goalMix.filter((g) => g.running + g.done + g.error > 0);
   const maxGoal = Math.max(1, ...goals.map((g) => g.running + g.done + g.error));
   const c = ins.context;
@@ -147,9 +168,15 @@ export function Insights({ view, now, onSelectAgent }: { view: SessionView; now:
             </div>
             <div className="kv">
               <span className="k">this minute</span>
-              <span className="v">{cur}/min</span>
+              <span className="v">
+                <Roll v={cur} />
+                /min
+              </span>
               <span className="k">peak</span>
-              <span className="v">{peak}/min</span>
+              <span className="v">
+                <Roll v={peak} />
+                /min
+              </span>
               {ins.busyShare != null && (
                 <>
                   <span className="k">busy</span>
@@ -170,11 +197,17 @@ export function Insights({ view, now, onSelectAgent }: { view: SessionView; now:
           <>
             <div className="kv">
               <span className="k">tokens</span>
-              <span className="v">{formatTokens(Math.round(ins.burn.tokensPerMin))}/min</span>
+              <span className="v">
+                <Roll v={formatTokens(Math.round(ins.burn.tokensPerMin))} />
+                /min
+              </span>
               <span className="k">tool calls</span>
-              <span className="v">{fmtRate(ins.burn.toolsPerMin)}/min</span>
+              <span className="v">
+                <Roll v={fmtRate(ins.burn.toolsPerMin)} />
+                /min
+              </span>
               <span className="k">cost est.</span>
-              <span className="v est">{ins.burn.costPerHour != null ? `~${formatUSD(ins.burn.costPerHour)}/h` : '—'}</span>
+              <span className="v est">{ins.burn.costPerHour != null ? <Roll v={`~${formatUSD(ins.burn.costPerHour)}/h`} /> : '—'}</span>
             </div>
             {c.pct != null && (
               <div
@@ -185,7 +218,11 @@ export function Insights({ view, now, onSelectAgent }: { view: SessionView; now:
                 <Icon name={urgent ? 'warn' : 'running'} size="xs" />
                 {c.minutesToCompact != null ? (
                   <span>
-                    auto-compact in ~<b>{Math.max(1, Math.round(c.minutesToCompact))}</b> min
+                    auto-compact in ~
+                    <b>
+                      <Roll v={Math.max(1, Math.round(c.minutesToCompact))} />
+                    </b>{' '}
+                    min
                   </span>
                 ) : (
                   <span>context stable</span>
@@ -204,11 +241,20 @@ export function Insights({ view, now, onSelectAgent }: { view: SessionView; now:
             <div className="ins-seg" role="img" aria-label={STATES.map((k) => `${ag[k]} ${k}`).join(', ')}>
               {STATES.map((k) => (ag[k] > 0 ? <i key={k} className={`s-${k}`} style={{ flexGrow: ag[k] }} /> : null))}
             </div>
+            <div className="ins-pips" aria-hidden>
+              {pips.map((k, i) => (
+                <i key={i} className={`s-${k}`} />
+              ))}
+              {ag.total > pips.length && <span>+{ag.total - pips.length}</span>}
+            </div>
             <div className="ins-legend">
               {STATES.map((k) => (
                 <span key={k} className={ag[k] === 0 ? 'zero' : ''}>
                   <i className={`s-${k}`} />
-                  <b>{ag[k]}</b> {k}
+                  <b>
+                    <Roll v={ag[k]} />
+                  </b>{' '}
+                  {k}
                 </span>
               ))}
             </div>
@@ -251,9 +297,11 @@ export function Insights({ view, now, onSelectAgent }: { view: SessionView; now:
               <div key={t.name} className="ins-tool" title={`${t.name}: ${t.count} calls`}>
                 <span className="tn">{t.name}</span>
                 <span className="tb">
-                  <i style={{ width: `${(t.count / maxTool) * 100}%` }} />
+                  <i style={{ '--f': t.count / maxTool } as React.CSSProperties} />
                 </span>
-                <span className="tc">{t.count}</span>
+                <span className="tc">
+                  <Roll v={t.count} />
+                </span>
               </div>
             ))}
           </div>
@@ -277,7 +325,18 @@ export function Insights({ view, now, onSelectAgent }: { view: SessionView; now:
                     title={`${f.path}\n${agentName(f.agentId)}\nclick to copy the path`}
                     data-testid="ins-file"
                   >
-                    {dot(f.agentId)}
+                    <span
+                      role="link"
+                      tabIndex={-1}
+                      className="ins-dotlink"
+                      title={`select ${agentName(f.agentId)}`}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        onSelectAgent?.(f.agentId);
+                      }}
+                    >
+                      {dot(f.agentId)}
+                    </span>
                     <span className="fn">{base}</span>
                     <span className={`fd ${copied === f.path ? 'copied' : ''}`}>{copied === f.path ? 'copied' : dir}</span>
                   </button>
