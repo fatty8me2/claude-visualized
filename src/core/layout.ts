@@ -1,7 +1,7 @@
 // Tree layout for the agent graph: main on top, subagents below, nested by parent.
 // Leaf-only sibling groups wrap into a grid so a 20-agent workflow stays readable.
 
-import { edgePath, gridGeom, treeGeom, trunkY } from './edgePath';
+import { edgePath, freeChannel, gridGeom, treeGeom, trunkY } from './edgePath';
 import type { EdgeGeom } from './edgePath';
 import { MAIN, type AgentNode } from './state';
 
@@ -83,7 +83,13 @@ interface Box {
   h: number;
   collapsed?: LayoutNode['collapsed'];
   children: Box[];
-  grid: boolean;
+  /** row: one line of children; grid: all-leaf children wrapped; blocks: leaf grid plus subtree rows beneath */
+  kind: 'row' | 'grid' | 'blocks';
+  /** blocks only */
+  leaves: Box[];
+  rows: Box[][];
+  /** blocks only: side margins reserved so a connector can run down past the upper rows */
+  pad: number;
   /** subtree extent */
   sw: number;
   sh: number;
@@ -139,7 +145,10 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
           h: opt.chipH,
           collapsed: { count: ids.size, ids: [...ids], parentId: a.id },
           children: [],
-          grid: false,
+          kind: 'row',
+          leaves: [],
+          rows: [],
+          pad: 0,
           // sized up front: a zero-width chip gets placed on top of its neighbour
           sw: opt.nodeW,
           sh: opt.chipH,
@@ -153,7 +162,10 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
       w: isMain ? opt.mainW : opt.nodeW,
       h: isMain ? opt.mainH : opt.nodeH,
       children: childBoxes,
-      grid: opt.maxCols >= 2 && childBoxes.length > opt.maxCols && childBoxes.every((c) => c.children.length === 0),
+      kind: 'row',
+      leaves: [],
+      rows: [],
+      pad: 0,
       sw: 0,
       sh: 0,
     };
@@ -172,18 +184,54 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
       b.sh = b.h;
       return;
     }
-    if (b.grid) {
+    const gw = gutterW(opt);
+    const targetW = opt.maxCols * opt.nodeW + (opt.maxCols - 1) * gw;
+    const subs = b.children.filter((c) => c.children.length > 0);
+    const flatW = b.children.reduce((s, c) => s + c.sw, 0) + (b.children.length - 1) * opt.gapX;
+    b.kind = 'row';
+    if (opt.maxCols >= 2 && subs.length === 0 && b.children.length > opt.maxCols) b.kind = 'grid';
+    else if (opt.maxCols >= 2 && subs.length > 0 && flatW > targetW) b.kind = 'blocks';
+    if (b.kind === 'grid') {
       const cols = opt.maxCols;
       const rows = Math.ceil(b.children.length / cols);
-      const cw = opt.nodeW;
       const rowH = Math.max(...b.children.map((c) => c.h));
-      b.sw = Math.max(b.w, cols * cw + (cols - 1) * gutterW(opt));
+      b.sw = Math.max(b.w, cols * opt.nodeW + (cols - 1) * gw);
       // each row gap holds a connector lane with clearance above and below
       b.sh = b.h + opt.gapY + rows * rowH + (rows - 1) * opt.gapY;
       return;
     }
-    const cw = b.children.reduce((s, c) => s + c.sw, 0) + (b.children.length - 1) * opt.gapX;
-    b.sw = Math.max(b.w, cw);
+    if (b.kind === 'blocks') {
+      // leaves wrap into a grid; subtrees (and workflow groups) go in rows beneath it, wrapping when too wide
+      b.leaves = b.children.filter((c) => c.children.length === 0);
+      b.rows = [];
+      let cur: Box[] = [];
+      let curW = 0;
+      for (const c of subs) {
+        if (cur.length > 0 && curW + gw + c.sw > targetW) {
+          b.rows.push(cur);
+          cur = [];
+          curW = 0;
+        }
+        curW += (cur.length ? gw : 0) + c.sw;
+        cur.push(c);
+      }
+      if (cur.length) b.rows.push(cur);
+      const lcols = Math.min(opt.maxCols, b.leaves.length);
+      const leafW = lcols > 0 ? lcols * opt.nodeW + (lcols - 1) * gw : 0;
+      const rowW = (r: Box[]) => r.reduce((s, c) => s + c.sw, 0) + (r.length - 1) * gw;
+      const nRows = b.rows.length + (b.leaves.length > 0 ? 1 : 0);
+      b.pad = nRows >= 2 ? gw : 0;
+      b.sw = Math.max(b.w, leafW, ...b.rows.map(rowW)) + 2 * b.pad;
+      let h = 0;
+      if (b.leaves.length > 0) {
+        const lr = Math.ceil(b.leaves.length / lcols);
+        h += lr * Math.max(...b.leaves.map((c) => c.h)) + (lr - 1) * opt.gapY;
+      }
+      for (const r of b.rows) h += (h > 0 ? opt.gapY : 0) + Math.max(...r.map((c) => c.sh));
+      b.sh = b.h + opt.gapY + h;
+      return;
+    }
+    b.sw = Math.max(b.w, flatW);
     b.sh = b.h + opt.gapY + Math.max(...b.children.map((c) => c.sh));
   };
 
@@ -205,32 +253,68 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
     };
     if (b.children.length === 0) return;
     const ctop = top + b.h + opt.gapY;
-    if (b.grid) {
-      const cols = opt.maxCols;
+    const pushEdge = (c: { id: string }, geom: EdgeGeom) => {
+      const st = statusOf(c.id);
+      edges.push({ from: b.id, to: c.id, d: edgePath(geom), active: st === 'running' || st === 'waiting', geom });
+    };
+    if (b.kind === 'grid' || b.kind === 'blocks') {
       const gw = gutterW(opt);
       const step = opt.nodeW + gw;
+      const lane0 = trunkY(py, ctop);
+      const cardsStart = nodes.length;
+      const leaves = b.kind === 'grid' ? b.children : b.leaves;
+      const cols = Math.max(1, Math.min(opt.maxCols, leaves.length));
       const gridW = cols * opt.nodeW + (cols - 1) * gw;
       const gx = left + (b.sw - gridW) / 2;
-      const rowH = Math.max(...b.children.map((c) => c.h));
-      const lane0 = trunkY(py, ctop);
+      const rowH = leaves.length ? Math.max(...leaves.map((c) => c.h)) : 0;
       // vertical gutter between columns nearest the parent (every row above the last is full, so they line up)
       let trunkX = gx + opt.nodeW + gw / 2;
       for (let k = 1; k < cols - 1; k++) {
         const g = gx + k * step + opt.nodeW + gw / 2;
         if (Math.abs(g - px) < Math.abs(trunkX - px)) trunkX = g;
       }
-      b.children.forEach((c, i) => {
+      leaves.forEach((c, i) => {
         const r = Math.floor(i / cols);
-        const inRow = Math.min(cols, b.children.length - r * cols);
+        const inRow = Math.min(cols, leaves.length - r * cols);
         const rowOffset = ((cols - inRow) * step) / 2;
         const cx = gx + rowOffset + (i % cols) * step;
         const cy = ctop + r * (rowH + opt.gapY);
         place({ ...c, sw: c.w }, cx, cy);
         const ex = cx + c.w / 2;
-        const st = statusOf(c.id);
-        const geom: EdgeGeom = r === 0 ? treeGeom(px, py, ex, cy, lane0) : gridGeom(px, py, ex, cy, lane0, trunkX, cy - opt.gapY / 2);
-        edges.push({ from: b.id, to: c.id, d: edgePath(geom), active: st === 'running' || st === 'waiting', geom });
+        pushEdge(c, r === 0 ? treeGeom(px, py, ex, cy, lane0) : gridGeom(px, py, ex, cy, lane0, trunkX, cy - opt.gapY / 2));
       });
+      if (b.kind === 'blocks') {
+        const lr = leaves.length ? Math.ceil(leaves.length / cols) : 0;
+        let y = ctop + (lr ? lr * rowH + (lr - 1) * opt.gapY : 0);
+        const roots: Array<{ c: Box; ex: number; top: number; first: boolean }> = [];
+        b.rows.forEach((row, ri) => {
+          const first = ri === 0 && lr === 0;
+          const top = first ? ctop : y + opt.gapY;
+          const rw = row.reduce((s, c) => s + c.sw, 0) + (row.length - 1) * gw;
+          let bx = left + (b.sw - rw) / 2;
+          for (const c of row) {
+            place(c, bx, top);
+            roots.push({ c, ex: bx + c.sw / 2, top, first });
+            bx += c.sw + gw;
+          }
+          y = top + Math.max(...row.map((c) => c.sh));
+        });
+        for (const rt of roots) {
+          if (rt.first) {
+            pushEdge(rt.c, treeGeom(px, py, rt.ex, rt.top, lane0));
+            continue;
+          }
+          // run down a clear channel (between blocks, or the side margin) to the lane above this row
+          const laneY = rt.top - opt.gapY / 2;
+          const blocked: Array<[number, number]> = [];
+          for (let i = cardsStart; i < nodes.length; i++) {
+            const n = nodes[i];
+            if (n.y < laneY && n.y + n.h > lane0) blocked.push([n.x, n.x + n.w]);
+          }
+          const chx = freeChannel(blocked, left + 3, left + b.sw - 3, px, 7) ?? left + gw / 2;
+          pushEdge(rt.c, gridGeom(px, py, rt.ex, rt.top, lane0, chx, laneY));
+        }
+      }
       return;
     }
     const total = b.children.reduce((s, c) => s + c.sw, 0) + (b.children.length - 1) * opt.gapX;
@@ -254,7 +338,6 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
     added = true;
   }
   if (added) {
-    root.grid = opt.maxCols >= 2 && root.children.length > opt.maxCols && root.children.every((c) => c.children.length === 0);
     measure(root);
   }
   place(root, 0, 0);
