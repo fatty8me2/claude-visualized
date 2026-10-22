@@ -66,6 +66,12 @@ function ShareSection({ p, now }: { p: PeersView; now: number }) {
             <>
               <div className="note">Enter this code on the other computer (Devices → Pair with code):</div>
               <div className="pair-code-row">
+                <span className={`pair-ring ${left < 60_000 ? 'low' : ''}`} aria-hidden="true">
+                  <svg viewBox="0 0 48 48">
+                    <circle className="ring-track" cx="24" cy="24" r="20" />
+                    <circle className="ring-arc" cx="24" cy="24" r="20" pathLength={100} style={{ strokeDashoffset: 100 - Math.min(1, left / 600_000) * 100 }} />
+                  </svg>
+                </span>
                 <span className="pair-code" data-testid="pair-code">
                   {p.code.code}
                 </span>

@@ -51,7 +51,7 @@ export function UpdatesSettings({ config }: { config: AppConfigView }) {
   const tone = u.status === 'error' ? 'err' : u.status === 'downloaded' || u.status === 'available' ? 'ok' : '';
   return (
     <div data-testid="updates-settings">
-      <h3 style={{ marginTop: 8 }}>Updates</h3>
+      <h3 className="dlg-sec">Updates</h3>
       <div className="row">
         <span>
           Current version <b data-testid="update-current">{u.currentVersion}</b>

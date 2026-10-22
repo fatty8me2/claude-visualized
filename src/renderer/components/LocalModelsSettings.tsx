@@ -45,7 +45,7 @@ export function LocalModelsSettings({ config }: { config: LocalModelsConfig }) {
   const dup = addrNorm !== null && config.extra.some((e) => e.url === addrNorm);
   return (
     <div data-testid="local-settings">
-      <h3 style={{ marginTop: 8 }}>Local models</h3>
+      <h3 className="dlg-sec">Local models</h3>
       <p className="note">
         Status of local model servers is polled from this app's main process (read-only, nothing from your sessions is sent). Defaults are this computer only; a
         remote address is contacted only if you add it here.
