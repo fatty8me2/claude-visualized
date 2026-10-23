@@ -34,7 +34,10 @@ const API_KEY_ONLY =
 
 const DEAD_LOGIN = 'Claude Code is signed out on this computer. Run `claude /login` in a terminal once; after that the app keeps the login fresh by itself.';
 
-export async function fetchUsage(retried = false): Promise<UsageApiResult> {
+export type LoginResult = { ok: true; token: string; renewal: Awaited<ReturnType<typeof refreshIfNeeded>> } | { ok: false; state: 'no-login' | 'expired' | 'error'; message: string };
+
+/** A usable access token (renewed first when it is about to expire), or why there is none. Shared by the usage read and the ping. */
+export async function loginForRequest(retried = false): Promise<LoginResult> {
   const renewal = await refreshIfNeeded(retried);
   if (renewal === 'dead') return { ok: false, state: 'expired', message: DEAD_LOGIN };
   const login = await readLogin();
@@ -51,6 +54,22 @@ export async function fetchUsage(retried = false): Promise<UsageApiResult> {
       message: transient ? `Could not renew the Claude Code login just now${lastRefreshProblem ? ` (${lastRefreshProblem})` : ''}; will retry.` : DEAD_LOGIN,
     };
   }
+  return { ok: true, token: login.token, renewal };
+}
+
+/** Retry-After (seconds or an HTTP date) in ms, or undefined when absent or zero (the real endpoints often answer `0`, which says nothing). */
+export function retryAfterMs(h: string | null): number | undefined {
+  const secs = h === null ? NaN : /^\d+(\.\d+)?$/.test(h.trim()) ? Number(h) : (Date.parse(h) - Date.now()) / 1000;
+  return Number.isFinite(secs) && secs > 0 ? Math.min(secs, 3600) * 1000 : undefined;
+}
+
+export const AUTH_DEAD_MESSAGE = (renewal: string) => (renewal === 'readonly' ? MAC_EXPIRED : DEAD_LOGIN);
+
+export async function fetchUsage(retried = false): Promise<UsageApiResult> {
+  const lg = await loginForRequest(retried);
+  if (!lg.ok) return lg;
+  const login = { token: lg.token };
+  const renewal = lg.renewal;
   try {
     const res = await fetch(usageUrl(), {
       headers: { Authorization: `Bearer ${login.token}`, 'anthropic-beta': 'oauth-2025-04-20', 'content-type': 'application/json' },
@@ -63,14 +82,12 @@ export async function fetchUsage(retried = false): Promise<UsageApiResult> {
     }
     if (res.status === 429) {
       // Retry-After is seconds (or an HTTP date). The real endpoint often answers `0`, which says nothing; the scheduler then backs off by itself.
-      const h = res.headers.get('retry-after');
-      const secs = h === null ? NaN : /^\d+(\.\d+)?$/.test(h.trim()) ? Number(h) : (Date.parse(h) - Date.now()) / 1000;
       return {
         ok: false,
         state: 'error',
         rateLimited: true,
         message: 'Usage API is rate limiting; will retry.',
-        retryAfterMs: Number.isFinite(secs) && secs > 0 ? Math.min(secs, 3600) * 1000 : undefined,
+        retryAfterMs: retryAfterMs(res.headers.get('retry-after')),
       };
     }
     if (!res.ok) return { ok: false, state: 'error', message: `Usage API answered ${res.status}.` };

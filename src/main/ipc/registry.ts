@@ -33,6 +33,8 @@ export interface IpcContext {
   updateConfig: (patch: Partial<AppConfig>) => AppConfig;
   getUsage: () => UsageView;
   pollUsageApi: () => Promise<{ ran: boolean; nextAllowedAt: number | null }>;
+  getPingStats: () => import('@core/pingStats').PingStatsSummary;
+  resetPingStats: () => void;
   systemInfo: () => SystemInfoView;
   applyHotkey: (accelerator: string) => { ok: boolean; error?: string; accelerator?: string };
   toggleMini: () => void;

@@ -11,7 +11,7 @@ export interface UsageWindow {
   resetsAt: number | null;
   /** epoch ms of the reading */
   at: number;
-  source: 'statusline' | 'transcript' | 'api';
+  source: 'statusline' | 'transcript' | 'api' | 'ping';
   /** the window rolled over and no reading of the new one has arrived yet: 0% is inferred, not read */
   inferred?: boolean;
 }
@@ -28,6 +28,8 @@ export interface UsageView {
   fiveHour: UsageWindow | null;
   sevenDay: UsageWindow | null;
   spend: SpendWindow | null;
+  /** epoch ms of the last ping reading (core/usagePing.ts); the usage API's errors are hidden while it is fresh */
+  pingAt?: number | null;
   /** last status-line reading, null if the status line has never reported */
   statuslineAt: number | null;
   /** per-model weekly windows from the usage API (e.g. "Opus", "Sonnet") */
@@ -151,5 +153,32 @@ export function applyUsageApi(u: UsageView, body: Json, now: number): UsageView 
     if (m && w) models.push({ label: m[1][0].toUpperCase() + m[1].slice(1), window: w });
   }
   next.models = models;
+  return next;
+}
+
+/**
+ * Merge the unified rate-limit headers of a Messages API reply (the "ping", see core/usagePing.ts). `h` has lower-case names. Missing or
+ * garbled headers change nothing; a window whose status is "rejected" is at 100% (a 429 that says a limit was actually hit).
+ */
+export function applyUnifiedHeaders(u: UsageView, h: Record<string, string | undefined>, now: number): UsageView {
+  const one = (k: '5h' | '7d'): UsageWindow | null => {
+    const raw = h[`anthropic-ratelimit-unified-${k}-utilization`];
+    const util = raw !== undefined && raw.trim() !== '' ? Number(raw) : NaN;
+    const rejected = (h[`anthropic-ratelimit-unified-${k}-status`] ?? '').trim().toLowerCase() === 'rejected';
+    if (!Number.isFinite(util) && !rejected) return null;
+    const reset = Number(h[`anthropic-ratelimit-unified-${k}-reset`]);
+    return {
+      pct: rejected ? 100 : Math.max(0, Math.min(100, Math.round(util * 1e4) / 100)),
+      resetsAt: Number.isFinite(reset) && reset > 0 ? reset * 1000 : null,
+      at: now,
+      source: 'ping',
+    };
+  };
+  const f = one('5h');
+  const s = one('7d');
+  if (!f && !s) return u;
+  const next: UsageView = { ...u, pingAt: now, api: { state: 'ok', message: 'ping', at: now } };
+  if (f) next.fiveHour = resolveWindow(u.fiveHour, f);
+  if (s) next.sevenDay = resolveWindow(u.sevenDay, s);
   return next;
 }

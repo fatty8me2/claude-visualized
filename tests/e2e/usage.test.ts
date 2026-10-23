@@ -61,6 +61,7 @@ describe('usage poller (fake usage server)', () => {
       JSON.stringify({ claudeAiOauth: { accessToken: 'fake-access-token', refreshToken: 'fake-refresh-token', expiresAt: Date.now() + 8 * 3600_000 } }),
     );
     userData = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-usage-ud-'));
+    fs.writeFileSync(path.join(userData, 'config.json'), JSON.stringify({ usagePing: false })); // this file tests the old usage-endpoint poller
     app = await electron.launch({
       args: [ROOT],
       cwd: ROOT,

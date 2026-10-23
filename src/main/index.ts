@@ -5,11 +5,14 @@ import type { SystemInfoView } from '@core/api';
 import { loginSupport, shouldShowOnSecondInstance, shouldStartHidden, validateHotkey } from '@core/system';
 import { HookServer } from './hookServer';
 import fs from 'node:fs';
-import { applyQuota, applyStatusline, applyUsageApi, emptyUsage, settleUsage, type UsageView } from '@core/usage';
+import { applyQuota, applyStatusline, applyUnifiedHeaders, applyUsageApi, emptyUsage, settleUsage, type UsageView } from '@core/usage';
 import { fetchUsage } from './usageApi';
+import { fetchPing } from './usagePing';
+import { addPing, emptyPingStats, summarizePingStats, type PingStats, type PingUsage } from '@core/pingStats';
+import { DEFAULT_PING_MINUTES, MIN_PING_MINUTES, rejectedWaitMs } from '@core/usagePing';
 import { loginStatus } from './claudeLogin';
 import type { UsageNumbers } from '@core/events';
-import { DEFAULT_CONFIG, scaleConfig, UsageScheduler, type PollOutcome } from '@core/usageScheduler';
+import { DEFAULT_CONFIG, scaleConfig, UsageScheduler, type PollOutcome, type SchedulerConfig, type SchedulerStatus } from '@core/usageScheduler';
 import { registerAllIpc } from './ipc/registry';
 import { getHookState } from './installer';
 import { writeStatusLineScript } from './statusline';
@@ -132,43 +135,128 @@ function loadUsage() {
 const usageScale = Number(process.env.CLAUDE_VIS_USAGE_TIME_SCALE) || 1;
 /** scheduler facts shown next to the numbers (not persisted, not shared with peers) */
 let schedulerHint: { intervalMs: number; nextAt: number | null; blockedUntil: number | null } | null = null;
-let hintForStart: number | null = null;
+
+/** The ping reading is fresh: the usage API's trouble (it is rate limited for good) is not shown while exact numbers keep coming. */
+const PING_FRESH_MS = 5 * 60_000;
+const pingFresh = () => !!usage.pingAt && Date.now() - usage.pingAt < PING_FRESH_MS;
 
 /** One read of the plan usage API; on failure keeps the last numbers (the meters mark them stale) and says why. */
 async function pollUsageOnce(): Promise<PollOutcome> {
+  const note = (api: NonNullable<UsageView['api']>) => {
+    if (!(pingActive() && pingFresh())) setUsage({ ...usage, api });
+  };
   try {
     const r = await fetchUsage();
     if (r.ok) {
       setUsage(applyUsageApi(usage, r.body, Date.now()));
       return { kind: 'ok' };
     }
-    setUsage({ ...usage, api: { state: r.state, message: r.message, at: Date.now() } });
+    note({ state: r.state, message: r.message, at: Date.now() });
     if (r.rateLimited) return { kind: 'rate-limited', retryAfterMs: r.retryAfterMs };
     return { kind: r.state === 'error' ? 'error' : 'auth' };
   } catch (e) {
     // a throw (unreadable login file, failed renewal write) must not stop polling; the message never contains token material
-    setUsage({ ...usage, api: { state: 'error', message: `Usage check failed: ${(e as Error).message}`, at: Date.now() } });
+    note({ state: 'error', message: `Usage check failed: ${(e as Error).message}`, at: Date.now() });
     return { kind: 'error' };
   }
 }
 
-const usageScheduler = new UsageScheduler(
-  {
-    poll: pollUsageOnce,
-    // after each finished read: publish when the next one is due / whether a Retry-After is pending
-    onChange: (st) => {
-      if (st.inFlight || st.lastStartAt === hintForStart) return;
-      hintForStart = st.lastStartAt;
-      schedulerHint = { intervalMs: st.intervalMs, nextAt: st.nextAt, blockedUntil: st.blockedUntil };
-      setImmediate(broadcastUsage);
-    },
-  },
-  usageScale === 1 ? {} : scaleConfig(DEFAULT_CONFIG, usageScale),
+// ---- what the pings cost, persisted locally (never synced) ----
+const pingStatsFile = () => path.join(app.getPath('userData'), 'ping-stats.json');
+let pingStats: PingStats = emptyPingStats();
+function loadPingStats() {
+  try {
+    pingStats = { ...emptyPingStats(), ...JSON.parse(fs.readFileSync(pingStatsFile(), 'utf8')) };
+  } catch {
+    pingStats = emptyPingStats();
+  }
+}
+function savePingStats() {
+  try {
+    fs.writeFileSync(pingStatsFile(), JSON.stringify(pingStats));
+  } catch {
+    /* non-fatal */
+  }
+}
+function recordPing(u: PingUsage | null, model: string | null) {
+  pingStats = addPing(pingStats, u, model, Date.now());
+  savePingStats();
+}
+
+/** One ping (core/usagePing.ts): exact 5-hour / weekly numbers from the unified rate-limit headers of a one-token request. */
+async function pollPingOnce(): Promise<PollOutcome> {
+  try {
+    const r = await fetchPing();
+    if (r.ok) {
+      recordPing(r.usage, r.model);
+      setUsage(applyUnifiedHeaders(usage, r.headers, Date.now()));
+      return { kind: 'ok' };
+    }
+    if (r.unavailable) {
+      pingUnavailable = true; // no Haiku id accepted: the old usage-API behaviour takes over
+      setImmediate(applyPingMode);
+      return { kind: 'error' };
+    }
+    if (r.headers && Object.keys(r.headers).length) setUsage(applyUnifiedHeaders(usage, r.headers, Date.now()));
+    if (r.rateLimited) {
+      const hit = r.headers && Object.values(r.headers).includes('rejected');
+      return { kind: 'rate-limited', retryAfterMs: hit ? rejectedWaitMs(r.headers!, Date.now()) : r.retryAfterMs };
+    }
+    setUsage({ ...usage, api: { state: r.state, message: r.message, at: Date.now() } });
+    return { kind: r.state === 'error' ? 'error' : 'auth' };
+  } catch (e) {
+    setUsage({ ...usage, api: { state: 'error', message: `Usage ping failed: ${(e as Error).message}`, at: Date.now() } });
+    return { kind: 'error' };
+  }
+}
+
+const hintOnChange = () => {
+  let startFor: number | null = null;
+  return (st: SchedulerStatus) => {
+    if (st.inFlight || st.lastStartAt === startFor) return;
+    startFor = st.lastStartAt;
+    schedulerHint = { intervalMs: st.intervalMs, nextAt: st.nextAt, blockedUntil: st.blockedUntil };
+    setImmediate(broadcastUsage);
+  };
+};
+const schedCfg = (c: Partial<SchedulerConfig>) => (usageScale === 1 ? c : scaleConfig({ ...DEFAULT_CONFIG, ...c }, usageScale));
+
+/** old behaviour (ping off or unavailable): the usage endpoint at the normal cadence */
+const usageScheduler = new UsageScheduler({ poll: pollUsageOnce, onChange: hintOnChange() }, schedCfg({}));
+/** ping on: the primary source: one ping per 10 minutes (configurable, min 5), only while the app runs and a session is active */
+const pingCfg = (): Partial<SchedulerConfig> => {
+  const iv = Math.max(MIN_PING_MINUTES, Number(config.usagePingMinutes) || DEFAULT_PING_MINUTES) * 60_000;
+  // at most one ping per interval, whatever asks (a click, a wake); none while no session is active; no burst-triggered extra read
+  return { activeMs: iv, idleMs: iv, minGapMs: iv, manualGapMs: iv, debounceMs: 1e12 };
+};
+const pingScheduler: UsageScheduler = new UsageScheduler({ poll: pollPingOnce, onChange: hintOnChange(), canRun: () => pingScheduler.status().active }, schedCfg({ debounceMs: 1e12 }));
+/** ping on: the usage endpoint is a rare secondary for the per-model weekly windows (every 30 min, backing off hard on a 429) */
+const modelScheduler = new UsageScheduler(
+  { poll: pollUsageOnce },
+  schedCfg({ activeMs: 1_800_000, idleMs: 1_800_000, activeForMs: 1_800_000, debounceMs: 1_800_000, minGapMs: 60_000, rateLimitBaseMs: 3_600_000, rateLimitMaxMs: 14_400_000 }),
 );
+
+let pingUnavailable = false;
+const pingActive = () => config.usagePing && !pingUnavailable && !process.env.CLAUDE_VIS_NO_USAGE_API;
+/** start the schedulers that fit the setting (also called when the setting changes or the ping turns out to be unavailable) */
+function applyPingMode() {
+  if (process.env.CLAUDE_VIS_NO_USAGE_API) return;
+  if (pingActive()) {
+    usageScheduler.stop();
+    pingScheduler.reconfigure(schedCfg(pingCfg()));
+    pingScheduler.start();
+    modelScheduler.start();
+  } else {
+    pingScheduler.stop();
+    modelScheduler.stop();
+    usageScheduler.start();
+  }
+}
+const eachScheduler = (f: (s: UsageScheduler) => void) => [usageScheduler, pingScheduler, modelScheduler].forEach(f);
 
 /** Click on the meters: read now if allowed, otherwise say when it will be. */
 function pollUsageApi() {
-  return process.env.CLAUDE_VIS_NO_USAGE_API ? Promise.resolve({ ran: false, nextAllowedAt: null }) : usageScheduler.request();
+  return process.env.CLAUDE_VIS_NO_USAGE_API ? Promise.resolve({ ran: false, nextAllowedAt: null }) : (pingActive() && pingScheduler.status().active ? pingScheduler : usageScheduler).request();
 }
 
 function setUsage(next: UsageView) {
@@ -190,7 +278,8 @@ function shownUsage(): UsageView {
   // the estimator learns from every authoritative view (incl. paired machines' readings) and extends it with the tokens seen since
   usageEstimator.observe(merged);
   const est = usageEstimator.estimate(Date.now());
-  const withHint = schedulerHint && merged.api ? { ...merged, api: { ...merged.api, ...schedulerHint } } : merged;
+  const shownApi = merged.api && merged.api.state !== 'ok' && pingActive() && pingFresh() ? { ...merged.api, state: 'ok' as const, message: 'ping' } : merged.api;
+  const withHint = schedulerHint && shownApi ? { ...merged, api: { ...shownApi, ...schedulerHint } } : shownApi ? { ...merged, api: shownApi } : merged;
   return { ...withHint, estimate: est };
 }
 
@@ -238,7 +327,7 @@ const hookServer = new HookServer(
   (payload) => manager.ingestHook(payload),
   (payload) => {
     setUsage(applyStatusline(usage, payload, Date.now()));
-    usageScheduler.activity();
+    eachScheduler((s) => s.activity());
   },
   (status) => broadcast('hookserver', status),
 );
@@ -594,6 +683,10 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
   manager.notifyAttention = config.notifyAttention;
   manager.notifyAgentDone = config.notifyAgentDone;
   if (patch.followActive !== undefined) manager.setFollow(config.followActive);
+  if (patch.usagePing !== undefined || patch.usagePingMinutes !== undefined) {
+    pingUnavailable = false;
+    applyPingMode();
+  }
   if (patch.launchAtLogin !== undefined) {
     applyLoginItem(config.launchAtLogin);
     saveConfig(config); // may differ from the request if the OS refused
@@ -634,6 +727,11 @@ function registerIpc() {
     updateConfig,
     getUsage: shownUsage,
     pollUsageApi,
+    getPingStats: () => summarizePingStats(pingStats, Date.now()),
+    resetPingStats: () => {
+      pingStats = emptyPingStats();
+      savePingStats();
+    },
     systemInfo,
     applyHotkey,
     toggleMini,
@@ -743,9 +841,10 @@ if (!app.requestSingleInstanceLock()) {
     // assistant output in any watched session is what moves the meters: read the API shortly after a burst (not for the startup backlog)
     const usageGrace = Date.now() + 10_000;
     manager.on('changed', () => {
-      if (Date.now() > usageGrace) usageScheduler.activity();
+      if (Date.now() > usageGrace) eachScheduler((s) => s.activity());
     });
     loadUsage();
+    loadPingStats();
     void loginStatus()
       .then((l) => l.subscriptionType)
       .catch(() => null)
@@ -765,13 +864,13 @@ if (!app.requestSingleInstanceLock()) {
     setInterval(() => {
       setUsage(usage);
       const online = net.isOnline();
-      if (online && !wasOnline) usageScheduler.wake();
+      if (online && !wasOnline) [usageScheduler, modelScheduler].forEach((s) => s.wake());
       wasOnline = online;
     }, 30_000 * usageScale);
     if (!process.env.CLAUDE_VIS_NO_USAGE_API) {
-      usageScheduler.start();
-      powerMonitor.on('resume', () => usageScheduler.wake());
-      powerMonitor.on('unlock-screen', () => usageScheduler.wake());
+      applyPingMode();
+      powerMonitor.on('resume', () => [usageScheduler, modelScheduler].forEach((s) => s.wake()));
+      powerMonitor.on('unlock-screen', () => [usageScheduler, modelScheduler].forEach((s) => s.wake()));
     }
     // keep the status-line forwarder in sync with the configured port
     void getHookState(config.port).then((h) => {

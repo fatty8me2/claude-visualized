@@ -24,6 +24,10 @@ export interface AppConfig {
   /** peer link: "Share with my other computers" (off by default) and its TCP port */
   shareEnabled: boolean;
   peerPort: number;
+  /** read the 5-hour / weekly limits from a tiny Messages API request about once a minute (privacy: docs/PRIVACY.md) */
+  usagePing: boolean;
+  /** minutes between pings while a session is active (min 5) */
+  usagePingMinutes: number;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -39,6 +43,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   localModels: DEFAULT_LOCAL_CONFIG,
   shareEnabled: false,
   peerPort: 47830,
+  usagePing: true,
+  usagePingMinutes: 10,
 };
 
 function file() {

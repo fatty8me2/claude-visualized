@@ -42,6 +42,7 @@ describe('live usage estimate (fake usage server)', () => {
     writeFixture(home);
     fs.writeFileSync(path.join(home, '.credentials.json'), JSON.stringify({ claudeAiOauth: { accessToken: 'fake-access-token', refreshToken: 'fake-refresh-token', expiresAt: Date.now() + 8 * 3600_000 } }));
     userData = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-live-ud-'));
+    fs.writeFileSync(path.join(userData, 'config.json'), JSON.stringify({ usagePing: false })); // this file tests the usage-endpoint poller
     app = await electron.launch({
       args: [ROOT],
       cwd: ROOT,

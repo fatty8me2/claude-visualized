@@ -34,6 +34,7 @@ function inText(at: number, now: number): string {
 const SOURCE: Record<UsageWindow['source'], string> = {
   statusline: 'live from a terminal session',
   api: 'from the usage API',
+  ping: 'exact (ping)',
   transcript: 'limit hit, from transcript',
 };
 
@@ -73,7 +74,7 @@ function Meter({
   }
   const confirmed = Math.round(w.pct);
   // live estimate: the confirmed reading plus what the transcripts say was spent since (snaps back to the next real reading)
-  const estimating = !!est && !w.inferred && Math.round(est.pct) > confirmed;
+  const estimating = !!est && !w.inferred && Math.round(est.pct) > confirmed && !(w.source === 'ping' && now - w.at < 70_000 && est.units === 0);
   const pct = estimating ? Math.round(est!.pct) : confirmed;
   // how far through the window we are: usage ahead of this marker means burning faster than the window refills
   const elapsed = w.resetsAt ? Math.max(0, Math.min(100, 100 - ((w.resetsAt - now) / span) * 100)) : null;

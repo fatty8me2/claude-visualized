@@ -26,6 +26,8 @@ export interface AppConfigView {
   setupVersion?: number;
   setupStep?: number;
   localModels: LocalModelsConfig;
+  usagePing: boolean;
+  usagePingMinutes: number;
 }
 
 /** What the setup wizard learns about Claude Code on this computer. Never contains a token. */
@@ -171,6 +173,9 @@ export interface VisApi {
   getUsage(): Promise<UsageView>;
   /** read the usage API now; `ran: false` when it is too soon or a Retry-After is pending (`nextAllowedAt`, epoch ms) */
   refreshUsage(): Promise<{ ran: boolean; nextAllowedAt: number | null }>;
+  /** what the usage pings have cost so far (local only) and the reset for that counter */
+  pingStats(): Promise<import('./pingStats').PingStatsSummary>;
+  resetPingStats(): Promise<void>;
   onUsage(cb: (u: UsageView) => void): () => void;
   /** history index (local SQLite built from the transcripts) */
   historyStatus(): Promise<HistoryStatus>;

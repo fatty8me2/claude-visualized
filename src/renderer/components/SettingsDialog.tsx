@@ -4,6 +4,7 @@ import { useDialogFocus } from '../state/dialogFocus';
 import { LocalModelsSettings } from './LocalModelsSettings';
 import { SyncSettings } from './SyncSettings';
 import { UpdatesSettings } from './UpdatesSettings';
+import type { PingStatsSummary } from '@core/pingStats';
 import type { AppConfigView, HookPreviewView, HookServerStatusView, HookStateView, SystemInfoView } from '@core/api';
 import '../dialogs.css';
 
@@ -185,6 +186,11 @@ export function SettingsDialog({
           <input type="checkbox" checked={config.notifyAgentDone} onChange={(e) => set({ notifyAgentDone: e.target.checked })} />
           Notify me when a subagent finishes
         </label>
+        <label className="chk" data-testid="set-usage-ping">
+          <input type="checkbox" checked={config.usagePing} onChange={(e) => set({ usagePing: e.target.checked })} />
+          Keep the usage meters exact: while a Claude Code session is active, send a tiny request to Claude about every 10 minutes (a few dozen tokens) and read my limits from the reply
+        </label>
+        <PingCost />
         <label className="chk">
           <input type="checkbox" checked={config.closeToTray} onChange={(e) => set({ closeToTray: e.target.checked })} />
           Closing the window keeps the app running in the tray
@@ -243,6 +249,37 @@ export function SettingsDialog({
 
         <LocalModelsSettings config={config.localModels} />
       </div>
+    </div>
+  );
+}
+
+const usd = (v: number) => (v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`);
+
+/** What the usage pings have cost so far (tokens from the replies, est. at Haiku list price). Local only. */
+function PingCost() {
+  const [s, setS] = useState<PingStatsSummary | null>(null);
+  useEffect(() => {
+    const load = () => void window.api.pingStats().then(setS);
+    load();
+    const t = setInterval(load, 5_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!s) return null;
+  const row = (label: string, b: PingStatsSummary['all']) => `${label}: ${b.n} pings, ${b.input} in / ${b.output} out tokens, est. ${usd(b.costUsd)}`;
+  return (
+    <div className="note" data-testid="ping-cost" style={{ margin: '0 0 8px 24px' }}>
+      <div data-testid="ping-cost-today">{row('today', s.today)}</div>
+      <div>{row('last 7 days', s.week)}</div>
+      <div data-testid="ping-cost-all">{row('all time', s.all)}</div>
+      <div>{s.lastAt ? `last ping ${new Date(s.lastAt).toLocaleString()}` : 'no ping yet'}</div>
+      <button
+        data-testid="ping-cost-reset"
+        onClick={() => {
+          void window.api.resetPingStats().then(() => window.api.pingStats().then(setS));
+        }}
+      >
+        Reset counter
+      </button>
     </div>
   );
 }

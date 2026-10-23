@@ -380,6 +380,10 @@ export function SetupWizard({
               <p className="lede">
                 The usage meters need the account Claude Code is signed in to. The app uses that login as it is, and never shows or copies it.
               </p>
+              <p className="fine" data-testid="setup-ping-note">
+                To keep the meters exact, the app sends a tiny request to Claude about every 10 minutes while a Claude Code session is active (a few dozen tokens) and reads your limits from the reply.
+                You can turn this off in Settings.
+              </p>
               {!det && <p className="fine">Checking…</p>}
               {det && signedIn && (
                 <>

@@ -4,7 +4,7 @@ import { settingsPath } from '../paths';
 import type { IpcRegistrar } from './registry';
 
 /** Plan usage meters, and the model set in Claude's own settings.json. */
-export const registerUsageIpc: IpcRegistrar = ({ getUsage, pollUsageApi }) => {
+export const registerUsageIpc: IpcRegistrar = ({ getUsage, pollUsageApi, getPingStats, resetPingStats }) => {
   ipcMain.handle('usage:get', () => getUsage());
   ipcMain.handle('claude:model', () => {
     try {
@@ -15,4 +15,6 @@ export const registerUsageIpc: IpcRegistrar = ({ getUsage, pollUsageApi }) => {
     }
   });
   ipcMain.handle('usage:refresh', () => pollUsageApi());
+  ipcMain.handle('ping:stats', () => getPingStats());
+  ipcMain.handle('ping:reset', () => resetPingStats());
 };

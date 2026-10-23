@@ -71,7 +71,11 @@ export interface SchedulerDeps {
   now?: () => number;
   random?: () => number;
   onChange?: (s: SchedulerStatus) => void;
+  /** when it returns false a due read is skipped (and looked at again in CAN_RUN_RECHECK_MS); the usage ping only runs while a session is active */
+  canRun?: () => boolean;
 }
+
+const CAN_RUN_RECHECK_MS = 15_000;
 
 export class UsageScheduler {
   private cfg: SchedulerConfig;
@@ -102,6 +106,12 @@ export class UsageScheduler {
     this.now = deps.now ?? Date.now;
     this.random = deps.random ?? Math.random;
     this.jitter = this.random();
+  }
+
+  /** new cadence numbers (a changed setting) */
+  reconfigure(cfg: Partial<SchedulerConfig>) {
+    this.cfg = { ...this.cfg, ...cfg };
+    this.plan();
   }
 
   start() {
@@ -198,6 +208,11 @@ export class UsageScheduler {
     if (!this.running || this.flight) return;
     // the timer can wake slightly early on a coarse clock; re-plan instead of firing inside the gap
     if (this.earliest(false) > this.now()) return this.plan();
+    if (this.deps.canRun && !this.deps.canRun()) {
+      this.timer = setTimeout(() => void this.fire(), CAN_RUN_RECHECK_MS);
+      this.nextAt = null;
+      return;
+    }
     await this.run();
   }
 
