@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
+import type { AgentEvent, UsageNumbers } from '@core/events';
 import { normalizeHook } from '@core/normalize';
 import { MAIN, toView, type AgentStatus, type SessionSummary, type SessionView } from '@core/state';
 import { OverviewEncoder, ViewEncoder, type OverviewMsg, type ViewMsg } from '@core/sync';
@@ -373,12 +374,27 @@ export class SessionManager extends EventEmitter {
   private prevStatus = new Map<string, Map<string, AgentStatus>>();
   private quotaSeen = new Map<string, number>();
 
+  /** latest model per session+agent, to attribute a usage event (the model event precedes it on the same transcript line) */
+  private modelOf = new Map<string, string>();
+
+  /** Token usage of freshly appended transcript lines (never the startup backlog), for the live usage estimate. */
+  private emitTokens(sessionId: string, events: readonly AgentEvent[]) {
+    const out: { msgId: string; model: string | null; usage: UsageNumbers; ts: number }[] = [];
+    for (const e of events) {
+      const key = `${sessionId}:${e.ref.agentId ?? ''}`;
+      if (e.k === 'model') this.modelOf.set(key, e.model);
+      else if (e.k === 'usage') out.push({ msgId: e.msgId, model: this.modelOf.get(key) ?? null, usage: e.usage, ts: e.ts });
+    }
+    if (out.length) this.emit('tokens', out);
+  }
+
   private notifyTransitions(w: SessionWatcher, wasPrimed: boolean) {
     const before = this.prevStatus.get(w.sessionId);
     const now = new Map<string, AgentStatus>();
     for (const a of Object.values(w.state.agents)) now.set(a.id, a.status);
     this.prevStatus.set(w.sessionId, now);
     const recent = w.drainRecent();
+    this.emitTokens(w.sessionId, recent);
     if (!wasPrimed || !before) return;
     const title = w.state.title ?? 'Claude session';
     for (const e of recent) {

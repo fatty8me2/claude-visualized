@@ -249,6 +249,7 @@
   filter: drop-shadow(0 0 3px color-mix(in srgb, var(--lvl) 55%, transparent));
 }
 .usage .m-bar > i {
+  transition: width 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
   border-radius: 2px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--lvl) 45%, transparent), var(--lvl) 85%, color-mix(in srgb, var(--lvl) 60%, #fff));
   -webkit-mask-image: var(--cell);
@@ -269,6 +270,10 @@
   min-width: 34px;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 9px color-mix(in srgb, var(--lvl) 55%, transparent);
+}
+.usage .meter.est .m-pct {
+  font-style: italic;
+  opacity: 0.92;
 }
 .usage .meter.empty .m-pct {
   text-shadow: none;

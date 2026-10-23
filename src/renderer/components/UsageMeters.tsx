@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import type { UsageView, UsageWindow } from '@core/usage';
+import type { WindowEstimate } from '@core/usageEstimate';
 import { useNow, useUsage } from '../hooks';
 import { ago } from '../util';
 import '../chrome.css';
@@ -46,6 +47,7 @@ function Meter({
   extra,
   staleMs,
   footer,
+  est,
 }: {
   label: string;
   w: UsageWindow | null;
@@ -56,6 +58,7 @@ function Meter({
   extra?: string[];
   staleMs: number;
   footer: string[];
+  est?: WindowEstimate;
 }) {
   if (!w) {
     return (
@@ -68,17 +71,23 @@ function Meter({
       </div>
     );
   }
-  const pct = Math.round(w.pct);
+  const confirmed = Math.round(w.pct);
+  // live estimate: the confirmed reading plus what the transcripts say was spent since (snaps back to the next real reading)
+  const estimating = !!est && !w.inferred && Math.round(est.pct) > confirmed;
+  const pct = estimating ? Math.round(est!.pct) : confirmed;
   // how far through the window we are: usage ahead of this marker means burning faster than the window refills
   const elapsed = w.resetsAt ? Math.max(0, Math.min(100, 100 - ((w.resetsAt - now) / span) * 100)) : null;
   // a reading older than two polling intervals is not trusted; after a failed poll a reading older than one interval is marked too (the last good numbers stay)
   const stale = now - w.at > staleMs || (!!problem && now - w.at > staleMs / 2);
   const tip = [
-    `${label}: ${pct}% used`,
+    estimating ? `${label}: ~${pct}% used (live estimate)` : `${label}: ${pct}% used`,
+    estimating
+      ? `Last confirmed: ${confirmed}%, ${ago(w.at, now)} (${SOURCE[w.source]}). Since then the transcripts show about +${Math.max(1, pct - confirmed)} points${est!.calibrated ? '' : ' (rate not yet learned for this account)'}.`
+      : null,
     w.inferred ? 'The window has just reset; waiting for the first reading of the new one.' : null,
     w.resetsAt ? `resets ${new Date(w.resetsAt).toLocaleString()}` : null,
     elapsed !== null ? `${Math.round(elapsed)}% of the window has elapsed` : null,
-    `updated ${ago(w.at, now)} (${SOURCE[w.source]})${now - w.at > staleMs ? ': stale' : ''}`,
+    estimating ? null : `updated ${ago(w.at, now)} (${SOURCE[w.source]})${now - w.at > staleMs ? ': stale' : ''}`,
     ...(extra ?? []),
     ...footer,
     problem ? `Problem: ${problem}` : null,
@@ -88,7 +97,7 @@ function Meter({
   const lvl = level(pct);
   const lines = tip.split(String.fromCharCode(10));
   return (
-    <div className={`meter ${lvl} ${stale ? 'stale' : ''}`} title={compact ? tip : undefined} data-src={w.source}>
+    <div className={`meter ${lvl} ${stale ? 'stale' : ''} ${estimating ? 'est' : ''}`} title={compact ? tip : undefined} data-src={w.source} data-est={estimating ? '1' : undefined}>
       {/* a fresh reading sweeps a sheen across the pill (re-keyed on every new reading) */}
       <span className="m-tick" key={`t${w.at}`} aria-hidden />
       <span className="m-label">{label}</span>
@@ -96,19 +105,22 @@ function Meter({
         <i style={{ width: `${pct}%` }} />
         {elapsed !== null && <b style={{ left: `${elapsed}%` }} />}
       </span>
-      <span className="m-pct">{pct}%</span>
+      <span className="m-pct" data-confirmed={confirmed}>
+        {estimating ? '~' : ''}
+        {pct}%
+      </span>
       <span className="m-dot" key={w.at} data-testid="m-dot" />
       {!compact && w.resetsAt && (
         <span className="m-reset">
           resets <em>{untilText(w.resetsAt, now)}</em>
         </span>
       )}
-      {!compact && stale && <span className="m-reset m-age">· {ago(w.at, now)}</span>}
+      {!compact && stale && !estimating && <span className="m-reset m-age">· {ago(w.at, now)}</span>}
       {!compact && (
         <span className="m-pop" role="tooltip">
           <b className="m-pop-h">
             {lines[0]}
-            <em>{SOURCE[w.source]}</em>
+            <em>{estimating ? 'estimate' : SOURCE[w.source]}</em>
           </b>
           {lines.slice(1).map((l, i) => (
             <span key={i}>{l}</span>
@@ -144,7 +156,7 @@ export function UsageMeters({ compact = false, usage: given }: { compact?: boole
     });
   return (
     <div className={`usage ${compact ? 'compact' : ''}`} data-tour="usage" onClick={click}>
-      <Meter label={compact ? '5h' : '5-HOUR'} w={u?.fiveHour ?? null} span={WINDOW_MS.fiveHour} now={now} compact={compact} problem={problem} staleMs={staleMs} footer={footer} />
+      <Meter label={compact ? '5h' : '5-HOUR'} w={u?.fiveHour ?? null} span={WINDOW_MS.fiveHour} now={now} compact={compact} problem={problem} staleMs={staleMs} footer={footer} est={u?.estimate?.fiveHour} />
       <Meter
         label={compact ? 'wk' : 'WEEKLY'}
         w={u?.sevenDay ?? null}
@@ -155,6 +167,7 @@ export function UsageMeters({ compact = false, usage: given }: { compact?: boole
         extra={perModel}
         staleMs={staleMs}
         footer={footer}
+        est={u?.estimate?.sevenDay}
       />
       {!compact && note && <span className="m-note">{note}</span>}
     </div>

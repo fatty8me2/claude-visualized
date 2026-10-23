@@ -23,6 +23,8 @@ export interface SpendWindow extends UsageWindow {
 }
 
 export interface UsageView {
+  /** live estimate between readings (core/usageEstimate.ts); set by the app for the renderer, never persisted or sent to peers */
+  estimate?: import('./usageEstimate').UsageEstimate;
   fiveHour: UsageWindow | null;
   sevenDay: UsageWindow | null;
   spend: SpendWindow | null;

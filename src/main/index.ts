@@ -7,6 +7,8 @@ import { HookServer } from './hookServer';
 import fs from 'node:fs';
 import { applyQuota, applyStatusline, applyUsageApi, emptyUsage, settleUsage, type UsageView } from '@core/usage';
 import { fetchUsage } from './usageApi';
+import { loginStatus } from './claudeLogin';
+import type { UsageNumbers } from '@core/events';
 import { DEFAULT_CONFIG, scaleConfig, UsageScheduler, type PollOutcome } from '@core/usageScheduler';
 import { registerAllIpc } from './ipc/registry';
 import { getHookState } from './installer';
@@ -19,6 +21,7 @@ import { applyUrlOverrides, normalizeLocalConfig } from '@core/localModels';
 import { Updater } from './updater';
 import { RELEASES_URL } from '@core/updates';
 import { mergeUsage } from '@core/remote';
+import { UsageEstimator, type EstimatorSnapshot } from '@core/usageEstimate';
 import { PeerService, type ShareSource } from './peer/service';
 import { deviceName } from './peer/name';
 import { SettingsSync } from './settingsSync';
@@ -184,10 +187,43 @@ function setUsage(next: UsageView) {
 function shownUsage(): UsageView {
   const remote = peers?.remoteUsage() ?? [];
   const merged = remote.length ? settleUsage(mergeUsage(usage, remote), Date.now()) : usage;
-  return schedulerHint && merged.api ? { ...merged, api: { ...merged.api, ...schedulerHint } } : merged;
+  // the estimator learns from every authoritative view (incl. paired machines' readings) and extends it with the tokens seen since
+  usageEstimator.observe(merged);
+  const est = usageEstimator.estimate(Date.now());
+  const withHint = schedulerHint && merged.api ? { ...merged, api: { ...merged.api, ...schedulerHint } } : merged;
+  return { ...withHint, estimate: est };
+}
+
+// ---- live estimate between readings: tokens of every session (desktop app included) x a learned percent-per-token rate ----
+const estimateFile = () => path.join(app.getPath('userData'), 'usage-estimate.json');
+let usageEstimator = new UsageEstimator();
+function loadEstimator(plan: string | null) {
+  let snap: EstimatorSnapshot | undefined;
+  try {
+    snap = JSON.parse(fs.readFileSync(estimateFile(), 'utf8'));
+  } catch {
+    /* none yet */
+  }
+  usageEstimator = new UsageEstimator(plan, snap);
+}
+function saveEstimator() {
+  try {
+    fs.writeFileSync(estimateFile(), JSON.stringify(usageEstimator.snapshot()));
+  } catch {
+    /* non-fatal */
+  }
 }
 
 let lastUsageJson = '';
+/** at most one push per second while tokens stream in; a real reading goes out at once */
+let estimateTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleEstimatePush() {
+  if (estimateTimer) return;
+  estimateTimer = setTimeout(() => {
+    estimateTimer = null;
+    broadcastUsage();
+  }, 1000);
+}
 function broadcastUsage() {
   const u = shownUsage();
   const j = JSON.stringify(u);
@@ -710,6 +746,20 @@ if (!app.requestSingleInstanceLock()) {
       if (Date.now() > usageGrace) usageScheduler.activity();
     });
     loadUsage();
+    void loginStatus()
+      .then((l) => l.subscriptionType)
+      .catch(() => null)
+      .then((plan) => {
+        loadEstimator(plan);
+        usageEstimator.observe(usage);
+      });
+    manager.on('tokens', (list: { msgId: string; model: string | null; usage: UsageNumbers; ts: number }[]) => {
+      let any = false;
+      for (const t of list) any = usageEstimator.addMessage(t.msgId, t.model, t.usage, Math.min(t.ts || Date.now(), Date.now())) || any;
+      if (any) scheduleEstimatePush();
+    });
+    setInterval(saveEstimator, 60_000);
+    app.on('before-quit', saveEstimator);
     // windows that reset while the app was closed, and countdowns crossing a reset
     let wasOnline = net.isOnline();
     setInterval(() => {
