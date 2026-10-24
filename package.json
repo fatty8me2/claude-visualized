@@ -1,7 +1,7 @@
 {
   "name": "claude-visualized",
   "productName": "Claude Visualized",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "Live desktop visualizer for Claude Code sessions, agents and subagents",
   "author": "fatty8me2",
   "license": "MIT",
