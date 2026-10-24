@@ -4,7 +4,7 @@ import { defaultRate, UsageEstimator, weightOf } from '@core/usageEstimate';
 
 const T0 = Date.parse('2026-10-20T10:00:00Z');
 const RESET = T0 + 3 * 3600_000;
-const win = (pct: number, at: number, extra: Partial<UsageWindow> = {}): UsageWindow => ({ pct, resetsAt: RESET, at, source: 'api', ...extra });
+const win = (pct: number, at: number, extra: Partial<UsageWindow> = {}): UsageWindow => ({ pct, resetsAt: RESET, at, source: 'ping', ...extra });
 const view = (f: UsageWindow | null, s: UsageWindow | null = null): UsageView => ({ ...emptyUsage(), fiveHour: f, sevenDay: s });
 /** an opus-5.5 message of `inTok` input tokens: 4 USD per million */
 const msg = (e: UsageEstimator, id: string, inTok: number, ts: number, model = 'claude-opus-5-5') =>
@@ -25,9 +25,9 @@ describe('usage estimator', () => {
     const e = new UsageEstimator();
     e.observe(view(win(20, T0)));
     expect(e.estimate(T0 + 1000).fiveHour).toMatchObject({ pct: 20, delta: 0, calibrated: false });
-    msg(e, 'm1', 500_000, T0 + 5000); // 2 USD
+    msg(e, 'm1', 100_000, T0 + 5000); // 0.4 USD (under the uncalibrated cap)
     const est = e.estimate(T0 + 6000).fiveHour!;
-    expect(est.pct).toBeCloseTo(20 + 2 * defaultRate('fiveHour'), 5);
+    expect(est.pct).toBeCloseTo(20 + 0.4 * defaultRate('fiveHour'), 5);
     expect(est.confirmedPct).toBe(20);
   });
 
@@ -98,7 +98,7 @@ describe('usage estimator', () => {
   it('keeps tokens just before an API reading (the API lags the transcripts) but not before a status-line one', () => {
     const e = new UsageEstimator();
     msg(e, 'a', 250_000, T0 - 5000);
-    e.observe(view(win(10, T0)));
+    e.observe(view(win(10, T0, { source: 'api' })));
     expect(e.estimate(T0 + 1).fiveHour!.units).toBeGreaterThan(0);
     const f = new UsageEstimator();
     msg(f, 'a', 250_000, T0 - 5000);
@@ -116,7 +116,7 @@ describe('usage estimator', () => {
 
   it('never drops below the reading and never claims the limit before it is read', () => {
     const e = new UsageEstimator();
-    e.observe(view(win(90, T0)));
+    e.observe(view(win(98, T0)));
     msg(e, 'huge', 50_000_000, T0 + 1000);
     expect(e.estimate(T0 + 2000).fiveHour!.pct).toBe(99);
     const f = new UsageEstimator();
@@ -155,5 +155,38 @@ describe('usage estimator', () => {
     const est = e.estimate(T0 + 2000);
     expect(est.sevenDay!.delta).toBeCloseTo(2 * defaultRate('sevenDay'), 5);
     expect(est.fiveHour!.delta).toBeGreaterThan(est.sevenDay!.delta);
+  });
+});
+
+describe('estimate stays near the truth (12% shown as 27% in 0.7.3)', () => {
+  const R = Date.UTC(2026, 9, 24, 19, 10);
+  const ping = (pct: number, at: number): UsageWindow => ({ pct, resetsAt: R, at, source: 'ping' });
+  const api = (pct: number, at: number): UsageWindow => ({ pct, resetsAt: R, at, source: 'api' });
+  const heavy = (e: UsageEstimator, at: number, n = 20) => {
+    for (let i = 0; i < n; i++) msg(e, `m${at}-${i}`, 400_000, at + i);
+  };
+
+  it('ignores rates saved by older versions', () => {
+    const e = new UsageEstimator('max', { rates: { fiveHour: { rate: 1.25, samples: 6 } } });
+    expect(e.snapshot().rates.fiveHour!.rate).toBeCloseTo(defaultRate('fiveHour', 'max'));
+    expect(e.snapshot().v).toBe(2);
+  });
+
+  it('never runs more than a few points ahead of the last exact reading', () => {
+    const e = new UsageEstimator('max', { v: 2, rates: { fiveHour: { rate: 5, samples: 3 } } });
+    e.observe(view(ping(12, 1000)));
+    heavy(e, 2000);
+    const est = e.estimate(10_000).fiveHour!;
+    expect(est.pct).toBeLessThanOrEqual(18);
+    expect(est.pct).toBeGreaterThan(12);
+  });
+
+  it('learns only from exact readings, not from the lagging usage API', () => {
+    const e = new UsageEstimator('max');
+    const before = e.snapshot().rates.fiveHour!.rate;
+    e.observe(view(api(10, 1000)));
+    heavy(e, 2000);
+    e.observe(view(api(40, 60_000)));
+    expect(e.snapshot().rates.fiveHour!.rate).toBe(before);
   });
 });

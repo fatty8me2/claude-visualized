@@ -59,7 +59,15 @@ interface Track {
   samples: number;
   anchor: Anchor | null;
 }
+/** Bumped when saved rates can no longer be trusted (v1 rates were learned from lagged, starved API readings and ran ~2x high). */
+export const SNAPSHOT_VERSION = 2;
+/** How far the estimate may run ahead of the last exact reading, in points: a guess must never swamp the truth. */
+export const MAX_AHEAD = { calibrated: 6, uncalibrated: 2 } as const;
+/** Readings exact enough to learn a rate from: both ends of a pair must be one of these. */
+const EXACT: ReadonlySet<UsageWindow['source']> = new Set(['ping', 'statusline']);
+
 export interface EstimatorSnapshot {
+  v?: number;
   rates: Partial<Record<WindowKey, { rate: number; samples: number }>>;
 }
 
@@ -82,7 +90,7 @@ export class UsageEstimator {
 
   constructor(plan: string | null = null, snap?: EstimatorSnapshot) {
     const mk = (k: WindowKey): Track => {
-      const s = snap?.rates?.[k];
+      const s = snap?.v === SNAPSHOT_VERSION ? snap.rates?.[k] : undefined;
       if (s && Number.isFinite(s.rate) && s.rate > 0) return { rate: s.rate, calibrated: s.samples > 0, samples: s.samples, anchor: null };
       return { rate: defaultRate(k, plan), calibrated: false, samples: 0, anchor: null };
     };
@@ -96,7 +104,7 @@ export class UsageEstimator {
 
   snapshot(): EstimatorSnapshot {
     const r = (k: WindowKey) => ({ rate: this.tracks[k].rate, samples: this.tracks[k].samples });
-    return { rates: { fiveHour: r('fiveHour'), sevenDay: r('sevenDay') } };
+    return { v: SNAPSHOT_VERSION, rates: { fiveHour: r('fiveHour'), sevenDay: r('sevenDay') } };
   }
 
   /** One assistant message's usage (from any session, any agent). Returns true if it added anything. */
@@ -138,7 +146,7 @@ export class UsageEstimator {
       changed = true;
       // a rollover (settleUsage's inferred 0%) or a transcript pin never teaches
       const sameWindow = !!a && !w.inferred && (a.resetsAt === null || w.resetsAt === null || Math.abs(a.resetsAt - w.resetsAt) <= SAME_WINDOW_MS);
-      if (a && sameWindow && w.at > a.at && w.source !== 'transcript' && a.source !== 'transcript') this.learn(t, a, w);
+      if (a && sameWindow && w.at > a.at && EXACT.has(w.source) && EXACT.has(a.source)) this.learn(t, a, w);
       t.anchor = { lagMs: w.source === 'api' && !w.inferred ? API_LAG_MS : 0, pct: w.pct, at: w.at, resetsAt: w.resetsAt, source: w.source };
     }
     if (changed) this.version++;
@@ -174,7 +182,8 @@ export class UsageEstimator {
       if (!a) continue;
       const units = this.unitsBetween(a.at - a.lagMs, now);
       // a limit already hit stays at 100; otherwise the estimate never claims the limit is reached before a reading says so
-      const cap = a.pct >= 100 ? 100 : 99;
+      // and never runs more than a few points ahead of it: the next exact reading corrects the rest
+      const cap = a.pct >= 100 ? 100 : Math.min(99, a.pct + (t.calibrated ? MAX_AHEAD.calibrated : MAX_AHEAD.uncalibrated));
       const pct = Math.max(a.pct, Math.min(cap, a.pct + units * t.rate));
       out[key] = { pct, confirmedPct: a.pct, delta: pct - a.pct, units, rate: t.rate, calibrated: t.calibrated };
     }
