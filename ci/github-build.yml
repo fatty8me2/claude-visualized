@@ -70,8 +70,7 @@ jobs:
         include:
           - os: windows-latest
             script: release:win
-          - os: macos-latest
-            script: release:mac
+          # the macOS build is attached by .github/workflows/release-mac.yml once the release is published
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

@@ -1,0 +1,50 @@
+name: release-mac
+
+# Adds the macOS download to a release that was built and published on Windows (see RELEASING.md).
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and attach the Mac assets to (e.g. v0.7.5)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # unsigned build: no Apple Developer ID configured
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx electron-vite build
+      # universal (arm64 + x64) dmg and zip; the zip is what electron-updater needs and latest-mac.yml lists
+      - run: npx electron-builder --mac dmg zip --universal --publish never
+      - name: Check latest-mac.yml matches the built files
+        run: |
+          set -euo pipefail
+          cd release/*/
+          ls -l
+          test -f latest-mac.yml
+          grep -E 'url:' latest-mac.yml | sed -E 's/.*url:[[:space:]]*//' | while read -r f; do
+            test -f "$f" || { echo "latest-mac.yml references missing file: $f"; exit 1; }
+          done
+      - name: Upload to the release
+        run: |
+          set -euo pipefail
+          cd release/*/
+          gh release upload "$TAG" ./*.dmg ./*.zip ./*.blockmap latest-mac.yml --clobber --repo "$GITHUB_REPOSITORY"

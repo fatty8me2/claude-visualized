@@ -27,6 +27,12 @@ download in the background and offer "Restart to update".
    `gh release edit v<version> --draft=false`. Users only see drafts once published; the "release notes" snippet in Settings → Updates shows them.
    Never build twice into the same `release/<version>` folder before uploading: `latest.yml`'s sha512 must match the uploaded installer.
 
+5. **macOS assets come from CI, after you publish.** Publishing the release triggers `.github/workflows/release-mac.yml` (macos-latest),
+   which checks out the tag, builds an unsigned universal build and uploads `Claude-Visualized-<version>-mac-universal.dmg`, `.zip`, both
+   `.blockmap`s and `latest-mac.yml` to that release (`--clobber`). Takes a few minutes. To retry or backfill: Actions, release-mac, Run workflow,
+   enter the tag. The workflow file must be pushed with a token that has the `workflow` scope. Unsigned Macs only get a "download" link in
+   the app (see below), not in-app install. `ci/github-build.yml`'s tag job no longer builds the Mac.
+
 `npm run dist:win` / `dist:mac` build local installers into `release/<version>/` with `--publish never`; nothing is uploaded.
 
 ## How updates are found: `latest.yml`

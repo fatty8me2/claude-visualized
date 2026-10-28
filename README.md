@@ -28,7 +28,7 @@ The screenshots use made-up demo sessions.
 
 The Mac build is not signed or notarized yet, so macOS blocks it the first time. Either:
 
-- open the `.dmg` from the release, drag **Claude Visualized** to **Applications**, then right-click it and choose **Open** the first time (or run `xattr -dr com.apple.quarantine "/Applications/Claude Visualized.app"` in a terminal), or
+- download `Claude-Visualized-<version>-mac-universal.dmg` (Apple Silicon and Intel) from the latest [release](https://github.com/fatty8me2/claude-visualized/releases) (it appears a few minutes after the Windows installer), open it, drag **Claude Visualized** to **Applications**, then right-click it and choose **Open** the first time (or run `xattr -dr com.apple.quarantine "/Applications/Claude Visualized.app"` in a terminal), or
 - build it yourself from source (see [Build from source](#build-from-source)). [docs/MAC.md](docs/MAC.md) has the steps.
 
 ## First launch

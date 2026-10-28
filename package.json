@@ -100,8 +100,13 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64",
-            "x64"
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
           ]
         }
       ],
@@ -109,7 +114,8 @@
       "icon": "build/icon.png",
       "identity": "-",
       "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "artifactName": "Claude-Visualized-${version}-mac-${arch}.${ext}"
     }
   }
 }
