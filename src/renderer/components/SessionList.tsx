@@ -74,7 +74,8 @@ function Row({
   const dot = s.waiting ? 'waiting' : active ? 'active' : s.live ? 'live' : '';
   const state = s.waiting ? 'needs you' : active ? 'working' : s.live ? 'live' : 'idle';
   const where = s.machine ? `running on ${s.machine}` : (s.cwd ?? s.file);
-  const client = s.entrypoint === 'claude-desktop' ? 'desktop app' : s.entrypoint === 'cli' ? 'claude CLI' : s.entrypoint;
+  const client =
+    s.source === 'opencode' ? 'OpenCode' : s.entrypoint === 'claude-desktop' ? 'desktop app' : s.entrypoint === 'cli' ? 'claude CLI' : s.entrypoint;
   return (
     <div
       data-state={dot || 'idle'}
@@ -121,17 +122,19 @@ function Row({
         )}
       </span>
       <span className="row-acts">
-        <button
-          className="row-claude btn-icon ghost"
-          aria-label="open in Claude"
-          title={s.machine ? `This session is running on ${s.machine}` : 'Open in the Claude desktop app'}
-          onClick={(e) => {
-            e.stopPropagation();
-            void openInClaude(s.id);
-          }}
-        >
-          <Icon name="openExternal" size="xs" />
-        </button>
+        {s.source !== 'opencode' && (
+          <button
+            className="row-claude btn-icon ghost"
+            aria-label="open in Claude"
+            title={s.machine ? `This session is running on ${s.machine}` : 'Open in the Claude desktop app'}
+            onClick={(e) => {
+              e.stopPropagation();
+              void openInClaude(s.id);
+            }}
+          >
+            <Icon name="openExternal" size="xs" />
+          </button>
+        )}
         <button
           className="row-more btn-icon ghost"
           aria-label="more actions"
@@ -161,6 +164,11 @@ function Row({
             s.project
           )}
         </span>
+        {s.source === 'opencode' && (
+          <span className="client oc-badge" data-testid="oc-badge" title="OpenCode session">
+            OpenCode
+          </span>
+        )}
         {s.entrypoint === 'cli' && (
           <span className="client" title="claude CLI">
             <Icon name="cli" size="xs" />

@@ -28,6 +28,8 @@ export interface AppConfigView {
   localModels: LocalModelsConfig;
   usagePing: boolean;
   usagePingMinutes: number;
+  opencodeEnabled: boolean;
+  opencodeDir: string;
 }
 
 /** What the setup wizard learns about Claude Code on this computer. Never contains a token. */

@@ -143,6 +143,16 @@ Claude Code can run against local models through a gateway or proxy (LiteLLM, Ol
   - An agent whose model a server has loaded shows "loaded in Ollama · 18.2 GB VRAM" on its card, and the view lists "used by: session / agent".
   - Test hooks: `CLAUDE_VIS_OLLAMA_URL`, `CLAUDE_VIS_LMSTUDIO_URL` (`off` disables).
 
+### OpenCode and local models
+
+[OpenCode](https://github.com/sst/opencode) sessions appear next to Claude Code ones, with an "OPENCODE" badge in the sidebar and "OpenCode" on the all-sessions page. Run OpenCode against a local model (Ollama, LM Studio, llama.cpp, ...) and the agent shows as a local model with the teal tag; hosted providers (`openrouter/...`, `anthropic/...`) are classified like any other model id.
+
+- **What is shown**: the session in its project group (LIVE while it is active), the agent graph (the main agent plus a card per subagent, i.e. child sessions started by OpenCode's `task` tool), model and provider, tokens per step (reasoning counts as output; cost when the provider reports one), tool calls with the current tool and its state (pending / running / completed / error), the todo list (as the plan checklist), the session log, replay, the all-sessions overview, errors as inbox items, and sharing over the peer link (the other computer sees the same graph live). "Open in Claude" is hidden for these sessions. The History page and hooks are Claude Code only.
+- **Where it reads**: OpenCode's data folder, `~/.local/share/opencode` (OpenCode uses this XDG path on Windows and macOS too; `$XDG_DATA_HOME/opencode`, `%APPDATA%\opencode` and `~/Library/Application Support/opencode` are also tried). Newer versions (1.x) keep a SQLite database there, `opencode.db` (tables `session`, `message`, `part`, `todo`; it is opened read-only). Older versions keep JSON files under `storage/{session,message,part,todo}`. Both are handled; unknown fields and unreadable rows are ignored. `auth.json` and everything else in that folder are never opened, and nothing is ever written there.
+- **Settings**: "Show OpenCode sessions" (on by default; does nothing when OpenCode is not installed) and "OpenCode data folder" (empty = automatic).
+- **Speed**: OpenCode has no hooks, so the app polls its data about four times a second; an unchanged database costs one `PRAGMA data_version`. A new tool call shows up on screen in well under a second, on the other computer too.
+- **Tests**: `tests/fixtures/opencode/build.ts` builds a sanitized fake data folder in both formats; the `CLAUDE_VIS_OPENCODE_HOME` variable points the app at one (when `CLAUDE_VIS_HOME` is set for a test and this is not, OpenCode data is not read at all).
+
 ### First run
 
 On first launch the app opens the setup wizard (`src/renderer/components/SetupWizard.tsx`, detection in `src/main/setup.ts`).
