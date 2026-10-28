@@ -691,6 +691,10 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
     applyLoginItem(config.launchAtLogin);
     saveConfig(config); // may differ from the request if the OS refused
   }
+  if (patch.opencodeEnabled !== undefined || patch.opencodeDir !== undefined) {
+    config.opencodeDir = String(config.opencodeDir ?? '').trim();
+    manager.setOpenCode({ enabled: config.opencodeEnabled, dir: config.opencodeDir });
+  }
   if (patch.localModels !== undefined) {
     config.localModels = normalizeLocalConfig(patch.localModels);
     saveConfig(config);
@@ -776,6 +780,7 @@ if (!app.requestSingleInstanceLock()) {
         quitting = true;
       },
     });
+    manager.setOpenCode({ enabled: config.opencodeEnabled, dir: config.opencodeDir });
     manager.followActive = config.followActive;
     manager.notifyAttention = config.notifyAttention;
     manager.notifyAgentDone = config.notifyAgentDone;

@@ -266,6 +266,8 @@ export interface SessionSummary {
   size: number;
   live: boolean;
   entrypoint: string | null;
+  /** which harness wrote the session: absent = Claude Code, 'opencode' = OpenCode (src/main/opencode.ts) */
+  source?: string;
   /** latest git branch seen in the transcript */
   gitBranch?: string | null;
   running?: number;

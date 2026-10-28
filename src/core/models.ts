@@ -35,7 +35,7 @@ const LOCAL_FAMILIES: [string, RegExp, string, boolean][] = [
 
 /** Path prefixes that mean the model is served from this machine. */
 const LOCAL_PREFIX =
-  /^(ollama|ollama_chat|lm[-_]?studio|lmstudio-community|lmstudio|llamacpp|llama[-_.]cpp|llamafile|jan|localai|vllm|hosted_vllm|mlx-community|hf\.co|huggingface\.co|bartowski|unsloth|thebloke)$/i;
+  /^(ollama|ollama_chat|lm[-_]?studio|lmstudio-community|lmstudio|llamacpp|llama[-_.]cpp|llamafile|jan|localai|vllm|hosted_vllm|mlx-community|local|llama-server|llama-swap|koboldcpp|tabbyapi|oobabooga|mlx|mlx-lm|exo|hf\.co|huggingface\.co|bartowski|unsloth|thebloke)$/i;
 /** Prefixes of hosted gateways: the model is not local, but the label is still prettified. */
 const CLOUD_PREFIX =
   /^(openrouter|together|togetherai|groq|fireworks|fireworks_ai|deepinfra|openai|azure|vertex_ai|gemini|google|bedrock|mistralai|meta-llama|deepseek-ai|qwen|huggingface)$/i;

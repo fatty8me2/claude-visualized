@@ -28,6 +28,9 @@ export interface AppConfig {
   usagePing: boolean;
   /** minutes between pings while a session is active (min 5) */
   usagePingMinutes: number;
+  /** follow OpenCode sessions (read-only) and where its data lives; empty = auto-detect */
+  opencodeEnabled: boolean;
+  opencodeDir: string;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -45,6 +48,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   peerPort: 47830,
   usagePing: true,
   usagePingMinutes: 10,
+  opencodeEnabled: true,
+  opencodeDir: '',
 };
 
 function file() {

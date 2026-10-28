@@ -97,15 +97,17 @@ export function SessionView({ view, summary, now, replay: replayApi, hookSrv, la
           </span>
         </div>
         <div className="actions">
-          <button
-            data-tour="open-in-claude"
-            data-testid="open-in-claude"
-            onClick={() => void openInClaude(view.id)}
-            title={view.machine ? `This session is running on ${view.machine}` : 'Open this session in the Claude desktop app'}
-          >
-            <Icon name="openExternal" size="xs" />
-            open in Claude
-          </button>
+          {view.entrypoint !== 'opencode' && (
+            <button
+              data-tour="open-in-claude"
+              data-testid="open-in-claude"
+              onClick={() => void openInClaude(view.id)}
+              title={view.machine ? `This session is running on ${view.machine}` : 'Open this session in the Claude desktop app'}
+            >
+              <Icon name="openExternal" size="xs" />
+              open in Claude
+            </button>
+          )}
           {replay ? (
             <button className="on" onClick={stop}>
               <Icon name="live" size="xs" />

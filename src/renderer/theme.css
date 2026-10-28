@@ -912,6 +912,15 @@ html.is-fullscreen .tb-inner {
   display: inline-flex;
   color: var(--faint);
 }
+.session-row .sub .client.oc-badge {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0 4px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: 4px;
+  flex-shrink: 0;
+}
 .session-row .sub .when {
   margin-left: auto;
   flex-shrink: 0;

@@ -89,7 +89,7 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
         </b>
       </span>
       {view.warnings > 0 && <span title="Transcript lines this version doesn't understand (ignored)">unparsed {view.warnings}</span>}
-      <span>{view.version ? `cc ${view.version}` : ''}</span>
+      <span>{view.version ? `${view.entrypoint === 'opencode' ? 'opencode' : 'cc'} ${view.version}` : ''}</span>
     </div>
   );
 }

@@ -34,6 +34,7 @@ export function SettingsDialog({
   const [port, setPort] = useState(String(config.port));
   const [sys, setSys] = useState<SystemInfoView | null>(null);
   const [hotkey, setHotkey] = useState(config.miniHotkey);
+  const [ocDir, setOcDir] = useState(config.opencodeDir);
   const [hotkeyMsg, setHotkeyMsg] = useState<{ ok: boolean; text: string } | null>(null);
   // closing plays the scale+fade out first, then really closes (Escape, the close button and a click on the scrim all come here)
   const [closing, setClosing] = useState(false);
@@ -188,9 +189,28 @@ export function SettingsDialog({
         </label>
         <label className="chk" data-testid="set-usage-ping">
           <input type="checkbox" checked={config.usagePing} onChange={(e) => set({ usagePing: e.target.checked })} />
-          Keep the usage meters exact: while a Claude Code session is active, send a tiny request to Claude about every 10 minutes (a few dozen tokens) and read my limits from the reply
+          Keep the usage meters exact: while a Claude Code session is active, send a tiny request to Claude about every 10 minutes (a few dozen tokens) and read
+          my limits from the reply
         </label>
         <PingCost />
+        <label className="chk" data-testid="set-opencode">
+          <input type="checkbox" checked={config.opencodeEnabled} onChange={(e) => set({ opencodeEnabled: e.target.checked })} />
+          Show OpenCode sessions (read-only; reads OpenCode&rsquo;s own session database or files, never its login)
+        </label>
+        {config.opencodeEnabled && (
+          <div className="row">
+            <span>OpenCode data folder</span>
+            <input
+              style={{ width: 260 }}
+              aria-label="OpenCode data folder"
+              placeholder="automatic (~/.local/share/opencode)"
+              value={ocDir}
+              onChange={(e) => setOcDir(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && set({ opencodeDir: ocDir })}
+              onBlur={() => ocDir !== config.opencodeDir && set({ opencodeDir: ocDir })}
+            />
+          </div>
+        )}
         <label className="chk">
           <input type="checkbox" checked={config.closeToTray} onChange={(e) => set({ closeToTray: e.target.checked })} />
           Closing the window keeps the app running in the tray

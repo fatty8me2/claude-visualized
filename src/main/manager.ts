@@ -8,10 +8,16 @@ import { OverviewEncoder, ViewEncoder, type OverviewMsg, type ViewMsg } from '@c
 import { isRemoteId } from '@core/remote';
 import { SessionIndexer, LIVE_MS } from './indexer';
 import { SessionWatcher } from './watcher';
+import { OpenCodeSource, OpenCodeWatcher, type OpenCodeOptions } from './opencode';
 import { loadBacklogInWorker } from './workerLoader';
 import { claudeDeepLink } from './desktopSessions';
 
 const POLL_MS = 600;
+/** OpenCode has no hooks, so its storage is polled faster; an unchanged database costs one PRAGMA per poll */
+const OC_POLL_MS = 250;
+const OC_SCAN_MS = 400;
+
+type Follower = SessionWatcher | OpenCodeWatcher;
 const SCAN_MS = 2500;
 const PUSH_MS = 200;
 const MAX_LIVE_WATCHERS = 12;
@@ -50,7 +56,10 @@ export interface RemoteSource {
  */
 export class SessionManager extends EventEmitter {
   private indexer = new SessionIndexer();
-  private watchers = new Map<string, SessionWatcher>();
+  private watchers = new Map<string, Follower>();
+  private oc = new OpenCodeSource();
+  private claudeSummaries: SessionSummary[] = [];
+  private ocSummaries: SessionSummary[] = [];
   private summaries: SessionSummary[] = [];
   private selectedId: string | null = null;
   private stateEnc = new ViewEncoder();
@@ -99,7 +108,9 @@ export class SessionManager extends EventEmitter {
   start() {
     void this.scan();
     this.timers.push(setInterval(() => void this.scan(), SCAN_MS));
-    this.timers.push(setInterval(() => void this.pollAll(), POLL_MS));
+    this.timers.push(setInterval(() => void this.pollAll(false), POLL_MS));
+    this.timers.push(setInterval(() => void this.pollAll(true), OC_POLL_MS));
+    this.timers.push(setInterval(() => this.scanOpenCode(), OC_SCAN_MS));
     this.timers.push(
       setInterval(() => {
         if (this.dirty) {
@@ -269,19 +280,45 @@ export class SessionManager extends EventEmitter {
     this.dirty = true;
   }
 
-  private ensureWatcher(id: string, file?: string): SessionWatcher | null {
+  /** Settings: follow OpenCode sessions or not, and where its data lives ('' = auto-detect). */
+  setOpenCode(o: OpenCodeOptions) {
+    this.oc.setConfig(o);
+    this.scanOpenCode();
+  }
+
+  get openCodeDir(): string | null {
+    return this.oc.dir;
+  }
+
+  private mergeSummaries() {
+    this.summaries = [...this.claudeSummaries, ...this.ocSummaries].sort((a, b) => b.mtime - a.mtime);
+  }
+
+  private scanOpenCode() {
+    const next = this.oc.scan();
+    if (next === this.ocSummaries) return;
+    this.ocSummaries = next;
+    this.mergeSummaries();
+    if (this.followActive) this.autoSelect();
+    this.emitSessions();
+    this.overviewDirty = true;
+    this.ovVersion++;
+  }
+
+  private ensureWatcher(id: string, file?: string): Follower | null {
     let w = this.watchers.get(id);
     if (w) return w;
     const f = file ?? this.summaries.find((s) => s.id === id)?.file;
     if (!f || isRemoteId(id)) return null;
-    w = new SessionWatcher(id, f, loadBacklogInWorker);
+    w = f.startsWith('opencode:') ? this.oc.watcher(id) : new SessionWatcher(id, f, loadBacklogInWorker);
     this.watchers.set(id, w);
     return w;
   }
 
   private async scan() {
     try {
-      this.summaries = await this.indexer.scan();
+      this.claudeSummaries = await this.indexer.scan();
+      this.mergeSummaries();
     } catch (e) {
       console.error('scan failed', e);
       return;
@@ -341,9 +378,10 @@ export class SessionManager extends EventEmitter {
     this.select(best.id, false);
   }
 
-  private async pollAll() {
+  private async pollAll(openCode: boolean) {
     let sessionsChanged = false;
     for (const w of [...this.watchers.values()]) {
+      if (w instanceof OpenCodeWatcher !== openCode) continue;
       const wasPrimed = w.primed;
       let changed = false;
       try {
@@ -388,7 +426,7 @@ export class SessionManager extends EventEmitter {
     if (out.length) this.emit('tokens', out);
   }
 
-  private notifyTransitions(w: SessionWatcher, wasPrimed: boolean) {
+  private notifyTransitions(w: Follower, wasPrimed: boolean) {
     const before = this.prevStatus.get(w.sessionId);
     const now = new Map<string, AgentStatus>();
     for (const a of Object.values(w.state.agents)) now.set(a.id, a.status);
@@ -444,6 +482,7 @@ export class SessionManager extends EventEmitter {
   async replayEvents(id: string) {
     const f = this.summaries.find((s) => s.id === id)?.file ?? this.watchers.get(id)?.mainFile ?? (await this.indexer.locate(id));
     if (!f) return [];
+    if (f.startsWith('opencode:')) return this.oc.watcher(id).collectAllEvents();
     return new SessionWatcher(id, f, loadBacklogInWorker).collectAllEvents();
   }
 }
