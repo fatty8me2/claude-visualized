@@ -127,9 +127,13 @@ describe('history page (fixture data)', () => {
     const db = path.join(userData, 'history.db');
     expect(fs.existsSync(db)).toBe(true);
     await page.getByTestId('history-search').fill('');
+    // the fixture's dates are fixed, so how many fall in the page's default range depends on today: compare before/after instead
+    const kpi = page.locator('[data-kpi="sessions"] .hist-kpi-value');
+    const before = (await kpi.innerText()).trim();
+    expect(Number(before)).toBeGreaterThan(0);
     await page.getByTestId('history-rebuild').click();
     await idle(page);
-    await page.locator('[data-kpi="sessions"] .hist-kpi-value', { hasText: '2' }).waitFor({ timeout: 10_000 });
+    await page.locator('[data-kpi="sessions"] .hist-kpi-value', { hasText: before }).waitFor({ timeout: 10_000 });
     expect(fs.existsSync(db)).toBe(true);
   });
 });
