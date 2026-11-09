@@ -3,6 +3,7 @@
 // field is treated as optional and anything unrecognized is dropped rather than thrown.
 
 import type { AgentEvent, AgentRef, SpawnInfo, TodoInput, UsageNumbers } from './events';
+import { desktopTodoOp, toolShipKinds } from './ship';
 
 type Json = Record<string, any>;
 
@@ -247,7 +248,7 @@ export function normalizeLine(line: string, ctx: LineContext, fallbackTs = 0): A
   if (Array.isArray(content)) {
     for (const b of content as Json[]) {
       if (b?.type === 'tool_use' && str(b.id) && str(b.name)) {
-        ev({ k: 'tool.start', toolUseId: b.id, name: b.name, input: compactInput(b.input) });
+        ev({ k: 'tool.start', toolUseId: b.id, name: b.name, input: compactInput(b.input), ...toolExtras(b.name, b.input) });
         if (b.name === 'ExitPlanMode') {
           const text = str(b.input?.plan);
           if (text || str(b.input?.planFilePath))
@@ -288,6 +289,13 @@ export function errorText(content: unknown): string | undefined {
 }
 
 /** Keep tool inputs small: they are summarized, never shown in full. */
+/** What only the full tool input tells: shipping steps in a shell command and desktop task-list changes (see ship.ts). */
+function toolExtras(name: string, input: unknown): { ship?: ReturnType<typeof toolShipKinds>; todo?: NonNullable<ReturnType<typeof desktopTodoOp>> } {
+  const ship = toolShipKinds(name, input);
+  const todo = desktopTodoOp(name, input);
+  return { ...(ship.length ? { ship } : {}), ...(todo ? { todo } : {}) };
+}
+
 export function compactInput(input: unknown): unknown {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
   const out: Json = {};
@@ -388,7 +396,7 @@ export function normalizeHook(p: Json, now: number): AgentEvent[] {
       break;
     case 'PreToolUse':
       if (str(p.tool_use_id) && str(p.tool_name)) {
-        ev({ k: 'tool.start', toolUseId: p.tool_use_id, name: p.tool_name, input: compactInput(p.tool_input) });
+        ev({ k: 'tool.start', toolUseId: p.tool_use_id, name: p.tool_name, input: compactInput(p.tool_input), ...toolExtras(p.tool_name, p.tool_input) });
         if (p.tool_name === 'ExitPlanMode' && !agentId && str(p.tool_input?.plan)) {
           ev({ k: 'plan', text: p.tool_input.plan.slice(0, PLAN_CAP), path: str(p.tool_input.planFilePath), source: 'exit', toolUseId: p.tool_use_id });
         }

@@ -1,0 +1,573 @@
+/* ---- the prompt's progress strip (components/PromptProgress.tsx) ----
+   One time axis from the prompt to its expected end: the elapsed part is a lit energy fill in the main agent's model
+   colour, the projected work is a striped run that fades out (it is an estimate), shipping is green, and what only
+   happens after the user's go-ahead is dashed. Subagents sit on the axis at their (expected) finish. */
+.pp {
+  --pp-acc: var(--fam, var(--opus));
+  position: relative;
+  flex-shrink: 0;
+  display: grid;
+  gap: 6px;
+  padding: 7px var(--gutter) 9px;
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(120% 220% at 0% 0%, color-mix(in srgb, var(--pp-acc) 9%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--pp-acc) 3%, var(--bg-2)), var(--bg-2));
+  outline: none;
+  z-index: 4;
+}
+.pp::before {
+  /* a thin lit seam along the top, as long as the elapsed part */
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 1px;
+  width: var(--pp-pos, 0%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--pp-acc) 70%, transparent));
+  opacity: 0.8;
+  transition: width var(--dur-3) var(--ease-out);
+}
+.pp:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--focus);
+}
+
+.pp-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.pp-eyebrow {
+  color: color-mix(in srgb, var(--pp-acc) 80%, var(--text));
+  flex-shrink: 0;
+}
+.pp-phase {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.pp-read {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.pp-read b {
+  color: var(--text);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--pp-acc) 55%, transparent);
+}
+.pp-read .pp-k {
+  font-family: var(--font-ui);
+  color: var(--muted);
+}
+.pp-at {
+  color: var(--muted);
+}
+.pp-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+  color: color-mix(in srgb, var(--ok) 85%, var(--text));
+  font-size: var(--fs-xs);
+}
+.pp-line.done {
+  border-color: color-mix(in srgb, var(--ok) 60%, transparent);
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  box-shadow: 0 0 14px -4px var(--ok);
+}
+.pp-line.later {
+  border-style: dashed;
+  background: transparent;
+  color: color-mix(in srgb, var(--ok) 55%, var(--muted));
+}
+.pp-line.failed {
+  border-color: color-mix(in srgb, var(--err) 55%, transparent);
+  background: color-mix(in srgb, var(--err) 10%, transparent);
+  color: var(--err);
+}
+.pp-est {
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  line-height: 1.5;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+  cursor: help;
+}
+
+/* ---- the axis ---- */
+.pp-track {
+  position: relative;
+  height: 8px;
+  margin: 3px 0 1px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--pp-acc) 6%, var(--track)), var(--track));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.035);
+}
+.pp-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--pp-acc) 30%, transparent), color-mix(in srgb, var(--pp-acc) 92%, white 8%));
+  box-shadow: 0 0 14px -3px var(--pp-acc);
+  transition: width var(--dur-3) var(--ease-out);
+}
+.pp-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.32), transparent);
+  transform: translateX(-120%);
+  animation: pp-sweep 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.pp.st-done .pp-fill::after,
+.pp.st-stale .pp-fill::after,
+.pp.st-waiting .pp-fill::after {
+  animation: none;
+  display: none;
+}
+.pp.st-done .pp-fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--pp-acc) 25%, transparent), color-mix(in srgb, var(--pp-acc) 70%, transparent));
+  box-shadow: none;
+}
+.pp.st-stale .pp-fill {
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+  box-shadow: none;
+}
+@keyframes pp-sweep {
+  to {
+    transform: translateX(320%);
+  }
+}
+
+/* the projected work: striped, fading toward the expected end (it is an estimate, and a rougher one fades sooner) */
+.pp-proj {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: 0 3px 3px 0;
+  background: repeating-linear-gradient(
+    -55deg,
+    color-mix(in srgb, var(--pp-acc) 34%, transparent) 0 4px,
+    color-mix(in srgb, var(--pp-acc) 10%, transparent) 4px 8px
+  );
+  -webkit-mask-image: linear-gradient(90deg, #000 55%, rgb(0 0 0 / 0.35));
+  mask-image: linear-gradient(90deg, #000 55%, rgb(0 0 0 / 0.35));
+}
+.pp.conf-low .pp-proj {
+  -webkit-mask-image: linear-gradient(90deg, #000 25%, rgb(0 0 0 / 0.15));
+  mask-image: linear-gradient(90deg, #000 25%, rgb(0 0 0 / 0.15));
+}
+.pp-shipseg {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: 0 3px 3px 0;
+  background: repeating-linear-gradient(-55deg, color-mix(in srgb, var(--ok) 38%, transparent) 0 4px, color-mix(in srgb, var(--ok) 12%, transparent) 4px 8px);
+}
+.pp-later {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  border: 1px dashed color-mix(in srgb, var(--ok) 50%, transparent);
+  background: color-mix(in srgb, var(--ok) 4%, transparent);
+}
+.pp-indet {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  right: 0;
+  overflow: hidden;
+  border-radius: 0 3px 3px 0;
+}
+.pp-indet::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--pp-acc) 45%, transparent), transparent);
+  transform: translateX(-110%);
+  animation: pp-sweep 2.2s ease-in-out infinite;
+}
+
+/* "now": a bright head on the lit part */
+.pp-now {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--pp-acc) 30%, white);
+  box-shadow:
+    0 0 6px 1px var(--pp-acc),
+    0 0 16px 2px color-mix(in srgb, var(--pp-acc) 50%, transparent);
+  transition: left var(--dur-3) var(--ease-out);
+}
+.pp.st-waiting .pp-now {
+  background: var(--warn);
+  box-shadow: 0 0 8px 1px var(--warn);
+}
+/* the expected end: a small flag post; green when the end is a shipped release / push */
+.pp-flag {
+  position: absolute;
+  top: -6px;
+  bottom: -2px;
+  width: 0;
+  border-left: 1.5px solid color-mix(in srgb, var(--text) 55%, transparent);
+}
+.pp-flag::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 7px;
+  height: 5px;
+  background: color-mix(in srgb, var(--text) 55%, transparent);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.pp-flag.ship {
+  border-color: var(--ok);
+}
+.pp-flag.ship::after {
+  background: var(--ok);
+}
+
+/* subagents at their (expected) finish: rings while running, small dots once done */
+.pp-agent {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--fam);
+  background: var(--bg-2);
+  box-shadow: 0 0 7px -1px var(--fam);
+  cursor: pointer;
+  z-index: 2;
+  transition:
+    left var(--dur-3) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+}
+.pp-agent:hover,
+.pp-agent:focus-visible {
+  transform: scale(1.5);
+  z-index: 3;
+}
+.pp-agent.done {
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border: none;
+  background: color-mix(in srgb, var(--fam) 70%, transparent);
+  box-shadow: none;
+  z-index: 1;
+}
+.pp-agent.error {
+  --fam: var(--err);
+}
+.pp-agent.overdue {
+  --fam: var(--warn);
+  border-style: dotted;
+}
+.pp-agent.waiting {
+  --fam: var(--warn);
+}
+
+/* shipping stages: diamonds; lit when done, pulsing while under way, dashed when only asked for */
+.pp-stage {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--ok);
+  background: var(--bg-2);
+  z-index: 2;
+  transition: left var(--dur-3) var(--ease-out);
+}
+.pp-stage.done {
+  background: var(--ok);
+  box-shadow: 0 0 9px var(--ok);
+}
+.pp-stage.active {
+  background: color-mix(in srgb, var(--ok) 40%, var(--bg-2));
+  animation: pp-pulse 1.4s ease-in-out infinite;
+}
+.pp-stage.failed {
+  border-color: var(--err);
+  background: color-mix(in srgb, var(--err) 35%, var(--bg-2));
+}
+.pp-stage.plan-later {
+  border-style: dashed;
+  opacity: 0.75;
+}
+@keyframes pp-pulse {
+  50% {
+    box-shadow: 0 0 12px 1px var(--ok);
+  }
+}
+
+/* stage legend under the axis */
+.pp-legend {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+}
+.pp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pp-chip > i {
+  width: 6px;
+  height: 6px;
+  transform: rotate(45deg);
+  border: 1px solid var(--ok);
+}
+.pp-chip.done {
+  color: color-mix(in srgb, var(--ok) 85%, var(--text));
+}
+.pp-chip.done > i {
+  background: var(--ok);
+  box-shadow: 0 0 6px var(--ok);
+}
+.pp-chip.active {
+  color: var(--text-2);
+}
+.pp-chip.active > i {
+  background: color-mix(in srgb, var(--ok) 45%, transparent);
+}
+.pp-chip.failed {
+  color: var(--err);
+}
+.pp-chip.failed > i {
+  border-color: var(--err);
+}
+.pp-chip.plan-later > i,
+.pp-chip.skipped > i {
+  border-style: dashed;
+}
+.pp-chip.skipped {
+  opacity: 0.6;
+}
+.pp-cnote {
+  color: var(--faint);
+}
+.pp-chip.done .pp-cnote {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* ---- details on hover / focus ---- */
+/* informational only: it never takes the pointer, so it cannot keep itself open over the graph or swallow its clicks
+   (the agents' dots on the bar are the clickable way to open an agent) */
+.pp-pop {
+  pointer-events: none;
+  position: absolute;
+  top: calc(100% - 2px);
+  right: var(--gutter);
+  width: min(440px, calc(100% - 2 * var(--gutter)));
+  max-height: 60vh;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: var(--r-3);
+  border: 1px solid color-mix(in srgb, var(--pp-acc) 30%, var(--line-2));
+  background:
+    radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--pp-acc) 10%, transparent), transparent 70%), color-mix(in srgb, var(--panel) 94%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-2);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-out),
+    visibility 0s linear var(--dur-2);
+  z-index: 40;
+}
+.pp:hover .pp-pop,
+.pp:focus-visible .pp-pop,
+.pp:has(:focus-visible) .pp-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 250ms, 250ms, 0s;
+}
+.pp-pop h5 {
+  margin: 10px 0 4px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pp-range {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-2);
+}
+.pp-range b {
+  color: var(--text);
+  font-weight: 600;
+}
+.pp-conf {
+  margin-left: auto;
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+}
+.pp.conf-high .pp-conf {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+.pp.conf-low .pp-conf {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.pp-basis {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  color: var(--text-2);
+}
+.pp-basis li::marker {
+  color: var(--pp-acc);
+}
+.pp-agents,
+.pp-ship {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.pp-arow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.pp-aname {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.pp-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--fam);
+  box-shadow: 0 0 6px -1px var(--fam);
+}
+.pp-arow.done .pp-dot,
+.pp-arow.error .pp-dot {
+  background: var(--fam);
+  border-color: transparent;
+  box-shadow: none;
+  opacity: 0.7;
+}
+.pp-arow.error {
+  --fam: var(--err);
+}
+.pp-arow.overdue .pp-astat {
+  color: var(--warn);
+}
+.pp-astat {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.pp-arow.running .pp-astat,
+.pp-arow.waiting .pp-astat {
+  color: var(--text-2);
+}
+.pp-more {
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+.pp-ship li {
+  display: flex;
+  gap: 10px;
+  font-size: var(--fs-xs);
+}
+.pp-sk {
+  width: 56px;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.pp-ship li.done .mono {
+  color: var(--ok);
+}
+.pp-ship li.failed .mono {
+  color: var(--err);
+}
+.pp-ship li.plan-later .mono {
+  color: var(--faint);
+}
+.pp-foot {
+  margin: 10px 0 0;
+  font-size: var(--fs-2xs);
+  color: var(--faint);
+  line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp::before,
+  .pp-fill,
+  .pp-now,
+  .pp-agent,
+  .pp-stage,
+  .pp-pop {
+    transition: none;
+  }
+  .pp-fill::after,
+  .pp-indet::after {
+    animation: none;
+    display: none;
+  }
+  .pp-stage.active {
+    animation: none;
+    box-shadow: 0 0 8px var(--ok);
+  }
+}

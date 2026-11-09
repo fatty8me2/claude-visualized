@@ -404,6 +404,72 @@
   }
 }
 
+/* ---- estimated progress (src/core/eta.ts): a determinate fill with a soft shimmer on top, and a short "est." label ---- */
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 5px; /* the label overflows its line box instead of making the card taller */
+  flex-shrink: 0;
+}
+.bar-row > .bar {
+  flex: 1;
+  min-width: 0;
+}
+.bar.det > b {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  border-radius: 3px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--fam) 55%, transparent), var(--fam));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--fam) 45%, transparent);
+  transition: width 0.8s var(--ease-out, ease-out);
+}
+.bar.det > b::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 55%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38) 50%, transparent);
+  transform: translateX(-100%);
+  animation: shimmer 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.eta-lbl {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 5px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.bar-row.est-over .bar {
+  background: color-mix(in srgb, var(--warn) 14%, var(--track));
+}
+.bar-row.est-over .bar.det > b {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--warn) 50%, transparent), var(--warn));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.bar-row.est-over .bar.det > b::after {
+  animation-duration: 3.4s;
+}
+.bar-row.est-over .eta-lbl {
+  color: var(--warn);
+}
+.bar-row.est-paused .bar.det > b {
+  opacity: 0.55;
+  box-shadow: none;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--fam) 60%, transparent) 0 4px, color-mix(in srgb, var(--fam) 25%, transparent) 4px 8px);
+}
+.bar-row.est-paused .bar.det > b::after {
+  display: none;
+}
+
 /* ---- activity ---- */
 .node .now {
   font-size: 11.5px;
@@ -657,6 +723,13 @@
   animation: none;
   transform: translateX(35%);
 }
+.graph-canvas.calm .bar.det > b {
+  transition: none;
+}
+.graph-canvas.calm .bar.det > b::after {
+  animation: none;
+  display: none;
+}
 .graph-canvas.calm .status .st-running {
   animation: none;
 }
@@ -691,6 +764,13 @@
   .bar.indet > i {
     animation: none;
     transform: translateX(35%);
+  }
+  .bar.det > b {
+    transition: none;
+  }
+  .bar.det > b::after {
+    animation: none;
+    display: none;
   }
   .node > .ring {
     animation: none;

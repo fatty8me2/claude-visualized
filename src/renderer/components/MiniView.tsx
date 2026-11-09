@@ -9,6 +9,10 @@ import { UsageMeters } from './UsageMeters';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
 import { agentName, clock, displayStatus, famClass } from '../util';
 import { Icon } from './Icon';
+import { EtaLine } from './PanelExtras';
+import { usePlanModel } from './PlanRail';
+import { useSessionEta } from '../eta';
+import { coarseNow } from '@core/panelContent';
 
 export function MiniView() {
   const view = useLiveState();
@@ -26,6 +30,10 @@ export function MiniView() {
     : [];
   const plan = view?.mode === 'plan';
   const st = main ? displayStatus(main, now) : 'idle';
+  // the live view is the full SessionView, so the same estimate as the main window; recomputed on a 15 s tick
+  const tick = coarseNow(now);
+  const project = view?.cwd?.split(/[\\/]/).filter(Boolean).pop() ?? null;
+  const eta = useSessionEta(view, tick, usePlanModel(view), project).prompt;
   return (
     <div className="mini">
       <div className="mini-head">
@@ -61,6 +69,7 @@ export function MiniView() {
               {agentInsight(view.agents, main, now, plan).activity.line}
             </span>
           </div>
+          {eta && <EtaLine prompt={eta} now={tick} mini />}
           {(running.length > 0 || recentDone.length > 0) && (
             <div className="mini-chips">
               {running.map((a) => {

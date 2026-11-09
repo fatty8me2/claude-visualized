@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { PromptEta } from '@core/eta';
 import type { SessionView } from '@core/state';
 import { AgentGraph } from '../components/AgentGraph';
 import { Timeline } from '../components/Timeline';
@@ -25,6 +26,8 @@ export interface GraphViewContext {
   replaying?: boolean;
   /** seek the replay to a wall-clock time; undefined when not replaying */
   onSeekTime?: (ts: number) => void;
+  /** the current prompt's time estimate (src/core/eta.ts), for the main agent's card; null without one */
+  promptEta?: PromptEta | null;
 }
 
 export interface GraphViewDef {
@@ -51,6 +54,7 @@ export const GRAPH_VIEWS: readonly GraphViewDef[] = [
         onHoverAgent={c.onHoverAgent}
         extraTools={c.extraTools}
         replaying={c.replaying}
+        prompt={c.promptEta}
       />
     ),
   },

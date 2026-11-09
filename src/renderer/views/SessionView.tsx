@@ -7,6 +7,8 @@ import { LocalTag } from '../components/LocalBits';
 import { LogPanel } from '../components/LogPanel';
 import { ModePanel } from '../components/ModePanel';
 import { PlanRail, PlanToggle, usePlanModel, usePlanRailPrefs } from '../components/PlanRail';
+import { PromptProgress } from '../components/PromptProgress';
+import { useSessionEta } from '../eta';
 import { StatusBar } from '../components/StatusBar';
 import { Icon } from '../components/Icon';
 import { useGraphPrefs } from '../state/graphPrefs';
@@ -71,6 +73,10 @@ export function SessionView({ view, summary, now, replay: replayApi, hookSrv, la
   const { agentSel, setAgentSel, logAgent, setLogAgent, hlAgents, setHlAgents, hoverAgent, setHoverAgent, editingLayout, setEditingLayout } = ui;
   const planPrefs = usePlanRailPrefs();
   const plan = usePlanModel(view);
+  // time estimates for the current prompt and its agents (src/core/eta.ts), shared by the progress strip, the cards and the drawer
+  const eta = useSessionEta(view, now, plan, summary?.project ?? null);
+  // a session that is no longer live and has been silent for a while (not a long tool call) has stopped, whatever its last line said
+  const stale = !replay && !!summary && !summary.live && !view.machine && now - (view.lastActivity ?? 0) > 20 * 60_000;
   const [graphViewId, setGraphViewId] = useState(GRAPH_VIEWS[0].id);
   const [graphPrefs, setGraphPrefs] = useGraphPrefs();
   const eventTimes = useMemo(() => replay?.events.map((e) => e.ts), [replay?.events]);
@@ -136,6 +142,11 @@ export function SessionView({ view, summary, now, replay: replayApi, hookSrv, la
         </div>
       )}
       {editingLayout && <LayoutToolbar api={layoutApi} onDone={() => setEditingLayout(false)} />}
+      {!layout.hidden.progress && eta.prompt && (
+        <div data-flip="progress">
+          <PromptProgress view={view} eta={eta.prompt} now={now} stale={stale} onSelectAgent={setAgentSel} />
+        </div>
+      )}
       {!layout.hidden.legend && (
         <div data-flip="legend">
           <Legend view={view} />
@@ -196,6 +207,7 @@ export function SessionView({ view, summary, now, replay: replayApi, hookSrv, la
                   replaying: !!replay,
                   onSeekTime: eventTimes ? (ts) => goto(eventIndexAt(eventTimes, ts)) : undefined,
                   extraTools: plan ? <PlanToggle plan={plan} prefs={planPrefs} /> : undefined,
+                  promptEta: stale ? null : eta.prompt,
                 })}
                 {agentSel && (
                   <AgentDrawer
@@ -205,6 +217,7 @@ export function SessionView({ view, summary, now, replay: replayApi, hookSrv, la
                     onClose={() => setAgentSel(null)}
                     onFilterLog={setLogAgent}
                     onSelect={setAgentSel}
+                    promptEta={stale ? null : eta.prompt}
                     onShowInTimeline={
                       GRAPH_VIEWS.some((g) => g.id === 'timeline') && graphView.id !== 'timeline' ? () => setGraphViewId('timeline') : undefined
                     }

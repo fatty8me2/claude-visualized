@@ -33,6 +33,10 @@ import {
 } from '@core/history';
 import type { Goal, ToolMix } from '@core/goal';
 import { projectName } from '@core/history';
+import { activeTimes, buildEtaPriors, turnTimes, type EtaPriors } from '@core/eta';
+
+/** how far back the time estimates look for similar agents and prompts */
+const ETA_WINDOW_MS = 120 * 86_400_000;
 
 /** Bump when the schema or what is extracted changes; an old database is rebuilt. */
 export const SCHEMA_VERSION = 1;
@@ -506,6 +510,44 @@ export class HistoryDb {
       snippet: parseSnippet(String(r.snip)),
     }));
     return { q: args.q, hits, empty: false };
+  }
+
+  /**
+   * What the time estimates compare against (src/core/eta.ts): finished subagent runs (active time and tool calls, by type,
+   * model family and goal) and past prompts (prompt to the main agent's last message), from the last 120 days.
+   */
+  etaPriors(now = Date.now()): EtaPriors {
+    const since = now - ETA_WINDOW_MS;
+    const agents = this.db
+      .prepare(
+        `select session_id s, agent_id a, type, family, goal, tool_count tools from agents
+         where agent_id != 'main' and status = 'done' and started >= ? order by started desc limit 6000`,
+      )
+      .all(since) as Row[];
+    const msgRows = this.db
+      .prepare(`select session_id s, agent_id a, ts from usage_msgs where agent_id != 'main' and ts >= ? order by session_id, agent_id, ts`)
+      .all(since) as { s: string; a: string; ts: number }[];
+    const active = activeTimes(msgRows);
+    const runs = agents.map((r) => ({
+      type: String(r.type ?? ''),
+      family: r.family ?? null,
+      goal: String(r.goal ?? 'general'),
+      tools: Number(r.tools) || 0,
+      activeMs: active.get(`${r.s}\t${r.a}`) ?? 0,
+    }));
+    const prompts = this.db
+      .prepare(`select session_id s, ts from docs where agent_id = 'main' and kind = 'prompt' and ts >= ? order by session_id, ts`)
+      .all(since) as { s: string; ts: number }[];
+    const msgs = this.db.prepare(`select session_id s, ts from usage_msgs where agent_id = 'main' and ts >= ? order by session_id, ts`).all(since) as {
+      s: string;
+      ts: number;
+    }[];
+    const projects = new Map((this.db.prepare('select id, project from sessions').all() as Row[]).map((r) => [String(r.id), String(r.project ?? '')]));
+    return buildEtaPriors(
+      runs,
+      turnTimes(prompts, msgs, (s) => projects.get(s) ?? ''),
+      now,
+    );
   }
 
   dbBytes(): number {

@@ -1,4 +1,4 @@
-import type { UsageNumbers } from './events';
+import type { ShipKind, UsageNumbers } from './events';
 import type { ToolMix } from './goal';
 
 export type AgentStatus = 'running' | 'waiting' | 'idle' | 'done' | 'error';
@@ -76,7 +76,23 @@ export interface TodoItem {
   text: string;
   status: string;
   owner: string;
+  /** event time it was first seen in progress; absent when never seen in progress */
+  startedAt?: number;
+  /** event time it was first seen completed; absent while not completed */
+  doneAt?: number;
 }
+
+/** One shipping command the main agent ran (see ShipKind): when it started, when it ended and whether it worked. */
+export interface ShipEvent {
+  kind: ShipKind;
+  toolUseId: string;
+  at: number;
+  /** null while the command is still running */
+  endAt: number | null;
+  ok: boolean | null;
+}
+
+export const SHIP_CAP = 60;
 
 export interface PlanInfo {
   /** markdown; null while only the file path is known */
@@ -119,6 +135,10 @@ export interface SessionState {
   agents: Record<string, AgentNode>;
   todos: TodoItem[];
   plan: PlanInfo | null;
+  /** when the user's latest prompt started the current turn (a prompt sent while the main agent is busy does not); null before the first */
+  turnStartedAt: number | null;
+  /** shipping commands of the main agent (commit, push, PR, release, publish), oldest first, at most SHIP_CAP */
+  ship: ShipEvent[];
   log: LogEntry[];
   totals: UsageNumbers;
   costUSD: number | null;
@@ -221,6 +241,8 @@ export function newSession(id: string): SessionState {
     agents: { [MAIN]: newAgent(MAIN, 'main', 0, null) },
     todos: [],
     plan: null,
+    turnStartedAt: null,
+    ship: [],
     log: [],
     totals: zeroUsage(),
     costUSD: null,

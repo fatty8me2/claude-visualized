@@ -1824,6 +1824,8 @@ html[data-platform='darwin'] .mini {
   align-items: baseline;
   white-space: nowrap;
   overflow: hidden;
+  /* the window is small: the main agent's line (and the estimate under it) keep their height, the chips and log below clip */
+  flex-shrink: 0;
 }
 .mini-chips {
   display: flex;

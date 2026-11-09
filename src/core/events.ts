@@ -22,6 +22,26 @@ export interface TodoInput {
   status: 'pending' | 'in_progress' | 'completed' | string;
 }
 
+/**
+ * A shipping step a shell command performs: a git commit or push, opening a pull request, building or uploading a
+ * release that is not public yet (a draft, `npm run release`), or publishing one (what update checks and installs see).
+ */
+export type ShipKind = 'commit' | 'push' | 'pr' | 'release' | 'publish';
+
+/** A change to the main agent's task list that only makes sense against the current list (Claude desktop's task list tool). */
+export interface TodoOp {
+  /** a whole new list */
+  replace?: TodoInput[];
+  /** complete the step in progress and start the next pending one */
+  advance?: boolean;
+  /** 1-based positions to mark completed */
+  done?: number[];
+  /** 1-based position to mark in progress */
+  start?: number;
+  /** the turn was wrapped up: every step left counts as completed */
+  finish?: boolean;
+}
+
 export interface SpawnInfo {
   childId: string;
   /** tool_use id of the Agent call that spawned this child (from meta.json); absent for workflow agents / hook-only spawns */
@@ -44,7 +64,16 @@ export type AgentEvent = Base &
     | { k: 'mode'; mode: string }
     | { k: 'model'; model: string; effort?: string }
     | { k: 'prompt'; text: string }
-    | { k: 'tool.start'; toolUseId: string; name: string; input: unknown }
+    | {
+        k: 'tool.start';
+        toolUseId: string;
+        name: string;
+        input: unknown;
+        /** shipping steps the call's shell command performs, read from the full command (the input above is clipped) */
+        ship?: ShipKind[];
+        /** task-list change carried by the call (Claude desktop's update_plan / wrap_up), applied once per call */
+        todo?: TodoOp;
+      }
     | {
         k: 'tool.end';
         toolUseId: string;

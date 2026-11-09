@@ -1,12 +1,13 @@
 // Pure-ish reducer: folds AgentEvents into a SessionState. It mutates the state it is given
 // (cheap for 10k+ event transcripts) and returns it; callers that need a new identity copy it.
 
-import type { AgentEvent, UsageNumbers } from './events';
+import type { AgentEvent, ShipKind, TodoInput, TodoOp, UsageNumbers } from './events';
 import {
   ACTIVITY_CAP,
   LOG_CAP,
   MAIN,
   SEEN_TOOLS_CAP,
+  SHIP_CAP,
   USAGE_MSGS_CAP,
   newAgent,
   newSession,
@@ -15,6 +16,7 @@ import {
   type LogEntry,
   type LogKind,
   type SessionState,
+  type TodoItem,
 } from './state';
 import { summarizeTool, toolLabel } from './summarize';
 import { toolCategory } from './goal';
@@ -148,15 +150,69 @@ function refreshCurrentTool(s: SessionState, a: AgentNode) {
   a.currentTool = best ? { id: best.id, name: best.name, summary: summarizeTool(best.name, best.input), since: best.start, input: best.input } : null;
 }
 
-function setTodo(s: SessionState, id: string, patch: { text?: string; status?: string }, owner: string) {
+const DONE_STATUS = /^(completed?|done)$/i;
+const ACTIVE_STATUS = /^(in[_-]progress|active)$/i;
+
+/** Set a todo's status and note when it was first seen in progress and completed (the estimates in eta.ts read these). */
+function setTodoStatus(t: TodoItem, status: string, ts: number) {
+  t.status = status;
+  if (ACTIVE_STATUS.test(status) && t.startedAt === undefined) t.startedAt = ts;
+  if (DONE_STATUS.test(status)) t.doneAt ??= ts;
+  else delete t.doneAt;
+}
+
+function setTodo(s: SessionState, id: string, patch: { text?: string; status?: string }, owner: string, ts: number) {
   const t = s.todos.find((x) => x.id === id);
   if (t) {
     if (patch.text) t.text = patch.text;
-    if (patch.status) t.status = patch.status;
+    if (patch.status) setTodoStatus(t, patch.status, ts);
   } else if (patch.text) {
-    s.todos.push({ id, text: patch.text, status: patch.status ?? 'pending', owner });
+    const item: TodoItem = { id, text: patch.text, status: 'pending', owner };
+    setTodoStatus(item, patch.status ?? 'pending', ts);
+    s.todos.push(item);
   }
   if (patch.status === 'deleted') s.todos = s.todos.filter((x) => x.id !== id);
+}
+
+/** A whole new list: items that were already there (same id and text, else same text) keep their times. */
+function replaceTodos(old: TodoItem[], items: TodoInput[], owner: string, ts: number): TodoItem[] {
+  const byText = new Map(old.map((t) => [t.text, t]));
+  return items.map((t) => {
+    const prev = old.find((o) => o.id === t.id && o.text === t.text) ?? byText.get(t.text);
+    const item: TodoItem = { id: t.id, text: t.text, status: t.status, owner };
+    if (prev?.startedAt !== undefined) item.startedAt = prev.startedAt;
+    if (prev?.doneAt !== undefined) item.doneAt = prev.doneAt;
+    setTodoStatus(item, t.status, ts);
+    return item;
+  });
+}
+
+/** The desktop app's task-list tool: a new list, or steps advanced / checked off by position. */
+function applyTodoOp(s: SessionState, op: TodoOp, owner: string, ts: number) {
+  if (op.replace) {
+    s.todos = replaceTodos(s.todos, op.replace, owner, ts);
+    return;
+  }
+  const list = s.todos;
+  if (op.finish) {
+    for (const t of list) if (!DONE_STATUS.test(t.status)) setTodoStatus(t, 'completed', ts);
+    return;
+  }
+  if (op.advance) {
+    const cur = list.findIndex((t) => ACTIVE_STATUS.test(t.status));
+    if (cur >= 0) setTodoStatus(list[cur], 'completed', ts);
+    const pending = (t: TodoItem) => !DONE_STATUS.test(t.status) && !ACTIVE_STATUS.test(t.status);
+    let next = list.findIndex((t, i) => i > cur && pending(t));
+    if (next < 0) next = list.findIndex(pending);
+    if (next >= 0) setTodoStatus(list[next], 'in_progress', ts);
+  }
+  for (const n of op.done ?? []) if (list[n - 1]) setTodoStatus(list[n - 1], 'completed', ts);
+  if (op.start && list[op.start - 1]) setTodoStatus(list[op.start - 1], 'in_progress', ts);
+}
+
+function recordShip(s: SessionState, toolUseId: string, kinds: ShipKind[], ts: number) {
+  for (const kind of kinds) s.ship.push({ kind, toolUseId, at: ts, endAt: null, ok: null });
+  if (s.ship.length > SHIP_CAP) s.ship.splice(0, s.ship.length - SHIP_CAP);
 }
 
 function statusFromNotification(status: string): 'done' | 'error' | 'running' {
@@ -223,6 +279,8 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
         .slice(-8)
         .some((l) => l.kind === 'prompt' && l.agentId === a.id && Math.abs(l.ts - ts) < 120_000 && text.startsWith(l.text.replace(/…$/, '')));
       if (!dupe) log(s, ts, a.id, 'prompt', text);
+      // each prompt to the main agent starts a turn (messages typed while it works arrive as queued commands, not prompts)
+      if (a.kind === 'main' && !dupe) s.turnStartedAt = ts;
       if (a.kind === 'main' && !s.title) {
         s.title = text.slice(0, 80);
         s.titleKind = 'prompt';
@@ -259,7 +317,12 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
         }
         if (e.name === 'TaskUpdate') {
           const i = (e.input ?? {}) as Json;
-          if (typeof i.taskId === 'string') setTodo(s, i.taskId, { status: i.status, text: i.subject }, a.id);
+          if (typeof i.taskId === 'string') setTodo(s, i.taskId, { status: i.status, text: i.subject }, a.id, ts);
+        }
+        // shipping and the desktop task list belong to the main agent (subagents commit inside their own worktrees)
+        if (a.kind === 'main') {
+          if (e.ship?.length) recordShip(s, e.toolUseId, e.ship, ts);
+          if (e.todo) applyTodoOp(s, e.todo, a.id, ts);
         }
       }
       break;
@@ -270,6 +333,13 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       const a = s.agents[ownerId] ?? ensureAgent(s, e.ref.agentId, ts);
       const name = p?.name ?? e.name ?? '';
       const rec = a.recent.find((r) => r.id === e.toolUseId);
+      for (let i = s.ship.length - 1; i >= 0 && i >= s.ship.length - 8; i--) {
+        const sh = s.ship[i];
+        if (sh.toolUseId === e.toolUseId && sh.endAt === null) {
+          sh.endAt = Math.max(ts, sh.at);
+          sh.ok = e.ok;
+        }
+      }
       // the hook and the transcript both report a failure; whichever carries the message fills it in
       if (rec && !e.ok && e.error && !rec.error) rec.error = e.error;
       if (p) {
@@ -385,8 +455,7 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       break;
     }
     case 'todos.replace': {
-      const owner = agentKey(e.ref.agentId);
-      s.todos = e.items.map((t) => ({ id: t.id, text: t.text, status: t.status, owner }));
+      s.todos = replaceTodos(s.todos, e.items, agentKey(e.ref.agentId), ts);
       break;
     }
     case 'plan': {
@@ -471,11 +540,11 @@ function onToolResult(s: SessionState, a: AgentNode, name: string, toolUseId: st
   switch (name) {
     case 'TaskCreate': {
       const t = r.task as Json | undefined;
-      if (t && t.id != null) setTodo(s, String(t.id), { text: String(t.subject ?? ''), status: 'pending' }, a.id);
+      if (t && t.id != null) setTodo(s, String(t.id), { text: String(t.subject ?? ''), status: 'pending' }, a.id, ts);
       break;
     }
     case 'TaskUpdate': {
-      if (r.taskId != null && r.statusChange?.to) setTodo(s, String(r.taskId), { status: r.statusChange.to }, a.id);
+      if (r.taskId != null && r.statusChange?.to) setTodo(s, String(r.taskId), { status: r.statusChange.to }, a.id, ts);
       break;
     }
     case 'Agent':

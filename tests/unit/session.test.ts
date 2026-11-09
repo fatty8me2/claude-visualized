@@ -70,7 +70,8 @@ describe('session folding from transcripts', () => {
   it('tracks mode, todos, title, cost, errors and unknown lines', async () => {
     const { state } = await load();
     expect(state.mode).toBe('plan');
-    expect(state.todos).toEqual([{ id: '1', text: 'Map the repo', status: 'completed', owner: MAIN }]);
+    // a todo first seen completed gets that moment as its finish (the time estimates read it)
+    expect(state.todos).toEqual([{ id: '1', text: 'Map the repo', status: 'completed', owner: MAIN, doneAt: expect.any(Number) }]);
     expect(state.title).toBe('Retry + docs');
     expect(state.costUSD).toBe(1.25);
     expect(state.agents.main.errorCount).toBe(1);

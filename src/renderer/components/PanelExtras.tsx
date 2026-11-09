@@ -11,6 +11,8 @@ import { MAIN, type AgentNode, type SessionView } from '@core/state';
 import { formatDuration, formatTokens } from '@core/summarize';
 import { GoalBadge } from './GoalBadge';
 import { agentName, clock, displayStatus, famClass } from '../util';
+import type { PromptEta } from '@core/eta';
+import { fmtClock, fmtLeft, fmtSpan } from '../eta';
 
 /** does the session have a plan or todo list to show? (cheap: the parse is only done when the strip renders) */
 export const hasPlanSource = (v: SessionView) => !!v.plan || v.todos.length > 0;
@@ -261,5 +263,87 @@ export const SideRail = memo(function SideRail({ v, tick, feed }: { v: SessionVi
       <InsightRail v={v} tick={tick} side />
       {feed && <LiveFeed v={v} count={6} testId="px-side-feed" />}
     </aside>
+  );
+});
+
+// ---------- the prompt's time estimate ----------
+
+const SHIP_ORDER = ['commit', 'push', 'release'] as const;
+const SHIP_WORD: Record<PromptEta['finishLine'], string> = { release: 'ready for updates', push: 'on GitHub', commit: 'committed', turn: '' };
+
+/** the words for a prompt estimate: a short readout, a one-line mini version and the tooltip. Always an estimate ("~", "est."). */
+export function promptEtaText(p: PromptEta, now: number) {
+  const late = p.state === 'running' && p.finishAt != null && p.finishAt < now;
+  let label: string;
+  if (p.state === 'done') label = p.finishAt ? `done ${fmtClock(p.finishAt)}` : 'done';
+  else if (p.state === 'waiting') label = 'waiting for you';
+  else if (p.finishAt == null) label = `estimating · ${fmtSpan(now - p.startedAt)}`;
+  else label = late ? 'running long' : fmtLeft(p.finishAt - now);
+  const ships = p.finishLine !== 'turn' && p.shipAt != null && p.state !== 'done';
+  const mini =
+    p.state === 'running' && p.finishAt != null && !late
+      ? `prompt ${label}${ships ? ` · ${p.finishLine} ≈ ${fmtClock(p.shipAt!)}` : ''}`
+      : p.state === 'running' && p.finishAt == null
+        ? `prompt ${label}`
+        : label === 'running long'
+          ? 'prompt running long'
+          : label;
+  // the overview has room for the finish time and the finish line, in the words the session's progress strip uses
+  const lineStage = p.stages.find((s) => s.key === p.finishLine);
+  const lineWord = SHIP_WORD[p.finishLine];
+  const wide =
+    p.state === 'running' && p.finishAt != null && !late
+      ? `${label} · ${fmtClock(p.finishAt)}${ships && lineWord ? ` · ${lineWord} ≈ ${fmtClock(p.shipAt!)}${lineStage?.plan === 'later' ? ' after your go-ahead' : ''}` : ''}`
+      : p.state === 'done' && lineWord && lineStage?.state === 'done' && lineStage.at
+        ? `${label} · ${lineWord} ${fmtClock(lineStage.at)}`
+        : label;
+  const lines: string[] = [];
+  if (p.state === 'done')
+    lines.push(p.finishAt ? `This prompt finished at ${fmtClock(p.finishAt)} (took ${fmtSpan(p.finishAt - p.startedAt)})` : 'This prompt is done');
+  else if (p.state === 'waiting') lines.push('Waiting for you; the estimate resumes when you answer');
+  else if (p.finishAt == null) lines.push('Estimate: not enough to go on yet');
+  else {
+    lines.push(
+      `Estimate: finishes about ${fmtClock(p.finishAt)}${p.low != null && p.high != null ? `, likely ${fmtClock(p.low)} to ${fmtClock(p.high)}` : ''}`,
+    );
+  }
+  if (ships) lines.push(`${p.finishLine} expected about ${fmtClock(p.shipAt!)}`);
+  for (const s of p.stages)
+    if (s.key !== 'work')
+      lines.push(`${s.key}: ${s.state}${s.plan === 'later' && s.state !== 'done' ? ' (after your go-ahead)' : ''}${s.note ? `, ${s.note}` : ''}`);
+  lines.push(...p.basis);
+  if (p.state !== 'done') lines.push('Estimates are statistical and can be off by a factor of two or more');
+  return { label, mini, wide, late, title: lines.join('\n') };
+}
+
+/** Prompt progress for one session: a slim energy bar, the readout and (past the plain "turn" finish line) commit / push / release pips. */
+export const EtaLine = memo(function EtaLine({ prompt, now, mini = false }: { prompt: PromptEta | null; now: number; mini?: boolean }) {
+  const t = useMemo(() => (prompt ? promptEtaText(prompt, now) : null), [prompt, now]);
+  if (!prompt || !t) return null;
+  const frac = prompt.state === 'done' ? 1 : (prompt.fraction ?? 0);
+  const pips =
+    prompt.finishLine === 'turn'
+      ? []
+      : prompt.stages.filter((s) => s.key !== 'work' && SHIP_ORDER.indexOf(s.key as 'commit') <= SHIP_ORDER.indexOf(prompt.finishLine as 'commit'));
+  return (
+    <div
+      className={`eta-line ${mini ? 'eta-mini' : ''} ${prompt.state} ${t.late ? 'late' : ''} ${prompt.finishAt == null && prompt.state === 'running' ? 'unknown' : ''}`}
+      style={{ '--p': Math.min(1, Math.max(0, frac)) } as CSSProperties}
+      title={t.title}
+      data-testid="eta-line"
+    >
+      {!mini && <span className="eta-k">prompt</span>}
+      <span className="eta-bar" aria-hidden>
+        <i />
+      </span>
+      <span className="eta-read">{mini ? t.mini : t.wide}</span>
+      {pips.length > 0 && (
+        <span className="eta-pips" aria-label="commit, push, release">
+          {pips.map((s) => (
+            <i key={s.key} className={`eta-pip ${s.state} ${s.plan}`} title={`${s.key}: ${s.state}`} />
+          ))}
+        </span>
+      )}
+    </div>
   );
 });

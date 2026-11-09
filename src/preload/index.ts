@@ -40,6 +40,7 @@ const api: VisApi = {
   historySummary: (a) => ipcRenderer.invoke('history:summary', a),
   historySearch: (a) => ipcRenderer.invoke('history:search', a),
   historyRebuild: () => ipcRenderer.invoke('history:rebuild'),
+  etaPriors: () => ipcRenderer.invoke('history:etaPriors'),
   onHistory: (cb) => on('history', cb),
   openInClaude: (id) => ipcRenderer.invoke('session:openInClaude', id),
   getSystemInfo: () => ipcRenderer.invoke('system:info'),

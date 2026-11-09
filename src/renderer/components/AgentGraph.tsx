@@ -18,6 +18,8 @@ import { agentName, displayStatus, famClass, type DisplayStatus } from '../util'
 import { MotionTracker, playMoves, trackTilt } from '../cardFx';
 import { Fade, FxLayers, StatusLabel, seedOf } from './cardParts';
 import { Icon } from './Icon';
+import { agentBasis, agentLeftLabel, fmtClock, fmtLeft, useEtaPriors } from '../eta';
+import { agentEta, type EtaPriors, type PromptEta } from '@core/eta';
 import { useGraphPrefs, useGroupFolds } from '../state/graphPrefs';
 
 const LOCAL_ROWS_H = 30;
@@ -48,8 +50,24 @@ function Spark({ counts }: { counts: number[] }) {
   );
 }
 
-/** No fake percentages: full when finished, a soft shimmer while working, empty when idle. */
-function Bar({ status }: { status: DisplayStatus }) {
+/** What a bar shows beyond its status: an estimated fill (see src/core/eta.ts), always labelled as an estimate. */
+interface BarEst {
+  /** 0..1, already rounded */
+  fraction: number;
+  mode: 'est' | 'over' | 'paused' | 'done';
+  /** short mono label: "~3 min left", "running long", "waiting" */
+  label: string;
+  title: string;
+}
+
+/** Full when finished; with an estimate a fill up to its fraction (soft shimmer on top); otherwise a soft indeterminate shimmer. */
+function Bar({ status, est }: { status: DisplayStatus; est?: BarEst | null }) {
+  if (est?.mode === 'done')
+    return (
+      <div className="bar full" title={est.title}>
+        <i />
+      </div>
+    );
   if (status === 'done')
     return (
       <div className="bar full">
@@ -62,6 +80,16 @@ function Bar({ status }: { status: DisplayStatus }) {
         <i />
       </div>
     );
+  if (est && (status === 'running' || status === 'quiet' || status === 'waiting' || status === 'idle')) {
+    return (
+      <div className={`bar-row est-${est.mode}`} title={est.title} data-testid="eta-bar">
+        <div className="bar det">
+          <b style={{ width: `${Math.round(est.fraction * 100)}%` }} />
+        </div>
+        {est.label && <span className="eta-lbl">{est.label}</span>}
+      </div>
+    );
+  }
   if (status === 'running' || status === 'quiet')
     return (
       <div className={`bar indet ${status === 'quiet' ? 'quiet' : ''}`}>
@@ -69,6 +97,37 @@ function Bar({ status }: { status: DisplayStatus }) {
       </div>
     );
   return <div className="bar" />;
+}
+
+/** the bar's estimate for a subagent at `now`; null without history */
+function agentBarEst(a: AgentNode, now: number, priors: EtaPriors): { est: BarEst | null; key: string } {
+  const e = a.kind === 'agent' ? agentEta(a, now, priors) : null;
+  if (!e) return { est: null, key: '' };
+  const label = agentLeftLabel(e);
+  const fraction = e.overdue ? 0.96 : Math.round(e.fraction * 100) / 100;
+  const mode = e.paused ? 'paused' : e.overdue ? 'over' : 'est';
+  const title = e.paused
+    ? `Waiting for you. est. ${fmtLeft(e.remaining)} of work left once it continues. ${agentBasis(e)}`
+    : e.overdue
+      ? `Running longer than most similar agents; the finish is a guess. ${agentBasis(e)}`
+      : `est. done ${fmtClock(e.at)}, likely ${fmtClock(e.low)} – ${fmtClock(e.high)} (${e.confidence} confidence). ${agentBasis(e)}`;
+  return { est: { fraction, mode, label, title }, key: `${label}|${fraction}|${mode}` };
+}
+
+/** the main card's bar, from the prompt estimate; recomputed by AgentGraph on each tick but reduced to primitives */
+function promptBarEst(p: PromptEta | null | undefined, now: number): BarEst | null {
+  if (p?.state === 'done') return { fraction: 1, mode: 'done', label: '', title: p.finishAt ? `prompt finished ${fmtClock(p.finishAt)}` : 'prompt finished' };
+  if (!p || p.fraction == null || p.finishAt == null) return null;
+  const left = p.finishAt - now;
+  const paused = p.state === 'waiting';
+  const label = paused ? 'waiting' : `${fmtLeft(left)} left`;
+  const range = p.low != null && p.high != null ? `, likely ${fmtClock(p.low)} – ${fmtClock(p.high)}` : '';
+  return {
+    fraction: Math.round(p.fraction * 100) / 100,
+    mode: paused ? 'paused' : 'est',
+    label,
+    title: `est. prompt wraps up ${fmtClock(p.finishAt)}${range} (${p.confidence} confidence)${p.basis.length ? '. ' + p.basis.join('. ') : ''}`,
+  };
 }
 
 function totalTokens(a: AgentNode) {
@@ -81,15 +140,16 @@ interface KidStats {
 }
 
 /** everything on a card that depends on the clock; compact cards show less, so they re-render less */
-function cardTime(a: AgentNode, now: number, kids: KidStats, compact: boolean) {
+function cardTime(a: AgentNode, now: number, kids: KidStats, compact: boolean, priors: EtaPriors) {
   const st = displayStatus(a, now);
   const act = describeActivity(a, { now, runningChildren: kids.running, totalChildren: kids.total });
   const dur = act.since != null && now - act.since >= 1000 ? formatDuration(now - act.since) : '';
-  if (compact) return { st, elapsedText: '', act, dur, spark: [] as number[], key: `${st}|${act.kind}|${act.phrase}|${dur}` };
+  if (compact) return { st, elapsedText: '', act, dur, spark: [] as number[], bar: null as BarEst | null, key: `${st}|${act.kind}|${act.phrase}|${dur}` };
   const elapsed = (a.endedAt ?? (st === 'running' || st === 'waiting' ? now : a.lastActivity)) - a.startedAt;
   const elapsedText = formatDuration(elapsed);
   const spark = sparkCounts(a.activity, now);
-  return { st, elapsedText, act, dur, spark, key: `${st}|${elapsedText}|${act.kind}|${act.line}|${dur}|${spark.join(',')}` };
+  const { est, key: etaKey } = agentBarEst(a, now, priors);
+  return { st, elapsedText, act, dur, spark, bar: est, key: `${st}|${elapsedText}|${act.kind}|${act.line}|${dur}|${spark.join(',')}|${etaKey}` };
 }
 
 /** A subagent's headline is its task; seventeen cards all titled "general-purpose" say nothing. */
@@ -108,6 +168,8 @@ const NodeCard = memo(function NodeCard({
   kidsTotal,
   kidsRunning,
   clock,
+  priors,
+  mainBar,
   motion,
   x,
   y,
@@ -125,6 +187,10 @@ const NodeCard = memo(function NodeCard({
   kidsTotal: number;
   kidsRunning: number;
   clock: Clock;
+  /** history the estimates compare with (one object shared by all cards) */
+  priors: EtaPriors;
+  /** the main card's prompt estimate, as primitives-only data that changes about once a minute; null elsewhere */
+  mainBar: BarEst | null;
   motion: MotionTracker;
   x: number;
   y: number;
@@ -139,8 +205,8 @@ const NodeCard = memo(function NodeCard({
   onFold: (id: string) => void;
 }) {
   const kids = { total: kidsTotal, running: kidsRunning };
-  const now = useClockKey(clock, (n) => cardTime(a, n, kids, compact).key);
-  const { st, elapsedText, act, dur, spark } = cardTime(a, now, kids, compact);
+  const now = useClockKey(clock, (n) => cardTime(a, n, kids, compact, priors).key);
+  const { st, elapsedText, act, dur, spark, bar } = cardTime(a, now, kids, compact, priors);
   const isMain = a.kind === 'main';
   const model = a.model ? modelLabel(a.model) : a.kind === 'workflow' ? 'workflow' : '—';
   const plan = mode === 'plan';
@@ -215,7 +281,7 @@ const NodeCard = memo(function NodeCard({
         </div>
       )}
       {isLocalModel(a.model) && <LocalLinkLine agent={a} />}
-      <Bar status={st} />
+      <Bar status={st} est={isMain ? mainBar : bar} />
       {!isMain && <div className="desc">{(a.prompt && a.prompt !== a.description ? a.prompt : a.lastText) || ''}</div>}
       <div className={`now ${act.kind}`} title={act.line} data-testid="now">
         <span className="lbl">now:</span>{' '}
@@ -250,7 +316,12 @@ const NO_GROUPS: ReadonlySet<string> = new Set();
 /** the card is fully inside the free part of the panel */
 function fullyIn(box: { x: number; y: number; w: number; h: number }, wrap: HTMLElement, obscured: number): boolean {
   const m = 8;
-  return box.x >= wrap.scrollLeft + m && box.y >= wrap.scrollTop + m && box.x + box.w <= wrap.scrollLeft + wrap.clientWidth - obscured - m && box.y + box.h <= wrap.scrollTop + wrap.clientHeight - m;
+  return (
+    box.x >= wrap.scrollLeft + m &&
+    box.y >= wrap.scrollTop + m &&
+    box.x + box.w <= wrap.scrollLeft + wrap.clientWidth - obscured - m &&
+    box.y + box.h <= wrap.scrollTop + wrap.clientHeight - m
+  );
 }
 
 export function AgentGraph({
@@ -266,6 +337,7 @@ export function AgentGraph({
   embedded = false,
   fill = false,
   replaying = false,
+  prompt,
 }: {
   view: SessionView;
   now: number;
@@ -285,6 +357,8 @@ export function AgentGraph({
   fill?: boolean;
   /** replaying: the backdrop stands still */
   replaying?: boolean;
+  /** the current prompt's time estimate (src/core/eta.ts) for the main card's bar; overview graphs omit it */
+  prompt?: PromptEta | null;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -391,6 +465,12 @@ export function AgentGraph({
     return m;
   }, [view.agents]);
   // the clock is pushed to the cards through a store so a per-second tick does not re-render every card
+  const priors = useEtaPriors();
+  // the main card's estimate, reduced to a stable object that changes only when its text does (about once a minute)
+  const mainEst = embedded ? null : promptBarEst(prompt, now);
+  const mainKey = mainEst ? `${mainEst.fraction}|${mainEst.mode}|${mainEst.label}|${mainEst.title}` : '';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const mainBar = useMemo(() => mainEst, [mainKey]);
   const [clock] = useState(() => createClock(now));
   useLayoutEffect(() => {
     clock.set(now);
@@ -718,6 +798,8 @@ export function AgentGraph({
                 kidsTotal={kidStats.get(a.id)?.total ?? 0}
                 kidsRunning={kidStats.get(a.id)?.running ?? 0}
                 clock={clock}
+                priors={priors}
+                mainBar={n.id === MAIN ? mainBar : null}
                 motion={motion}
                 x={n.x}
                 y={n.y}

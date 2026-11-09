@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import type { HistoryStatus, HistorySummary, SearchArgs, SearchResult, SummaryArgs } from '@core/history';
+import type { EtaPriors } from '@core/eta';
 import workerPath from './historyWorker?modulePath';
 
 export const REINDEX_MS = 60_000;
@@ -102,6 +103,9 @@ export class HistoryService extends EventEmitter {
   }
   search(a: SearchArgs): Promise<SearchResult> {
     return this.call('search', a);
+  }
+  etaPriors(): Promise<EtaPriors> {
+    return this.call('etaPriors');
   }
   async rebuild(): Promise<void> {
     await this.call('rebuild');

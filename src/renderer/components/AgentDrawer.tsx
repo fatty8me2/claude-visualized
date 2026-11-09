@@ -12,6 +12,8 @@ import { StatusText } from './cardParts';
 import { CopyButton } from './CopyButton';
 import { Icon, type IconName } from './Icon';
 import { isLocalModel, LocalLinkLine } from './LocalBits';
+import { agentBasis, fmtClock, fmtLeft, fmtSpan, useAgentEta } from '../eta';
+import type { FinishLine, PromptEta } from '@core/eta';
 
 const TOOL_ICON: Record<ToolCategory, IconName> = {
   search: 'search',
@@ -123,6 +125,100 @@ function MixBars({ a }: { a: AgentNode }) {
   );
 }
 
+const FINISH_LINE: Record<FinishLine, string> = {
+  release: 'release published, update checks see it',
+  push: 'pushed to GitHub',
+  commit: 'committed',
+  turn: 'turn over',
+};
+
+/** a subagent's time estimate: running (from history), or how long a finished one took */
+function AgentEtaBlock({ a, now, end }: { a: AgentNode; now: number; end: number }) {
+  const e = useAgentEta(a, now);
+  if (a.kind !== 'agent') return null;
+  if (!e) {
+    if (a.status === 'running' || a.status === 'waiting' || !a.endedAt) return null;
+    return (
+      <div className="d-eta done" data-testid="drawer-eta">
+        <span className="eta-k">took</span>
+        <span className="eta-big">{fmtSpan(end - a.startedAt)}</span>
+      </div>
+    );
+  }
+  return (
+    <div className={`d-eta ${e.overdue ? 'over' : ''} ${e.paused ? 'paused' : ''}`} data-testid="drawer-eta">
+      <div className="eta-head">
+        <span className="eta-big">{e.paused ? 'waiting for you' : e.overdue ? 'running long' : `${fmtLeft(e.remaining)} left`}</span>
+        <span className="eta-tag" title="A guess from similar past agents on this computer">
+          est. · {e.confidence}
+        </span>
+      </div>
+      {e.overdue ? (
+        <div className="eta-row">Longer than most similar agents, so the finish is a rough guess.</div>
+      ) : (
+        <div className="eta-row">
+          {e.paused ? 'once it continues, ' : ''}done ≈ <span className="mono">{fmtClock(e.at)}</span>
+          <span className="eta-sep"> · </span>likely{' '}
+          <span className="mono">
+            {fmtClock(e.low)} – {fmtClock(e.high)}
+          </span>
+        </div>
+      )}
+      <div className="eta-basis">{agentBasis(e)}</div>
+    </div>
+  );
+}
+
+/** the main agent's estimate for the whole prompt */
+function PromptEtaBlock({ p, now }: { p: PromptEta | null | undefined; now: number }) {
+  if (!p) return null;
+  if (p.state === 'done') {
+    return (
+      <div className="d-eta done" data-testid="drawer-eta">
+        <span className="eta-k">prompt finished</span>
+        <span className="eta-big">{fmtSpan((p.finishAt ?? now) - p.startedAt)}</span>
+      </div>
+    );
+  }
+  if (p.finishAt == null) return null;
+  return (
+    <div className={`d-eta ${p.state === 'waiting' ? 'paused' : ''}`} data-testid="drawer-eta">
+      <div className="eta-head">
+        <span className="eta-big">{p.state === 'waiting' ? 'waiting for you' : `${fmtLeft(p.finishAt - now)} left`}</span>
+        <span className="eta-tag" title="A guess from this computer's history of similar prompts">
+          est. · {p.confidence}
+        </span>
+      </div>
+      <div className="eta-row">
+        prompt wraps up ≈ <span className="mono">{fmtClock(p.finishAt)}</span>
+        {p.low != null && p.high != null && (
+          <>
+            <span className="eta-sep"> · </span>likely{' '}
+            <span className="mono">
+              {fmtClock(p.low)} – {fmtClock(p.high)}
+            </span>
+          </>
+        )}
+      </div>
+      <div className="eta-row">
+        finish line: {FINISH_LINE[p.finishLine]}
+        {p.shipAt != null && p.finishLine !== 'turn' && (
+          <>
+            {' '}
+            ≈ <span className="mono">{fmtClock(p.shipAt)}</span>
+            {p.stages.find((s) => s.key === p.finishLine)?.plan === 'later' && ' after your go-ahead'}
+          </>
+        )}
+      </div>
+      {p.basis.map((b, i) => (
+        <div key={i} className="eta-basis">
+          {b}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function AgentDrawer({
   view,
   id,
@@ -131,10 +227,13 @@ export function AgentDrawer({
   onFilterLog,
   onSelect,
   onShowInTimeline,
+  promptEta,
 }: {
   view: SessionView;
   id: string;
   now: number;
+  /** the session's current prompt estimate (the same one the progress strip shows), for the main agent */
+  promptEta?: PromptEta | null;
   onClose: () => void;
   onFilterLog: (id: string) => void;
   /** select another agent (parent, children) */
@@ -217,6 +316,7 @@ export function AgentDrawer({
             <span className="lbl">now:</span> {act.phrase}
             {act.since != null && <span className="dur"> · {formatDuration(now - act.since)}</span>}
           </div>
+          {a.kind === 'main' ? <PromptEtaBlock p={promptEta} now={now} /> : <AgentEtaBlock a={a} now={now} end={end} />}
           <div className="d-tiles">
             <div className="d-tile" data-k="tools">
               <span className="tk">tools</span>

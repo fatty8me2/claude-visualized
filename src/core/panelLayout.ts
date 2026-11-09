@@ -110,7 +110,7 @@ export interface PanelLayout {
   /** px: the side panel's size along its free axis, and the dock panel's */
   side: number;
   dock: number;
-  hidden: { mode: boolean; log: boolean; legend: boolean; status: boolean };
+  hidden: { mode: boolean; log: boolean; legend: boolean; status: boolean; progress: boolean };
   sidebar: { side: 'left' | 'right'; width: number };
 }
 
@@ -120,7 +120,7 @@ export const DEFAULT_LAYOUT: PanelLayout = {
   slots: { A: 'mode', B: 'graph', C: 'log' },
   side: 250,
   dock: 230,
-  hidden: { mode: false, log: false, legend: false, status: false },
+  hidden: { mode: false, log: false, legend: false, status: false, progress: false },
   sidebar: { side: 'left', width: 280 },
 };
 

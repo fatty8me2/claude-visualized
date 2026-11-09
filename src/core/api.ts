@@ -184,6 +184,8 @@ export interface VisApi {
   historySummary(args: SummaryArgs): Promise<HistorySummary>;
   historySearch(args: SearchArgs): Promise<SearchResult>;
   historyRebuild(): Promise<void>;
+  /** past agent runs and prompts the time estimates compare with (see eta.ts); empty when the index is unavailable */
+  etaPriors(): Promise<import('./eta').EtaPriors>;
   onHistory(cb: (s: HistoryStatus) => void): () => void;
   /** open the session in the Claude desktop app (claude:// deep link) */
   openInClaude(id: string): Promise<OpenInClaudeResult>;

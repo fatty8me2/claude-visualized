@@ -510,6 +510,87 @@
   }
 }
 
+/* time estimate block: always marked "est." */
+.drawer .d-eta {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px 8px;
+  border-radius: var(--r-2);
+  border: 1px solid color-mix(in srgb, var(--dc) 26%, var(--line));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--dc) 10%, transparent), color-mix(in srgb, var(--bg-2) 60%, transparent));
+  overflow: hidden;
+}
+.drawer .d-eta::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--dc) 70%, transparent), transparent);
+}
+.drawer .d-eta .eta-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.drawer .d-eta .eta-big {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.drawer .d-eta .eta-tag,
+.drawer .d-eta .eta-k {
+  font-family: var(--font-ui);
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.drawer .d-eta.done {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+.drawer .d-eta .eta-row {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.drawer .d-eta .eta-row .mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.drawer .d-eta .eta-sep {
+  color: var(--faint);
+}
+.drawer .d-eta .eta-basis {
+  font-size: 10.5px;
+  color: var(--faint);
+}
+.drawer .d-eta.over {
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--warn) 10%, transparent), color-mix(in srgb, var(--bg-2) 60%, transparent));
+}
+.drawer .d-eta.over .eta-big,
+.drawer .d-eta.over .eta-tag {
+  color: var(--warn);
+}
+.drawer .d-eta.paused .eta-big {
+  color: var(--text-2);
+}
+.drawer .d-eta.paused {
+  border-style: dashed;
+}
+
 /* stat tiles */
 .drawer .d-tiles {
   display: grid;

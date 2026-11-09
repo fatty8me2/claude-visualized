@@ -3,6 +3,7 @@
 // Defensive on purpose: every field may be missing or a different type in some version; unknown fields are ignored.
 
 import type { AgentEvent, TodoInput, UsageNumbers } from './events';
+import { toolShipKinds } from './ship';
 
 export const OPENCODE = 'opencode';
 
@@ -379,7 +380,9 @@ export class OpenCodeConverter {
         if (tool === 'task' && child) this.spawnTool.set(child, p.id);
         if (!seen.started) {
           seen.started = true;
-          push({ ts: startTs, k: 'tool.start', toolUseId: p.id, name, input: mapToolInput(tool, st.input), sid });
+          // shipping commands (commit, push, release) are read from the full command, like Claude Code's (ship.ts)
+          const ship = toolShipKinds(name, obj(st.input));
+          push({ ts: startTs, k: 'tool.start', toolUseId: p.id, name, input: mapToolInput(tool, st.input), ...(ship.length ? { ship } : {}), sid });
         }
         if (tool === 'todowrite' && Array.isArray(obj(st.input).todos) && status !== 'error') {
           const items = (obj(st.input).todos as unknown[]).map((t, i) => ({

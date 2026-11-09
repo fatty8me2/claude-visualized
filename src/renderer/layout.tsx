@@ -328,6 +328,9 @@ export function LayoutToolbar({ api, onDone }: { api: LayoutApi; onDone: () => v
         <button className={layout.hidden.status ? '' : 'on'} onClick={() => toggle('status')}>
           status bar
         </button>
+        <button className={layout.hidden.progress ? '' : 'on'} onClick={() => toggle('progress')} title="The prompt's progress and time estimates">
+          progress
+        </button>
       </div>
       <div className="lb-group">
         <button

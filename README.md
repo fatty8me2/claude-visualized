@@ -116,6 +116,7 @@ A desktop app (Windows + macOS) that shows what your Claude Code sessions are do
   "est." with a tooltip (prices in `src/core/pricing.ts`, `PRICES_AS_OF`). Subscription plans are not billed per token, so the estimate is a
   yardstick, not a bill. History shows the same estimate for all tokens in the range next to the reported total.
 - **Plan rail**: when the session has a plan (plan mode's plan file or the approved `ExitPlanMode` plan, else its todo list) it is drawn as a metro line beside the agent graph: sections are stations, steps are nodes (done / in progress / pending) and the agents doing each step hang under it as chips. A step counts as done or in progress only on evidence: a ticked `[x]`, a matching todo, or a matching agent (keyword overlap with the agent's description). Hover a step to light up its agents in the graph, hover an agent to light up its step. Toggle it with **plan** in the graph toolbar, drag its edge to resize, and flip it to the other side with the arrows button.
+- **Prompt progress**: a strip under the session title with the current prompt's expected end, where each running subagent should finish, and the commit, push and release still to come ("ready for updates" once a release is published). All of it is estimated; see [What "progress" means here](#what-progress-means-here).
 - **Session log**: timestamped prompts, tool calls, spawns, completions, mode changes and replies, filterable by agent and kind.
   Failed tool calls carry the first line of what they said; the agent details show the full message (up to 300 characters).
 - **Session picker**: every session under `~/.claude/projects`, live ones first, then recent ones grouped by project (collapsible),
@@ -185,11 +186,16 @@ optional and counts lines it doesn't understand (shown as "unparsed" in the stat
 
 #### What "progress" means here
 
-Claude Code doesn't report a percentage for an agent, so the app doesn't invent one:
+Claude Code doesn't report progress, so every fill and time the app shows for work that is still running is an estimate. It is marked "est." or "~", and its tooltip says what it is based on (`src/core/eta.ts`).
 
-- A running agent gets an animated striped bar.
+- **Agents**: a running subagent's bar fills toward its expected finish ("~3 min left"). The estimate compares the agent with similar agents that ran on this computer (same agent type and model family, from the history index's last 120 days), given how long it has already run. Only active time counts, so an agent resumed hours later does not look like one that ran for hours. An agent that has outlasted nearly every similar run says *running long*. With nothing similar in the history yet, the bar stays the animated striped one.
+- **The prompt**: a progress strip under the session title runs from your latest prompt to its expected end (hide it under **layout**). It paces the turn's task list (the Claude desktop app's task list, `TodoWrite`, `TaskCreate`/`TaskUpdate`, or the plan) by how long its finished steps took. It never ends before the slowest running agent is due, and it adds the shipping steps still to do. Without a task list it compares with past prompts of the same project. Hover it for the likely range, each agent's finish and the reasons. The overview panels, the main agent's card and drawer, and the mini view show the same estimate.
+- **Shipping**: the strip follows the main agent's shell commands: `git commit` (and `npm version`), `git push`, `gh pr create`, release builds and uploads (`npm run release…`, `electron-builder --publish`, draft GitHub releases) and publishing (`gh release edit --draft=false`, a non-draft `gh release create`, `npm publish` and the like).
+  - When the prompt includes a release, the strip's finish line is **ready for updates**: the release is published and installed apps get it at their next update check.
+  - Shipping on the task list counts toward the prompt's end. Shipping only asked for in the prompt usually happens in a later turn, after your go-ahead, so it is drawn after the end, dashed.
+- **How good the estimates are**: a read-only backtest on real sessions (`ETA_REAL=1 npx vitest run tests/unit/eta-real.test.ts`) puts the prompt estimate about right on average. It is still typically off by a factor of 2 to 2.5 either way, and its likely range contains the real end about half the time. Early in a long run it tends to be short; near the end it tends to be long. Read it like a weather forecast.
 - A finished agent gets a solid bar; a failed one gets a red bar.
-- The checklist shows real completion (`3/7`) from `TaskCreate`/`TaskUpdate`/`TodoWrite`.
+- The checklist shows real completion (`3/7`) from the task list.
 - The sparkline shows tool calls over the last 12 minutes.
 - An agent that's still marked running but has been silent for a few minutes is shown as *quiet*.
 
@@ -275,6 +281,7 @@ Environment overrides (mainly for tests):
 | `CLAUDE_VIS_PEER_BIND` | interface to share on, e.g. `127.0.0.1` (default: all interfaces; the e2e tests stay on loopback) |
 | `CLAUDE_VIS_NO_DISCOVERY` | no LAN discovery beacon / listener |
 | `CLAUDE_VIS_DEVICE_NAME` | this computer's name as shown on paired computers |
+| `CLAUDE_VIS_ETA_PRIORS` | test only (ignored in installed builds): a JSON file of fixed history for the time estimates |
 
 #### Layout
 

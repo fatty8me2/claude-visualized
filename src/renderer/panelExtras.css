@@ -575,3 +575,154 @@
 .ov-side .px-rail .sub {
   margin-top: 0;
 }
+
+/* ---------- prompt estimate line: a slim energy bar, a mono readout and commit / push / release pips ----------
+   Sits under an overview panel's header (and in the mini view). Colour follows the model (--fam); a late estimate turns amber. */
+.eta-line {
+  --eta: var(--fam, var(--opus));
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--eta) 6%, transparent), transparent 60%);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.eta-line.eta-mini {
+  padding: 0;
+  border-bottom: 0;
+  background: none;
+}
+.eta-line.late,
+.eta-line.waiting {
+  --eta: var(--warn);
+}
+.eta-line.done {
+  --eta: var(--ok);
+}
+.eta-bar {
+  position: relative;
+  flex: 1 1 40px;
+  min-width: 28px;
+  max-width: 320px;
+  height: 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--eta) 12%, var(--track));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.04);
+  overflow: hidden;
+}
+.eta-bar > i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--eta) 55%, transparent), var(--eta));
+  box-shadow: 0 0 8px 0 var(--eta);
+  transform-origin: left center;
+  transform: scaleX(var(--p, 0));
+  transition: transform 0.8s var(--ease-out);
+}
+.eta-line.running:not(.unknown):not(.late) .eta-bar > i::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55));
+  animation: eta-glint 2.4s ease-in-out infinite;
+}
+.eta-line.unknown .eta-bar > i {
+  display: none;
+}
+.eta-k {
+  flex: none;
+  font-family: var(--font-ui);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--eta) 70%, var(--muted));
+}
+.eta-read {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--eta) 55%, var(--text-2));
+}
+.eta-line.eta-mini .eta-bar {
+  flex: 0 0 56px;
+}
+.eta-pips {
+  flex: none;
+  display: inline-flex;
+  gap: 4px;
+}
+.eta-pip {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--faint);
+  box-sizing: border-box;
+}
+.eta-pip.later {
+  opacity: 0.55;
+}
+.eta-pip.done {
+  background: var(--ok);
+  border-color: var(--ok);
+  box-shadow: 0 0 6px 0 var(--ok);
+}
+.eta-pip.active {
+  border-color: var(--eta);
+  background: color-mix(in srgb, var(--eta) 50%, transparent);
+  animation: eta-pulse 1.6s ease-in-out infinite;
+}
+.eta-pip.failed {
+  border-color: var(--err);
+  background: var(--err);
+}
+.eta-pip.skipped {
+  border-style: dashed;
+  opacity: 0.4;
+}
+@keyframes eta-glint {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+@keyframes eta-pulse {
+  50% {
+    transform: scale(1.5);
+    opacity: 0.6;
+  }
+}
+.ov-panel.d-compact .eta-line {
+  padding: 2px 8px;
+}
+.ov-panel.d-spacious .eta-line {
+  padding: 4px 14px;
+}
+.overview.calm .eta-line .eta-bar > i::after,
+.overview.calm .eta-pip.active {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .eta-line .eta-bar > i::after,
+  .eta-pip.active {
+    animation: none;
+  }
+  .eta-bar > i {
+    transition: none;
+  }
+}

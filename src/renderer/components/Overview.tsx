@@ -39,7 +39,9 @@ import { seedOf, StatusText } from './cardParts';
 import { useNow, useOverview } from '../hooks';
 import { agentName, ago, clock, displayStatus, famClass } from '../util';
 import { AgentGraph } from './AgentGraph';
-import { AgentTable, InsightRail, LiveFeed, PlanStrip, Roll, SideRail } from './PanelExtras';
+import { AgentTable, EtaLine, InsightRail, LiveFeed, PlanStrip, Roll, SideRail } from './PanelExtras';
+import { usePlanModel } from './PlanRail';
+import { useSessionEta } from '../eta';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
 import { estimateAgents, estimateTooltip, formatUSD } from '@core/pricing';
 import { Icon } from './Icon';
@@ -120,6 +122,9 @@ function Panel(p: PanelProps) {
   const recent = logLines > 0 ? v.log.filter((l) => l.kind !== 'text').slice(-logLines) : [];
   const project = v.cwd?.split(/[\\/]/).filter(Boolean).pop() ?? '';
   const ctx = main ? contextInfo(main) : null;
+  // one estimate per panel per coarse tick (the readout only changes about once a minute)
+  const etaPlan = usePlanModel(v);
+  const eta = useSessionEta(v, tick, etaPlan, project || null).prompt;
   const live = st === 'running' || running > 0;
   const tone = st === 'waiting' ? 'waiting' : live ? 'live' : 'idle';
   const est = v.costUSD == null ? estimateAgents(v.agents) : null;
@@ -263,6 +268,7 @@ function Panel(p: PanelProps) {
           </button>
         </div>
       </header>
+      {eta && <EtaLine prompt={eta} now={tick} />}
       {main && density !== 'compact' && (
         <div className={`ov-tool ${famClass(main.model)}`}>
           <GoalBadge goal={agentGoal(main, plan)} glyphOnly /> <span className="lbl">now:</span> {agentInsight(v.agents, main, now, plan).activity.line}
