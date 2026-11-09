@@ -127,7 +127,9 @@ describe('history page (fixture data)', () => {
     const db = path.join(userData, 'history.db');
     expect(fs.existsSync(db)).toBe(true);
     await page.getByTestId('history-search').fill('');
-    // the fixture's dates are fixed, so how many fall in the page's default range depends on today: compare before/after instead
+    // the fixture's dates are fixed, so how many fall in the page's default range depends on today (none at all once they are
+    // more than 30 days old): look at all time, and compare before/after instead of a constant
+    await page.getByTestId('range-all').click();
     const kpi = page.locator('[data-kpi="sessions"] .hist-kpi-value');
     const before = (await kpi.innerText()).trim();
     expect(Number(before)).toBeGreaterThan(0);
