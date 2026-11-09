@@ -23,9 +23,22 @@ download in the background and offer "Restart to update".
      ```
 4. electron-builder creates a **draft** release (`releaseType: draft`) and uploads the installer, its `.blockmap` and `latest.yml`
    (`latest-mac.yml` on macOS). Publishing straight to a non-draft release races (it tries to create the release twice and one upload
-   fails, leaving `latest.yml` out of sync with the installer). Check the three assets, write the notes, then publish:
+   fails, leaving `latest.yml` out of sync with the installer). Check the three assets (two drafts? see below), write the notes, then publish:
    `gh release edit v<version> --draft=false`. Users only see drafts once published; the "release notes" snippet in Settings → Updates shows them.
    Never build twice into the same `release/<version>` folder before uploading: `latest.yml`'s sha512 must match the uploaded installer.
+
+   **Two drafts for one tag.** Draft mode makes the race rarer but not impossible: 0.4.0 and 0.9.0 each got a second draft holding only
+   the `.blockmap`. Commands that take the tag (`gh release edit`, `gh release upload`, the Mac job in step 5) can then pick the wrong one,
+   so get back to one draft before publishing. List the drafts, keep the one with the installer and delete the other (its files are all in
+   `release/<version>/`, and deleting a release keeps the tag). Upload what the kept draft lacks through the API, which lets you set the
+   asset name: the local files have spaces, but `latest.yml` points at the names with dashes.
+   ```powershell
+   gh api repos/fatty8me2/claude-visualized/releases --jq '.[] | select(.draft) | {id, tag_name, assets: [.assets[].name]}'
+   gh api --method DELETE repos/fatty8me2/claude-visualized/releases/<other draft id>
+   gh api --method POST -H "Content-Type: application/octet-stream" "https://uploads.github.com/repos/fatty8me2/claude-visualized/releases/<kept draft id>/assets?name=Claude-Visualized-Setup-<version>.exe.blockmap" --input "release/<version>/Claude Visualized Setup <version>.exe.blockmap"
+   ```
+   Then check the three assets and publish as above. Afterwards
+   `https://github.com/fatty8me2/claude-visualized/releases/latest/download/latest.yml` should show the new version.
 
 5. **macOS assets come from CI, after you publish.** Publishing the release triggers `.github/workflows/release-mac.yml` (macos-latest),
    which checks out the tag, builds an unsigned universal build and uploads `Claude-Visualized-<version>-mac-universal.dmg`, `.zip`, both
