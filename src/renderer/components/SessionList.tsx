@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useSshHosts } from '../hooks';
 import type { PeersView } from '@core/api';
 import { groupRecent, matchSession, type ProjectGroup } from '@core/sessionGroups';
 import type { SessionSummary } from '@core/state';
@@ -260,6 +261,7 @@ export function SessionList({
   const listRef = useRef<HTMLDivElement>(null);
   useFlip(listRef);
   const [showHidden, setShowHidden] = useState(false);
+  const sshHosts = useSshHosts();
   const [menu, setMenu] = useState<{ s: SessionSummary; x: number; y: number } | null>(null);
   const { prefs, togglePin, toggleHidden, toggleGroup } = useSidebarPrefs();
   const openMenu = useCallback<OpenMenu>((s, x, y) => setMenu({ s, x, y }), []);
@@ -299,7 +301,20 @@ export function SessionList({
   const isHidden = new Set(prefs.hidden);
   const live = all.filter((s) => s.live && matchSession(s, q));
   const localLive = live.filter((s) => !s.machine);
-  const hosts = peers?.devices.filter((d) => d.role === 'host') ?? [];
+  // paired computers, then the ones watched over SSH (no app on them): both get a machine group
+  const hosts = [
+    ...(peers?.devices.filter((d) => d.role === 'host') ?? []).map((d) => ({ ...d, where: `${d.host}:${d.port}` })),
+    ...(sshHosts ?? []).map((h) => ({
+      key: h.id,
+      deviceId: h.id,
+      name: h.name,
+      online: h.state === 'online' || h.state === 'syncing',
+      state: h.state === 'connecting' ? ('connecting' as const) : ('offline' as const),
+      error: h.error,
+      offlineSince: h.offlineSince,
+      where: h.port ? `${h.target}:${h.port}` : h.target,
+    })),
+  ];
   const grouped = groupRecent(
     all.filter((s) => !s.live && matchSession(s, q)),
     prefs,
@@ -430,7 +445,7 @@ export function SessionList({
                       : 'offline';
               return (
                 <div className="machine-group" key={h.key} data-testid="machine-group" data-machine={h.name} data-online={h.online}>
-                  <div className="group-label machine-label" title={h.error ?? `${h.host}:${h.port}`}>
+                  <div className="group-label machine-label" title={h.error ?? h.where}>
                     <span className={`mdot ${h.online ? 'on' : 'off'}`} />
                     <span className="ml-name">{h.name}</span>
                     <span className="gl-n">{state}</span>

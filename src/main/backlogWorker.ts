@@ -8,4 +8,5 @@ async function main() {
   parentPort!.postMessage({ ok: true, snapshot });
 }
 
-main().catch((e) => parentPort!.postMessage({ ok: false, error: String(e?.stack ?? e) }));
+// imported outside a worker thread (unit tests resolve ?modulePath to this module): nothing to do
+if (parentPort) main().catch((e) => parentPort!.postMessage({ ok: false, error: String(e?.stack ?? e) }));

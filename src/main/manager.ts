@@ -7,7 +7,7 @@ import { MAIN, toView, type AgentStatus, type SessionSummary, type SessionView }
 import { OverviewEncoder, ViewEncoder, type OverviewMsg, type ViewMsg } from '@core/sync';
 import { isRemoteId } from '@core/remote';
 import { SessionIndexer, LIVE_MS } from './indexer';
-import { SessionWatcher } from './watcher';
+import { SessionWatcher, type BacklogLoader } from './watcher';
 import { OpenCodeSource, OpenCodeWatcher, type OpenCodeOptions } from './opencode';
 import { loadBacklogInWorker } from './workerLoader';
 import { claudeDeepLink } from './desktopSessions';
@@ -54,8 +54,19 @@ export interface RemoteSource {
  * Events: 'sessions' (SessionSummary[]), 'state' (ViewMsg: a full SessionView or a delta, see core/sync.ts), 'notify' (NotifyRequest),
  * 'overview' (OverviewMsg for every live session, only while an overview is open)
  */
+export interface SessionManagerOptions {
+  /** follow this folder instead of ~/.claude/projects (an SSH remote's mirror, see main/ssh/service.ts) */
+  projectsRoot?: string;
+  /** a source for another component to read: no OpenCode, no desktop-app index, and it never selects a session by itself */
+  passive?: boolean;
+  /** how a session's backlog is first read (default: on a worker thread) */
+  backlogLoader?: BacklogLoader;
+}
+
 export class SessionManager extends EventEmitter {
-  private indexer = new SessionIndexer();
+  private indexer: SessionIndexer;
+  private passive: boolean;
+  private loader: BacklogLoader;
   private watchers = new Map<string, Follower>();
   private oc = new OpenCodeSource();
   private claudeSummaries: SessionSummary[] = [];
@@ -67,7 +78,7 @@ export class SessionManager extends EventEmitter {
   private dirty = false;
   private overviewDirty = false;
   private ovViewers = 0;
-  private remote: RemoteSource | null = null;
+  private remotes: RemoteSource[] = [];
   /** per-session change stamps (from one clock, so a value never repeats) and the overview's, for the peer link's sharer */
   private versions = new Map<string, number>();
   private clock = 0;
@@ -75,18 +86,25 @@ export class SessionManager extends EventEmitter {
   /** sessions a peer viewer is subscribed to: kept followed like the selected one */
   private retained = new Map<string, number>();
 
+  constructor(opts: SessionManagerOptions = {}) {
+    super();
+    this.passive = !!opts.passive;
+    this.loader = opts.backlogLoader ?? loadBacklogInWorker;
+    this.indexer = new SessionIndexer(opts.projectsRoot, !this.passive);
+  }
+
   /** number of windows currently showing the all-sessions overview */
   get overviewViewers(): number {
     return this.ovViewers;
   }
   set overviewViewers(n: number) {
     this.ovViewers = n;
-    this.remote?.setOverviewWanted(n > 0);
+    for (const r of this.remotes) r.setOverviewWanted(n > 0);
   }
 
   /** Merge another computer's sessions into the list, the overview and the selection. */
-  setRemote(r: RemoteSource) {
-    this.remote = r;
+  addRemote(r: RemoteSource) {
+    this.remotes.push(r);
     r.on('sessions', () => this.emitSessions());
     r.on('view', (id: string) => {
       if (id === this.selectedId) this.markDirty();
@@ -109,8 +127,10 @@ export class SessionManager extends EventEmitter {
     void this.scan();
     this.timers.push(setInterval(() => void this.scan(), SCAN_MS));
     this.timers.push(setInterval(() => void this.pollAll(false), POLL_MS));
-    this.timers.push(setInterval(() => void this.pollAll(true), OC_POLL_MS));
-    this.timers.push(setInterval(() => this.scanOpenCode(), OC_SCAN_MS));
+    if (!this.passive) {
+      this.timers.push(setInterval(() => void this.pollAll(true), OC_POLL_MS));
+      this.timers.push(setInterval(() => this.scanOpenCode(), OC_SCAN_MS));
+    }
     this.timers.push(
       setInterval(() => {
         if (this.dirty) {
@@ -132,7 +152,7 @@ export class SessionManager extends EventEmitter {
   /** Snapshots of every live session (log trimmed), most recently active first, then other computers' live sessions. */
   overview(): SessionView[] {
     const local = this.localOverview();
-    return this.remote ? [...local, ...this.remote.overview()] : local;
+    return this.remotes.length ? [...local, ...this.remotes.flatMap((r) => r.overview())] : local;
   }
 
   /** This machine's live sessions only (what the peer link shares). */
@@ -158,7 +178,7 @@ export class SessionManager extends EventEmitter {
 
   /** Title for a session id from the index, else the live state. */
   titleOf(id: string): string | null {
-    if (isRemoteId(id)) return this.remote?.summaries().find((s) => s.id === id)?.title ?? null;
+    if (isRemoteId(id)) return this.remoteSummaries().find((s) => s.id === id)?.title ?? null;
     const w = this.watchers.get(id);
     return (w?.primed ? w.state.title : null) ?? this.summaries.find((s) => s.id === id)?.title ?? null;
   }
@@ -194,7 +214,19 @@ export class SessionManager extends EventEmitter {
 
   /** This machine's sessions, then other computers' (namespaced, with a machine name). */
   getSummaries(): SessionSummary[] {
-    return this.remote ? [...this.summaries, ...this.remote.summaries()] : this.summaries;
+    return this.remotes.length ? [...this.summaries, ...this.remoteSummaries()] : this.summaries;
+  }
+
+  private remoteSummaries(): SessionSummary[] {
+    return this.remotes.flatMap((r) => r.summaries());
+  }
+
+  private remoteView(id: string): SessionView | null {
+    for (const r of this.remotes) {
+      const v = r.view(id);
+      if (v) return v;
+    }
+    return null;
   }
 
   /** This machine's sessions only (what the peer link shares). */
@@ -236,7 +268,7 @@ export class SessionManager extends EventEmitter {
 
   currentView(): SessionView | null {
     if (!this.selectedId) return null;
-    if (isRemoteId(this.selectedId)) return this.remote?.view(this.selectedId) ?? null;
+    if (isRemoteId(this.selectedId)) return this.remoteView(this.selectedId);
     const w = this.watchers.get(this.selectedId);
     return w && w.primed ? toView(w.state) : null;
   }
@@ -248,7 +280,7 @@ export class SessionManager extends EventEmitter {
       this.emit('follow', false);
     }
     this.selectedId = id;
-    this.remote?.setSelected(id && isRemoteId(id) ? id : null);
+    for (const r of this.remotes) r.setSelected(id && isRemoteId(id) ? id : null);
     if (id && !isRemoteId(id)) {
       const w = this.ensureWatcher(id);
       if (w) void w.poll().then(() => this.markDirty());
@@ -310,7 +342,7 @@ export class SessionManager extends EventEmitter {
     if (w) return w;
     const f = file ?? this.summaries.find((s) => s.id === id)?.file;
     if (!f || isRemoteId(id)) return null;
-    w = f.startsWith('opencode:') ? this.oc.watcher(id) : new SessionWatcher(id, f, loadBacklogInWorker);
+    w = f.startsWith('opencode:') ? this.oc.watcher(id) : new SessionWatcher(id, f, this.loader);
     this.watchers.set(id, w);
     return w;
   }
@@ -328,7 +360,9 @@ export class SessionManager extends EventEmitter {
     for (const s of live) this.ensureWatcher(s.id, s.file);
     const keep = new Set([...live.map((s) => s.id), this.selectedId, ...this.recentHookSessions(), ...this.retained.keys()]);
     for (const id of [...this.watchers.keys()]) if (!keep.has(id)) this.watchers.delete(id);
-    if (this.followActive) this.autoSelect();
+    if (this.passive) {
+      /* whoever reads this source decides what is selected */
+    } else if (this.followActive) this.autoSelect();
     // not following (e.g. after a restart): still show something rather than an empty page
     else if (!this.selectedId && this.summaries[0]) this.select(this.summaries[0].id, false);
     this.emitSessions();
@@ -483,6 +517,6 @@ export class SessionManager extends EventEmitter {
     const f = this.summaries.find((s) => s.id === id)?.file ?? this.watchers.get(id)?.mainFile ?? (await this.indexer.locate(id));
     if (!f) return [];
     if (f.startsWith('opencode:')) return this.oc.watcher(id).collectAllEvents();
-    return new SessionWatcher(id, f, loadBacklogInWorker).collectAllEvents();
+    return new SessionWatcher(id, f, this.loader).collectAllEvents();
   }
 }

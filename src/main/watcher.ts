@@ -4,6 +4,7 @@ import type { AgentEvent } from '@core/events';
 import { normalizeJournalLine, normalizeLine, normalizeMeta, PLAN_CAP } from '@core/normalize';
 import { apply } from '@core/reducer';
 import { newSession, type SessionState } from '@core/state';
+import { isMirrorPath } from './paths';
 import { FileTail, type TailSnapshot } from './tail';
 
 interface AgentFile {
@@ -227,7 +228,8 @@ export class SessionWatcher {
   /** The plan file is where Claude edits the plan, so it is newer than any ExitPlanMode copy. Read it when its mtime changes. */
   private async pollPlanFile() {
     const file = this.state.plan?.path;
-    if (!file || !/\.md$/i.test(file)) return;
+    // a mirrored session's plan path names a file on the other computer
+    if (!file || !/\.md$/i.test(file) || isMirrorPath(this.mainFile)) return;
     try {
       const st = await fs.stat(file);
       if (!st.isFile() || st.size > 2_000_000) return;

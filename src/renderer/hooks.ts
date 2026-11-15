@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AppConfigView, HookServerStatusView, PeersView } from '@core/api';
+import type { SshHostView } from '@core/sshRemote';
 import type { InboxSnapshot } from '@core/inbox';
 import type { SessionSummary, SessionView } from '@core/state';
 import { OverviewDecoder, ViewDecoder } from '@core/sync';
@@ -156,6 +157,16 @@ export function useInbox(): InboxSnapshot | null {
     return window.api.onInbox(set);
   }, []);
   return s;
+}
+
+/** Computers watched over SSH (no app installed on them). */
+export function useSshHosts(): SshHostView[] | null {
+  const [h, set] = useState<SshHostView[] | null>(null);
+  useEffect(() => {
+    void window.api.getSshHosts().then(set);
+    return window.api.onSshHosts(set);
+  }, []);
+  return h;
 }
 
 /** Peer link state: sharing, pairing code, paired and discovered computers. */

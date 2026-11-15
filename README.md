@@ -226,6 +226,10 @@ Mac's host name or IP (or its Tailscale name), port `47830` and the code. From t
 the Mac's name, on the all-sessions page and in the inbox, and the usage meters use the freshest reading from either machine. The link is
 read-only and encrypted. Design and security notes: [docs/PEER-LINK.md](docs/PEER-LINK.md). Building on a Mac: [docs/MAC.md](docs/MAC.md).
 
+If you would rather not install the app on the other computer, and you can already `ssh` into it (macOS or Linux), add it under
+**Watch a computer without the app** on the same page: this computer reads its transcripts over SSH with your own key, read-only, and
+shows its sessions the same way. Details: [docs/SSH-REMOTES.md](docs/SSH-REMOTES.md).
+
 ### Launching
 
 - **Installed app:** run `release/<version>/Claude Visualized Setup <version>.exe` once. It installs per user (no admin), adds **Claude Visualized** to the Start menu, so you can just search for it, and puts a shortcut on the desktop.

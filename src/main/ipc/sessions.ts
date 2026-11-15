@@ -9,11 +9,11 @@ const overviewWatchers = new Set<number>();
 const hookedSenders = new Set<number>();
 
 /** Sessions: list, selection, live state, replay, overview and "open in Claude". */
-export const registerSessionsIpc: IpcRegistrar = ({ manager, updateConfig, peers }) => {
+export const registerSessionsIpc: IpcRegistrar = ({ manager, updateConfig, peers, ssh }) => {
   ipcMain.handle('session:openInClaude', async (_e, id: string): Promise<OpenInClaudeResult> => {
-    // another computer's session: never open anything here (the peer link is read-only)
+    // another computer's session: never open anything here (watching other computers is read-only)
     if (isRemoteId(id)) {
-      const machine = peers.machineOf(id) ?? 'another computer';
+      const machine = ssh.machineOf(id) ?? peers.machineOf(id) ?? 'another computer';
       return { ok: false, machine, error: `This session is running on ${machine}` };
     }
     const url = manager.deepLink(id);

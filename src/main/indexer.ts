@@ -49,9 +49,15 @@ export class SessionIndexer {
   private cache = new Map<string, Cached>();
   readonly desktop = new DesktopSessionIndex();
 
+  /** `root`: a folder laid out like ~/.claude/projects (an SSH remote's mirror); `useDesktop`: join with this machine's desktop-app sessions */
+  constructor(
+    private root?: string,
+    private useDesktop = true,
+  ) {}
+
   async scan(): Promise<SessionSummary[]> {
-    const root = projectsDir();
-    await this.desktop.scan();
+    const root = this.root ?? projectsDir();
+    if (this.useDesktop) await this.desktop.scan();
     let projects: string[];
     try {
       projects = await fs.readdir(root);
@@ -113,7 +119,7 @@ export class SessionIndexer {
    */
   async locate(id: string): Promise<string | null> {
     if (!/^[A-Za-z0-9_-]+$/.test(id)) return null;
-    const root = projectsDir();
+    const root = this.root ?? projectsDir();
     let projects: string[];
     try {
       projects = await fs.readdir(root);

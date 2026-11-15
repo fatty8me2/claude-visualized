@@ -340,3 +340,12 @@
     display: none;
   }
 }
+
+/* SSH remotes (components/SshHosts.tsx) */
+.sshm-host + .sshm-host {
+  margin-top: 2px;
+}
+.sshm-error {
+  margin: 2px 0 6px 18px;
+  font-size: 12px;
+}

@@ -9,6 +9,7 @@ import type { HistoryStatus, HistorySummary, SearchArgs, SearchResult, SummaryAr
 import type { OverviewMsg, ViewMsg } from './sync';
 import type { LocalModelsConfig, LocalModelsView } from './localModels';
 import type { AccountView } from './setupWizard';
+import type { SshAddResult, SshHostView } from './sshRemote';
 import type { SyncChoice, SyncDetectView, SyncEnableResult, SyncStatusView } from './settingsSync';
 
 export interface AppConfigView {
@@ -235,6 +236,11 @@ export interface VisApi {
   /** quit and install the downloaded update */
   installUpdate(): Promise<boolean>;
   onUpdates(cb: (u: UpdateView) => void): () => void;
+  /** SSH remotes: computers watched without the app installed on them */
+  getSshHosts(): Promise<SshHostView[]>;
+  onSshHosts(cb: (hosts: SshHostView[]) => void): () => void;
+  addSshHost(args: { target: string; port?: number | null; label?: string }): Promise<SshAddResult>;
+  removeSshHost(id: string): Promise<SshHostView[]>;
   /** peer link: share with / watch other computers */
   getPeers(): Promise<PeersView>;
   onPeers(cb: (p: PeersView) => void): () => void;

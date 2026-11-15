@@ -28,7 +28,8 @@ import { UsageEstimator, type EstimatorSnapshot } from '@core/usageEstimate';
 import { PeerService, type ShareSource } from './peer/service';
 import { deviceName } from './peer/name';
 import { SettingsSync } from './settingsSync';
-import { testOverride } from './paths';
+import { SSH_MIRROR_DIR, testOverride } from './paths';
+import { SshService } from './ssh/service';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 
@@ -119,6 +120,7 @@ let localMonitor: LocalMonitor;
 let inbox: InboxService;
 let updater: Updater;
 let peers: PeerService;
+let ssh: SshService;
 // ---- 5-hour / weekly usage limits, persisted so they show right after a restart ----
 const usageFile = () => path.join(app.getPath('userData'), 'usage.json');
 let usage: UsageView = emptyUsage();
@@ -682,6 +684,7 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
   saveConfig(config);
   manager.notifyAttention = config.notifyAttention;
   manager.notifyAgentDone = config.notifyAgentDone;
+  ssh?.setNotify(config.notifyAttention, config.notifyAgentDone);
   if (patch.followActive !== undefined) manager.setFollow(config.followActive);
   if (patch.usagePing !== undefined || patch.usagePingMinutes !== undefined) {
     pingUnavailable = false;
@@ -743,6 +746,7 @@ function registerIpc() {
     showInbox,
     updater,
     peers,
+    ssh,
     sync: settingsSync,
     setSharing,
     setPeerPort,
@@ -806,7 +810,21 @@ if (!app.requestSingleInstanceLock()) {
       bindHost: process.env.CLAUDE_VIS_PEER_BIND || undefined,
       discovery: !process.env.CLAUDE_VIS_NO_DISCOVERY,
     });
-    manager.setRemote(peers);
+    manager.addRemote(peers);
+    // computers watched over SSH without the app on them: their transcripts are mirrored into the app data folder
+    ssh = new SshService({
+      root: path.join(app.getPath('userData'), SSH_MIRROR_DIR),
+      hosts: process.env.CLAUDE_VIS_NO_SSH ? [] : config.sshHosts,
+      save: (hosts) => updateConfig({ sshHosts: hosts }),
+      // tests: a local shell stands in for the ssh client (ignored in an installed build)
+      spawn: testOverride('CLAUDE_VIS_SSH_CMD') ? () => ({ command: testOverride('CLAUDE_VIS_SSH_CMD')!, args: [] }) : undefined,
+    });
+    ssh.setNotify(config.notifyAttention, config.notifyAgentDone);
+    manager.addRemote(ssh);
+    const remoteInbox = () => inbox.setRemote([...peers.remoteInbox(), ...ssh.remoteInbox()]);
+    ssh.on('status', (st) => broadcast('ssh', st));
+    ssh.on('inbox', remoteInbox);
+    ssh.on('notify', notify);
     // "Sync my settings": allowlisted preferences through a Google Drive (or any) folder; see src/main/settingsSync.ts
     settingsSync = new SettingsSync({
       stateFile: path.join(app.getPath('userData'), 'sync-state.json'),
@@ -823,7 +841,7 @@ if (!app.requestSingleInstanceLock()) {
       broadcast('peers', st);
       rebuildTrayMenu();
     });
-    peers.on('inbox', () => inbox.setRemote(peers.remoteInbox()));
+    peers.on('inbox', remoteInbox);
     peers.on('usage', broadcastUsage);
     inbox.on('inbox', (snap) => {
       broadcast('inbox', snap);
@@ -896,6 +914,7 @@ if (!app.requestSingleInstanceLock()) {
     localMonitor.start();
     updater.start();
     peers.start();
+    ssh.start();
     settingsSync.start();
     if (config.shareEnabled) void peers.setSharing(true);
     if (!process.env.CLAUDE_VIS_NO_HOOK_SERVER) hookServer.start(config.port);
@@ -914,6 +933,7 @@ if (!app.requestSingleInstanceLock()) {
     updater?.stop();
     hookServer.stop();
     void peers?.stop();
+    ssh?.stop();
     settingsSync?.stop();
   });
   app.on('window-all-closed', () => {

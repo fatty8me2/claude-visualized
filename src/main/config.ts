@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import { DEFAULT_MINI_HOTKEY } from '@core/system';
+import type { SshHostConfig } from '@core/sshRemote';
 import { DEFAULT_LOCAL_CONFIG, normalizeLocalConfig, type LocalModelsConfig } from '@core/localModels';
 
 export interface AppConfig {
@@ -31,6 +32,8 @@ export interface AppConfig {
   /** follow OpenCode sessions (read-only) and where its data lives; empty = auto-detect */
   opencodeEnabled: boolean;
   opencodeDir: string;
+  /** computers watched over SSH, without the app installed on them (docs/SSH-REMOTES.md); never synced between machines */
+  sshHosts: SshHostConfig[];
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -50,6 +53,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   usagePingMinutes: 10,
   opencodeEnabled: true,
   opencodeDir: '',
+  sshHosts: [],
 };
 
 function file() {
@@ -60,7 +64,7 @@ export function loadConfig(): AppConfig {
   try {
     const saved = JSON.parse(fs.readFileSync(file(), 'utf8'));
     delete saved.openInClaudeOnClick; // removed option: sessions only open in Claude via the button
-    return { ...DEFAULT_CONFIG, ...saved, localModels: normalizeLocalConfig(saved.localModels) };
+    return { ...DEFAULT_CONFIG, ...saved, localModels: normalizeLocalConfig(saved.localModels), sshHosts: Array.isArray(saved.sshHosts) ? saved.sshHosts : [] };
   } catch {
     return { ...DEFAULT_CONFIG };
   }

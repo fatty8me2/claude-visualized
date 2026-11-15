@@ -76,6 +76,15 @@ machine being watched.
 
 Design and security notes: [PEER-LINK.md](PEER-LINK.md).
 
+### Only when you add a computer under "Watch a computer without the app" (none by default)
+
+| What | When | What is sent |
+| --- | --- | --- |
+| An SSH connection to the computer you entered, made by your system's `ssh` client with your own key | While that computer is in the list | A file listing request and byte-range reads of its Claude Code transcripts. Nothing is written or changed there. The app never asks for or stores a password or key. |
+
+The recent transcripts of that computer are copied into this computer's app data folder (`ssh-mirror`), and deleted when you remove
+it from the list. Details: [SSH-REMOTES.md](SSH-REMOTES.md).
+
 ### Listening on your computer
 
 - The hook receiver listens on `127.0.0.1:47821` only, so other computers cannot reach it. It accepts the events Claude Code sends and always answers `200` with an empty body. It never blocks or approves a tool call.

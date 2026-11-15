@@ -19,3 +19,9 @@ export const isPackagedApp = (): boolean => !!process.versions.electron && !proc
 
 /** A test-only env override: ignored in an installed build, so nothing can redirect the user's login token elsewhere. */
 export const testOverride = (name: string): string | undefined => (isPackagedApp() ? undefined : process.env[name] || undefined);
+
+/** Folder (in the app data folder) holding the copies of SSH remotes' transcripts, one sub-folder per remote. */
+export const SSH_MIRROR_DIR = 'ssh-mirror';
+
+/** True for a transcript copied from another computer: paths written inside it belong to that computer, not this one. */
+export const isMirrorPath = (file: string): boolean => file.split(/[\\/]/).includes(SSH_MIRROR_DIR);

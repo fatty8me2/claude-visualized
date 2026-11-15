@@ -3,6 +3,7 @@ import type { PeerDeviceView, PeersView } from '@core/api';
 import { useNow, usePeers } from '../hooks';
 import { ago, clock } from '../util';
 import { Icon } from './Icon';
+import { SshHosts } from './SshHosts';
 
 const FAILURE_TEXT: Record<string, string> = {
   'bad-code': 'someone entered a wrong code',
@@ -277,6 +278,7 @@ export function DevicesPage() {
       <div className="devices-page">
         <ShareSection p={p} now={now} />
         <PairSection p={p} />
+        <SshHosts />
         <section className="dev-card" data-testid="paired-section">
           <header>
             <b>Paired computers</b>
