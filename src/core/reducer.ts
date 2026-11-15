@@ -520,6 +520,17 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       const a = ensureAgent(s, e.ref.agentId, ts);
       log(s, ts, a.id, 'attention', e.detail, e.kind);
       if (e.kind !== 'error') finish(a, 'waiting', ts);
+      else if (a.status === 'running') {
+        // an API error (usage limit, sign-in) is the last line of the turn: nothing follows unless the agent is resumed,
+        // and anything newer flips it back to running (touch)
+        for (const [id, p] of Object.entries(s.internal.pending)) if (p.agentId === a.id) delete s.internal.pending[id];
+        a.currentTool = null;
+        if (a.kind === 'main') finish(a, 'idle', ts);
+        else {
+          finish(a, 'error', ts);
+          log(s, ts, a.id, 'done', 'stopped by an error');
+        }
+      }
       break;
     }
     case 'session.end': {
