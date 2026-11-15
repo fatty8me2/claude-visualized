@@ -38,6 +38,8 @@ import { GoalBadge } from './GoalBadge';
 import { seedOf, StatusText } from './cardParts';
 import { useNow, useOverview } from '../hooks';
 import { agentName, ago, clock, displayStatus, famClass } from '../util';
+import { addCounts, workCounts } from '@core/work';
+import { WorkPill } from './WorkPill';
 import { AgentGraph } from './AgentGraph';
 import { AgentTable, EtaLine, InsightRail, LiveFeed, PlanStrip, Roll, SideRail } from './PanelExtras';
 import { usePlanModel } from './PlanRail';
@@ -96,6 +98,7 @@ function Panel(p: PanelProps) {
   const st = main ? displayStatus(main, now) : 'idle';
   const subs = Object.values(v.agents).filter((a) => a.kind === 'agent');
   const running = subs.filter((a) => a.status === 'running').length;
+  const work = workCounts(v.agents, now);
   const plan = v.mode === 'plan';
   const localAgents = Object.values(v.agents).filter((a) => isLocalModel(a.model)).length;
   const tokens = v.totals.in + v.totals.out + v.totals.cacheRead + v.totals.cacheWrite;
@@ -208,7 +211,7 @@ function Panel(p: PanelProps) {
             )}
             <CtxChip agent={main} />
             {main && main.contextTokens > 0 ? ' · ' : ''}
-            agents {running}/{subs.length}
+            <WorkPill c={work} size="sm" />
             {localAgents > 0 && !isLocalModel(main?.model) ? ` · ${localAgents} local` : ''} · <Roll text={formatTokens(tokens)} /> tok
             {v.costUSD != null ? (
               ` · $${v.costUSD.toFixed(2)}`
@@ -570,7 +573,7 @@ export function Overview({ onOpen, onLocal, activeOnly = false }: { onOpen: (id:
       </div>
     );
   const total = views.length;
-  const running = views.reduce((k, v) => k + Object.values(v.agents).filter((a) => a.kind === 'agent' && a.status === 'running').length, 0);
+  const work = views.map((v) => workCounts(v.agents, now)).reduce(addCounts, { working: 0, idle: 0, finished: 0, total: 0 });
   const customized = JSON.stringify(layout) !== JSON.stringify(DEFAULT_OVERVIEW) || showHidden || !!maxActive;
   const sumPx = (a: number[]) => a.reduce((x, y) => x + y, 0);
   return (
@@ -580,9 +583,8 @@ export function Overview({ onOpen, onLocal, activeOnly = false }: { onOpen: (id:
           <Icon name="overview" size="md" />
           All sessions
         </h2>
-        <span className="sub">
-          {total} live · {running} subagent{running === 1 ? '' : 's'} running · click a panel to open it
-        </span>
+        <span className="sub">{total} live · click a panel to open it</span>
+        <WorkPill c={work} noun="agents" />
         <div className="actions">
           <div className="ov-density" role="group" aria-label="Density">
             {DENSITIES.map((d) => (

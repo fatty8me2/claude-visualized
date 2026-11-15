@@ -58,6 +58,7 @@ export function namespaceSummary(s: SessionSummary, host: RemoteHostData): Sessi
     // a session we can no longer see is not shown as live
     live: offline ? false : s.live,
     running: offline ? 0 : s.running,
+    working: offline ? 0 : s.working,
     waiting: offline ? false : s.waiting,
   };
 }

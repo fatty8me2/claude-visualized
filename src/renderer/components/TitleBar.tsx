@@ -25,7 +25,7 @@ export function BrandMark({ size = 16 }: { size?: number }) {
 function LiveBeat({ live, running, waiting }: { live: number; running: number; waiting: boolean }) {
   if (live === 0) return null;
   const state = waiting ? 'wait' : running > 0 ? 'busy' : 'calm';
-  const tip = `${live} live session${live === 1 ? '' : 's'}${running ? `, ${running} subagent${running === 1 ? '' : 's'} running` : ''}${waiting ? ', waiting for you' : ''}`;
+  const tip = `${live} live session${live === 1 ? '' : 's'}${running ? `, ${running} agent${running === 1 ? '' : 's'} working` : ''}${waiting ? ', waiting for you' : ''}`;
   return (
     <span className="tb-live" data-state={state} data-testid="tb-live" title={tip}>
       <i className="tb-beat" aria-hidden />
@@ -38,7 +38,7 @@ function LiveBeat({ live, running, waiting }: { live: number; running: number; w
 export function TitleBar({ page, icon, onSettings, onLocal }: { page: string; icon: IconName; onSettings: () => void; onLocal: () => void }) {
   const sessions = useSessions();
   const liveList = (sessions ?? []).filter((x) => x.live && !x.offlineSince);
-  const running = liveList.reduce((n, x) => n + (x.running ?? 0), 0);
+  const running = liveList.reduce((n, x) => n + (x.working ?? 0), 0);
   const waiting = liveList.some((x) => x.waiting);
   const activity = waiting ? 'wait' : running > 0 ? 'busy' : liveList.length > 0 ? 'live' : 'idle';
   return (

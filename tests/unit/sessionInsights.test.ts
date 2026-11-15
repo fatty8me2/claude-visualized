@@ -41,7 +41,7 @@ describe('sessionInsights: empty and partial views', () => {
     expect(r.burn).toEqual({ tokensPerMin: 0, toolsPerMin: 0, costPerHour: null });
     expect(r.context).toEqual(EMPTY_CONTEXT);
     expect(r.goalMix).toEqual([]);
-    expect(r.agents).toEqual({ running: 0, waiting: 0, done: 0, error: 0, total: 0 });
+    expect(r.agents).toEqual({ running: 0, working: 0, idle: 0, waiting: 0, done: 0, error: 0, total: 0 });
     expect(r.uptimeMs).toBe(0);
     expect(r.busyShare).toBeNull();
   });
@@ -183,7 +183,7 @@ describe('sessionInsights: goal grouping and counts', () => {
       { goal: 'search', running: 1, done: 1, error: 0 },
       { goal: 'plan', running: 0, done: 0, error: 1 },
     ]);
-    expect(r.agents).toEqual({ running: 2, waiting: 1, done: 1, error: 1, total: 5 });
+    expect(r.agents).toEqual({ running: 2, working: 0, idle: 2, waiting: 1, done: 1, error: 1, total: 5 });
   });
 });
 

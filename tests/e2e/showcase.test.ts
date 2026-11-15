@@ -19,6 +19,13 @@ const trace = (m: string) => {
   fs.appendFileSync(path.join(ART, 'showcase-trace.log'), `${new Date().toISOString()} ${m}\n`);
 };
 
+/** subagents still open and in total, from the graph toolbar chip */
+async function graphCount(page: Page): Promise<{ running: number; total: number } | null> {
+  const chip = page.locator('.graph-count');
+  if ((await chip.count()) === 0) return null;
+  return { running: Number(await chip.getAttribute('data-running')), total: Number(await chip.getAttribute('data-total')) };
+}
+
 const describeShowcase = process.env.SHOWCASE === '1' ? describe : describe.skip;
 
 describeShowcase('showcase scenario (fixture data, live)', () => {
@@ -114,14 +121,7 @@ describeShowcase('showcase scenario (fixture data, live)', () => {
     await sleep(500);
     trace('before scenario');
 
-    const runningBefore = await page
-      .locator('.graph-count')
-      .innerText()
-      .catch(() => '');
-    const badgeBefore = (() => {
-      const m = /(\d+)\/(\d+)/.exec(runningBefore);
-      return m ? { running: Number(m[1]), total: Number(m[2]) } : null;
-    })();
+    const badgeBefore = await graphCount(page);
     const nodesBefore = await page.locator('.node[data-agent]').count();
     const chips = await page.locator('.node.collapsed').allInnerTexts();
     const shape = await page.evaluate(() => {
@@ -129,9 +129,9 @@ describeShowcase('showcase scenario (fixture data, live)', () => {
       const w = document.querySelector('.graph-wrap') as HTMLElement | null;
       return { canvasW: r ? Math.round(r.width) : 0, canvasH: r ? Math.round(r.height) : 0, wrapW: w?.clientWidth ?? 0, wrapH: w?.clientHeight ?? 0 };
     });
-    trace(`before: ${nodesBefore} cards, badge "${runningBefore.trim()}", chips ${JSON.stringify(chips)}, canvas ${JSON.stringify(shape)}`);
+    trace(`before: ${nodesBefore} cards, badge ${JSON.stringify(badgeBefore)}, chips ${JSON.stringify(chips)}, canvas ${JSON.stringify(shape)}`);
     console.log(
-      `[showcase] before the scenario: ${nodesBefore} cards, badge "${runningBefore.trim()}", chips ${JSON.stringify(chips)}, canvas ${JSON.stringify(shape)}, shots ${n1} ${n2}`,
+      `[showcase] before the scenario: ${nodesBefore} cards, badge ${JSON.stringify(badgeBefore)}, chips ${JSON.stringify(chips)}, canvas ${JSON.stringify(shape)}, shots ${n1} ${n2}`,
     );
     expect(nodesBefore).toBeGreaterThanOrEqual(10);
 
@@ -259,10 +259,7 @@ describeShowcase('showcase scenario (fixture data, live)', () => {
 
     // the scenario landed: the new agents are on the graph, and the badge counts four more subagents in total
     for (const id of ['r10', 'r11', 'r12', 'n1d']) expect(await page.locator(`[data-agent="${id}"]`).count(), id).toBe(1);
-    const badge = async () => {
-      const m = /(\d+)\/(\d+)/.exec(await page.locator('.graph-count').innerText());
-      return m ? { running: Number(m[1]), total: Number(m[2]) } : null;
-    };
+    const badge = () => graphCount(page);
     const end = await badge();
     console.log(`[showcase] badge before ${JSON.stringify(badgeBefore)}, after ${JSON.stringify(end)}`);
     expect(end!.total - badgeBefore!.total).toBe(4);

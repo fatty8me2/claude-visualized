@@ -4,6 +4,7 @@ import type { HookServerStatusView } from '@core/api';
 import { estimateAgents, estimateTooltip, formatUSD } from '@core/pricing';
 import { useRef } from 'react';
 import { displayStatus } from '../util';
+import { WORK_HELP, workCounts } from '@core/work';
 import '../chrome.css';
 import { tokensByProvider } from '@core/localModels';
 
@@ -23,7 +24,7 @@ function Roll({ v, className }: { v: string; className?: string }) {
   );
 }
 
-/** One lamp per subagent (up to 10): running ones glow and breathe. */
+/** One lamp per agent (up to 10): one glows and breathes for each agent that is working right now. */
 function Lamps({ agents, running }: { agents: number; running: number }) {
   const n = Math.min(agents, 10);
   if (n === 0) return null;
@@ -38,8 +39,8 @@ function Lamps({ agents, running }: { agents: number; running: number }) {
 
 export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView; now: number; hookSrv: HookServerStatusView | null; replaying: boolean }) {
   const main = view.agents[MAIN];
-  const subs = Object.values(view.agents).filter((a) => a.kind === 'agent');
-  const running = subs.filter((a) => a.status === 'running').length;
+  const work = workCounts(view.agents, now);
+  const running = work.working;
   const st = main ? displayStatus(main, now) : 'idle';
   const split = tokensByProvider(view.agents, view.totals);
   const t = split.claude;
@@ -52,9 +53,9 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
       <span>
         mode <b className={plan ? 'mode-plan' : 'mode-build'}>[{plan ? 'plan' : 'build'}]</b>
       </span>
-      <span className={running > 0 ? 'sb-agents live' : 'sb-agents'}>
-        subagents <Lamps agents={subs.length} running={running} />
-        <Roll v={`[${running}/${subs.length}]`} />
+      <span className={running > 0 ? 'sb-agents live' : 'sb-agents'} title={WORK_HELP} data-testid="sb-agents">
+        agents <Lamps agents={work.total} running={running} />
+        <Roll v={`[${running} working${work.idle ? ` · ${work.idle} idle` : ''}]`} />
       </span>
       <span className="sb-grow">
         {modelLabel(main?.model).toLowerCase()}{' '}

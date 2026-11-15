@@ -72,7 +72,7 @@ describe('time estimates', () => {
     const strip = page.getByTestId('prompt-progress');
     await strip.waitFor({ timeout: 10_000 });
     await vi.waitFor(async () => expect(await page.getByTestId('pp-phase').textContent()).toContain('step 3 of 4'), { timeout: 10_000 });
-    expect(await page.getByTestId('pp-phase').textContent()).toContain('2 agents running');
+    expect(await page.getByTestId('pp-phase').textContent()).toContain('3 working');
     expect(await page.getByTestId('pp-read').textContent()).toMatch(/~\d+ min/);
     expect(await page.getByTestId('pp-line').textContent()).toMatch(/ready for updates ≈/);
     expect(await page.getByTestId('pp-agent').count()).toBe(3);

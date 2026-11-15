@@ -103,11 +103,17 @@ export const InsightRail = memo(function InsightRail({ v, tick, side = false }: 
       <div className="cell">
         <div className="k">subagents</div>
         <div className="counts">
-          <span className="run">
+          <span className={c.working ? 'ok' : 'faint'} title="Subagents doing something right now">
             <b>
-              <Roll text={String(c.running)} />
+              <Roll text={String(c.working)} />
             </b>{' '}
-            running
+            working
+          </span>
+          <span className={c.idle ? 'warn' : 'faint'} title="Subagents still open but doing nothing themselves: waiting on their own subagents, or quiet">
+            <b>
+              <Roll text={String(c.idle)} />
+            </b>{' '}
+            idle
           </span>
           <span className={c.waiting ? 'warn' : 'faint'}>
             <b>
@@ -115,7 +121,7 @@ export const InsightRail = memo(function InsightRail({ v, tick, side = false }: 
             </b>{' '}
             waiting
           </span>
-          <span className="ok">
+          <span className={c.done ? 'run' : 'faint'}>
             <b>
               <Roll text={String(c.done)} />
             </b>{' '}

@@ -20,6 +20,7 @@
 // - Subagent counts and goal groups use kind 'agent' only (main and workflow nodes are excluded);
 //   'waiting' is counted as running in goalMix.
 
+import { workingIds } from './work';
 import type { AgentNode, LogEntry, SessionView } from './state';
 import { MAIN } from './state';
 import { agentGoal } from './insight';
@@ -42,7 +43,8 @@ export interface SessionInsights {
   /** subagents grouped by goal (from goal.ts), with counts by state */
   goalMix: { goal: string; running: number; done: number; error: number }[];
   /** agent counts */
-  agents: { running: number; waiting: number; done: number; error: number; total: number };
+  /** `running` is the status; `working` / `idle` split those into doing something right now or not (core/work.ts) */
+  agents: { running: number; working: number; idle: number; waiting: number; done: number; error: number; total: number };
   /** wall-clock since the session's first activity, and share of that time with at least one agent running (0..1) */
   uptimeMs: number;
   busyShare: number | null;
@@ -188,7 +190,8 @@ export function sessionInsights(view: SessionView, now: number): SessionInsights
   }
 
   // subagents: counts by state, and by goal
-  const counts = { running: 0, waiting: 0, done: 0, error: 0, total: 0 };
+  const counts = { running: 0, working: 0, idle: 0, waiting: 0, done: 0, error: 0, total: 0 };
+  const busyNow = workingIds(agentMap, now);
   const byGoal = new Map<string, { running: number; done: number; error: number }>();
   for (const a of agents) {
     if (a.kind !== 'agent') continue;
@@ -199,8 +202,11 @@ export function sessionInsights(view: SessionView, now: number): SessionInsights
       row = { running: 0, done: 0, error: 0 };
       byGoal.set(g, row);
     }
-    if (a.status === 'running') counts.running++;
-    else if (a.status === 'waiting') counts.waiting++;
+    if (a.status === 'running') {
+      counts.running++;
+      if (busyNow.has(a.id)) counts.working++;
+      else counts.idle++;
+    } else if (a.status === 'waiting') counts.waiting++;
     else if (a.status === 'done') counts.done++;
     else if (a.status === 'error') counts.error++;
     // waiting agents are still live, so goalMix folds them into running
@@ -228,7 +234,7 @@ export function sessionInsights(view: SessionView, now: number): SessionInsights
     for (const a of agents) {
       const s0 = num(a.startedAt);
       if (s0 <= 0) continue;
-      const end0 = a.status === 'running' ? now : (num(a.endedAt) || num(a.lastActivity) || s0);
+      const end0 = a.status === 'running' ? now : num(a.endedAt) || num(a.lastActivity) || s0;
       const s = Math.max(s0, start);
       const e = Math.min(Math.max(end0, s0), now);
       if (e > s) spans.push([s, e]);

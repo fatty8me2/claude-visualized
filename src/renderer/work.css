@@ -1,0 +1,111 @@
+/* Working / idle agent counts (components/WorkPill.tsx, core/work.ts). Prefix: wk- */
+.wk-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  padding: 2px 9px 2px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ok) 55%, var(--line-2));
+  background: color-mix(in srgb, var(--ok) 13%, var(--bg-2));
+  color: var(--text-1);
+  white-space: nowrap;
+  box-shadow: 0 0 14px -4px color-mix(in srgb, var(--ok) 70%, transparent);
+}
+.wk-pill .wk-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
+  animation: wk-beat 1.4s ease-in-out infinite;
+}
+.wk-pill .wk-n {
+  color: var(--ok);
+  font-size: 1.25em;
+  font-weight: 700;
+  line-height: 1;
+}
+.wk-pill .wk-w {
+  color: var(--ok);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.wk-pill .wk-idle {
+  margin-left: 2px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line-2);
+  color: var(--text-2);
+  opacity: 0.85;
+}
+.wk-pill .wk-idle b {
+  color: var(--warn);
+  font-weight: 700;
+}
+/* nothing is working: flat and grey, so a lit pill always means real activity */
+.wk-pill.wk-off {
+  border-color: var(--line-2);
+  background: var(--bg-2);
+  box-shadow: none;
+}
+.wk-pill.wk-off .wk-dot {
+  background: var(--text-2);
+  box-shadow: none;
+  animation: none;
+  opacity: 0.5;
+}
+.wk-pill.wk-off .wk-n,
+.wk-pill.wk-off .wk-w {
+  color: var(--text-2);
+}
+.wk-pill.wk-lg {
+  font-size: var(--fs-sm);
+  padding: 3px 12px 3px 9px;
+}
+.wk-pill.wk-lg .wk-n {
+  font-size: 1.45em;
+}
+.wk-pill.wk-sm {
+  font-size: var(--fs-2xs);
+  padding: 0 6px 0 5px;
+  gap: 4px;
+  box-shadow: none;
+}
+.wk-pill.wk-sm .wk-dot {
+  width: 6px;
+  height: 6px;
+}
+@keyframes wk-beat {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wk-pill .wk-dot {
+    animation: none;
+  }
+}
+
+/* an agent card that is open but not doing anything itself (waiting on subagents, quiet): toned down next to the working ones */
+.node.wk-resting {
+  filter: saturate(0.5) brightness(0.88);
+}
+.node.wk-resting.sel,
+.node.wk-resting:hover {
+  filter: none;
+}
+
+/* sidebar badge: agents working in that session */
+.badge.run.wk-none {
+  --tone: var(--text-2);
+  opacity: 0.7;
+}

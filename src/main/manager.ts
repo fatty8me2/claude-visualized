@@ -6,6 +6,7 @@ import { normalizeHook } from '@core/normalize';
 import { MAIN, toView, type AgentStatus, type SessionSummary, type SessionView } from '@core/state';
 import { OverviewEncoder, ViewEncoder, type OverviewMsg, type ViewMsg } from '@core/sync';
 import { isRemoteId } from '@core/remote';
+import { workCounts } from '@core/work';
 import { SessionIndexer, LIVE_MS } from './indexer';
 import { SessionWatcher, type BacklogLoader } from './watcher';
 import { OpenCodeSource, OpenCodeWatcher, type OpenCodeOptions } from './opencode';
@@ -381,6 +382,7 @@ export class SessionManager extends EventEmitter {
       if (w && w.primed) {
         const agents = Object.values(w.state.agents);
         s.running = agents.filter((a) => a.id !== MAIN && a.status === 'running').length;
+        s.working = workCounts(w.state.agents, Date.now()).working;
         s.mode = w.state.mode;
         s.waiting = w.state.agents[MAIN]?.status === 'waiting';
         if (w.state.title && w.state.titleKind !== 'prompt') s.title = w.state.title;

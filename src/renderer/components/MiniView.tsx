@@ -8,6 +8,8 @@ import { CtxChip } from './ContextMeter';
 import { UsageMeters } from './UsageMeters';
 import { isLocalModel, LocalChip, LocalTag } from './LocalBits';
 import { agentName, clock, displayStatus, famClass } from '../util';
+import { workCounts } from '@core/work';
+import { WorkPill } from './WorkPill';
 import { Icon } from './Icon';
 import { EtaLine } from './PanelExtras';
 import { usePlanModel } from './PlanRail';
@@ -72,6 +74,7 @@ export function MiniView() {
           {eta && <EtaLine prompt={eta} now={tick} mini />}
           {(running.length > 0 || recentDone.length > 0) && (
             <div className="mini-chips">
+              <WorkPill c={workCounts(view.agents, now)} size="sm" />
               {running.map((a) => {
                 const ins = agentInsight(view.agents, a, now);
                 return (

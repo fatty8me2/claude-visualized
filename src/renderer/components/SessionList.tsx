@@ -111,14 +111,18 @@ function Row({
             <i />
           </span>
         )}
-        {!!s.running && (
-          <span className="badge run" title={`${s.running} subagent${s.running === 1 ? '' : 's'} running`}>
+        {(!!s.working || !!s.running) && (
+          <span
+            className={`badge run${s.working ? '' : ' wk-none'}`}
+            data-testid="row-working"
+            title={`${s.working ?? 0} agent${s.working === 1 ? '' : 's'} working right now${s.running ? ` · ${s.running} subagent${s.running === 1 ? '' : 's'} still open` : ''}`}
+          >
             <span className="pips" aria-hidden>
-              {Array.from({ length: Math.min(s.running, 4) }, (_, i) => (
+              {Array.from({ length: Math.min(s.working ?? 0, 4) }, (_, i) => (
                 <i key={i} style={{ animationDelay: `${i * 140}ms` }} />
               ))}
             </span>
-            {s.running}
+            {s.working ?? 0}
           </span>
         )}
       </span>

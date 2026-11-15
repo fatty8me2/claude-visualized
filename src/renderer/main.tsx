@@ -17,6 +17,7 @@ import './insights.css';
 import './graphFlow.css';
 import './graphCamera.css';
 import './promptProgress.css';
+import './work.css';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';

@@ -129,7 +129,7 @@ describe('adaptive overview: two live sessions on 1920x1080', () => {
     }
     // the rail shows the forecast line and agent counts
     const rail = page.locator('.ov-panel').first().locator('[data-testid="px-rail"]');
-    expect(await rail.innerText()).toMatch(/running/i);
+    expect(await rail.innerText()).toMatch(/working/i);
     expect(await page.locator('.ov-panel').first().getByTestId('px-compact').innerText()).toMatch(/auto-compact|forecast/);
     // the feed has lines and the table lists the main agent
     expect(await page.locator('.ov-panel').first().locator('.px-feed .ln').count()).toBeGreaterThan(3);

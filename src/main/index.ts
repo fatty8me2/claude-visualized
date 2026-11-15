@@ -562,12 +562,12 @@ function usageText(): string {
 function updateTrayTooltip() {
   if (!tray) return;
   const sessions = manager.getSummaries().filter((s) => s.live);
-  const running = sessions.reduce((n, s) => n + (s.running ?? 0), 0);
+  const running = sessions.reduce((n, s) => n + (s.working ?? 0), 0);
   const u = usageText();
   const need = inbox?.count ?? 0;
   const sharing = peers?.isSharing ? ' · sharing with your other computers' : '';
   tray.setToolTip(
-    `Claude Visualized — ${sessions.length} live session${sessions.length === 1 ? '' : 's'}${running ? `, ${running} subagents running` : ''}${need ? `, ${need} need you` : ''}${sharing}${
+    `Claude Visualized — ${sessions.length} live session${sessions.length === 1 ? '' : 's'}${running ? `, ${running} agent${running === 1 ? '' : 's'} working` : ''}${need ? `, ${need} need you` : ''}${sharing}${
       u
         ? `
 ${u}`
@@ -596,7 +596,7 @@ function rebuildTrayMenu() {
     .slice(0, 8);
   // rebuilding an open native menu makes it flicker; only rebuild when something visible changed
   const sig = JSON.stringify([
-    sessions.map((s) => [s.id, s.title, s.running, s.waiting]),
+    sessions.map((s) => [s.id, s.title, s.working, s.waiting]),
     !!miniWin,
     manager.followActive,
     config.launchAtLogin,
@@ -616,7 +616,7 @@ function rebuildTrayMenu() {
     ...(need > 0 ? [{ label: `⚠ ${need} need you`, click: showInbox }, { type: 'separator' as const }] : []),
     { label: `${sessions.length} live session${sessions.length === 1 ? '' : 's'}`, enabled: false },
     ...sessions.map((s) => ({
-      label: `${s.waiting ? '⚠ ' : s.running ? '● ' : '○ '}${(s.title ?? s.project).slice(0, 48)}${s.running ? `  (${s.running} running)` : ''}`,
+      label: `${s.waiting ? '⚠ ' : s.working ? '● ' : '○ '}${(s.title ?? s.project).slice(0, 48)}${s.working ? `  (${s.working} working)` : ''}`,
       click: () => {
         manager.select(s.id);
         showMain();

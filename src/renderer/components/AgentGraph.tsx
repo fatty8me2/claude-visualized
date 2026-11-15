@@ -15,6 +15,8 @@ import { GraphEdges, type EdgeMeta } from './GraphEdges';
 import { isLocalModel, LocalLinkLine } from './LocalBits';
 import { createClock, useClockKey, type Clock } from '../clockStore';
 import { agentName, displayStatus, famClass, type DisplayStatus } from '../util';
+import { isWorking, workCounts } from '@core/work';
+import { WorkPill } from './WorkPill';
 import { MotionTracker, playMoves, trackTilt } from '../cardFx';
 import { Fade, FxLayers, StatusLabel, seedOf } from './cardParts';
 import { Icon } from './Icon';
@@ -142,14 +144,35 @@ interface KidStats {
 /** everything on a card that depends on the clock; compact cards show less, so they re-render less */
 function cardTime(a: AgentNode, now: number, kids: KidStats, compact: boolean, priors: EtaPriors) {
   const st = displayStatus(a, now);
+  // open but not doing anything itself (waiting on its subagents, or quiet): the card is toned down
+  const resting = (st === 'running' || st === 'quiet') && a.kind !== 'workflow' && !isWorking(a, now, kids.running);
   const act = describeActivity(a, { now, runningChildren: kids.running, totalChildren: kids.total });
   const dur = act.since != null && now - act.since >= 1000 ? formatDuration(now - act.since) : '';
-  if (compact) return { st, elapsedText: '', act, dur, spark: [] as number[], bar: null as BarEst | null, key: `${st}|${act.kind}|${act.phrase}|${dur}` };
+  if (compact)
+    return {
+      st,
+      resting,
+      elapsedText: '',
+      act,
+      dur,
+      spark: [] as number[],
+      bar: null as BarEst | null,
+      key: `${st}|${resting}|${act.kind}|${act.phrase}|${dur}`,
+    };
   const elapsed = (a.endedAt ?? (st === 'running' || st === 'waiting' ? now : a.lastActivity)) - a.startedAt;
   const elapsedText = formatDuration(elapsed);
   const spark = sparkCounts(a.activity, now);
   const { est, key: etaKey } = agentBarEst(a, now, priors);
-  return { st, elapsedText, act, dur, spark, bar: est, key: `${st}|${elapsedText}|${act.kind}|${act.line}|${dur}|${spark.join(',')}|${etaKey}` };
+  return {
+    st,
+    resting,
+    elapsedText,
+    act,
+    dur,
+    spark,
+    bar: est,
+    key: `${st}|${resting}|${elapsedText}|${act.kind}|${act.line}|${dur}|${spark.join(',')}|${etaKey}`,
+  };
 }
 
 /** A subagent's headline is its task; seventeen cards all titled "general-purpose" say nothing. */
@@ -206,7 +229,7 @@ const NodeCard = memo(function NodeCard({
 }) {
   const kids = { total: kidsTotal, running: kidsRunning };
   const now = useClockKey(clock, (n) => cardTime(a, n, kids, compact, priors).key);
-  const { st, elapsedText, act, dur, spark, bar } = cardTime(a, now, kids, compact, priors);
+  const { st, resting, elapsedText, act, dur, spark, bar } = cardTime(a, now, kids, compact, priors);
   const isMain = a.kind === 'main';
   const model = a.model ? modelLabel(a.model) : a.kind === 'workflow' ? 'workflow' : '—';
   const plan = mode === 'plan';
@@ -229,7 +252,7 @@ const NodeCard = memo(function NodeCard({
       <Icon name="fold" size="xs" />
     </button>
   ) : null;
-  const cls = `node ${famClass(a.model)} ${st === 'idle' && !isMain ? 'idle-agent' : st} ${isMain ? 'main' : ''} ${selected ? 'sel' : ''}${hl ? ' hl' : ''}${compact ? ' compact' : ''}${st === 'running' && a.currentTool ? ' tool' : ''}`;
+  const cls = `node ${famClass(a.model)} ${st === 'idle' && !isMain ? 'idle-agent' : st} ${isMain ? 'main' : ''} ${selected ? 'sel' : ''}${hl ? ' hl' : ''}${compact ? ' compact' : ''}${st === 'running' && a.currentTool ? ' tool' : ''}${resting ? ' wk-resting' : ''}`;
   const style = { left: x, top: y, width: w, height: h, ['--seed' as string]: seedOf(a.id) };
 
   if (compact) {
@@ -720,8 +743,14 @@ export function AgentGraph({
               fold all
             </button>
           )}
-          <span className="badge graph-count" title={`${running} running of ${total} subagents`}>
-            subagents {running}/{total}
+          <WorkPill c={workCounts(view.agents, now)} size="lg" />
+          <span
+            className="badge graph-count"
+            data-running={running}
+            data-total={total}
+            title={`${total} subagent${total === 1 ? '' : 's'} in this session, finished ones included`}
+          >
+            {total} subagent{total === 1 ? '' : 's'}
           </span>
           {extraTools}
         </div>

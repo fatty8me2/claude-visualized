@@ -8,6 +8,7 @@ import type { AgentMark, FinishLine, PromptEta, StageEta } from '@core/eta';
 import { MAIN, type SessionView } from '@core/state';
 import { agentBasis, agentLeftLabel, fmtClock, fmtLeft, fmtSpan } from '../eta';
 import { famClass } from '../util';
+import { workCounts, workText, type WorkCounts } from '@core/work';
 import { Icon } from './Icon';
 
 const LINE: Record<Exclude<FinishLine, 'turn'>, { label: string; title: string }> = {
@@ -26,14 +27,14 @@ function agentTitle(view: SessionView, id: string): string {
   return firstLine(a.description, 60) || a.agentType || 'agent';
 }
 
-function phaseText(eta: PromptEta, stale: boolean): string {
+function phaseText(eta: PromptEta, stale: boolean, work: WorkCounts): string {
   if (stale) return 'stopped';
   if (eta.state === 'done') return `done · took ${fmtSpan((eta.finishAt ?? eta.startedAt) - eta.startedAt)}`;
   if (eta.state === 'waiting') return 'waiting for you';
   const bits: string[] = [];
   if (eta.steps) bits.push(`step ${Math.min(eta.steps.total, eta.steps.done + Math.max(1, eta.steps.active))} of ${eta.steps.total}`);
-  const running = eta.agents.filter((m) => m.state === 'running').length;
-  if (running) bits.push(`${running} agent${running === 1 ? '' : 's'} running`);
+  // agents doing something right now, not every agent that is still open (core/work.ts)
+  if (work.working || work.idle) bits.push(workText(work));
   const shipping = eta.stages.find((s) => s.key !== 'work' && s.plan === 'turn' && s.state === 'active');
   if (shipping) bits.push(shipping.note ? `${shipping.key}: ${shipping.note}` : `${shipping.key} under way`);
   return bits.join(' · ') || 'working';
@@ -137,7 +138,7 @@ export function PromptProgress({ view, eta, now, stale, onSelectAgent }: PromptP
       <div className="pp-head">
         <span className="pp-eyebrow eyebrow">prompt</span>
         <span className="pp-phase" data-testid="pp-phase">
-          {phaseText(eta, stale)}
+          {phaseText(eta, stale, workCounts(view.agents, now))}
         </span>
         <span className="pp-read" data-testid="pp-read">
           {over ? (

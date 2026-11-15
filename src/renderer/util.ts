@@ -1,5 +1,6 @@
 import { modelFamily } from '@core/summarize';
 import type { AgentNode } from '@core/state';
+import { quietAfterMs } from '@core/work';
 
 export type DisplayStatus = 'running' | 'quiet' | 'waiting' | 'idle' | 'done' | 'error';
 
@@ -7,8 +8,7 @@ export type DisplayStatus = 'running' | 'quiet' | 'waiting' | 'idle' | 'done' | 
 export function displayStatus(a: AgentNode, now: number): DisplayStatus {
   if (a.status !== 'running') return a.status;
   if (a.currentTool) return 'running';
-  const quietAfter = a.kind === 'main' ? 90_000 : 180_000;
-  return now - a.lastActivity > quietAfter ? 'quiet' : 'running';
+  return now - a.lastActivity > quietAfterMs(a.kind) ? 'quiet' : 'running';
 }
 
 /** the status word shown next to its icon (see StatusText in components/cardParts.tsx) */

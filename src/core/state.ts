@@ -292,7 +292,10 @@ export interface SessionSummary {
   source?: string;
   /** latest git branch seen in the transcript */
   gitBranch?: string | null;
+  /** subagents whose status is still running (some may be idle: see `working`) */
   running?: number;
+  /** agents doing something right now, the main agent included (core/work.ts) */
+  working?: number;
   mode?: string;
   waiting?: boolean;
   /** the Claude desktop app's own id (local_…) when it knows this session */
