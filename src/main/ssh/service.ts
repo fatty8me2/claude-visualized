@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { deriveInbox, type InboxItem } from '@core/inbox';
 import { mergeSummaries, namespaceView, parseRemoteId, remoteId, type RemoteHostData, type RemoteInbox } from '@core/remote';
-import { parseSshTarget, sshArgs, type SshAddResult, type SshHostConfig, type SshHostView } from '@core/sshRemote';
+import { parseSshTarget, sshArgs, type RemoteShell, type SshAddResult, type SshHostConfig, type SshHostView } from '@core/sshRemote';
 import type { SessionSummary, SessionView } from '@core/state';
 import { SessionManager, type NotifyRequest } from '../manager';
 import type { BacklogLoader } from '../watcher';
@@ -23,7 +23,7 @@ export interface SshServiceOptions {
   /** persist the list after an add, a remove or a learned hostname */
   save: (hosts: SshHostConfig[]) => void;
   /** how to reach a remote (tests: a local shell) */
-  spawn?: (h: SshHostConfig) => SpawnSpec;
+  spawn?: (h: SshHostConfig, shell: RemoteShell) => SpawnSpec;
   mirror?: Pick<MirrorOptions, 'quickMs' | 'fullMs' | 'chunk' | 'retryMs'>;
   tickMs?: number;
   /** tests: read backlogs on the calling thread */
@@ -109,8 +109,8 @@ export class SshService extends EventEmitter {
 
   private attach(cfg: SshHostConfig): Host {
     const dir = path.join(this.opts.root, cfg.id);
-    const spec = this.opts.spawn?.(cfg) ?? { command: sshCommand(), args: sshArgs(cfg) };
-    const mirror = new HostMirror({ dir, spec, target: cfg.target, ...this.opts.mirror });
+    const spec = (shell: RemoteShell): SpawnSpec => this.opts.spawn?.(cfg, shell) ?? { command: sshCommand(), args: sshArgs(cfg, shell), shell };
+    const mirror = new HostMirror({ dir, spec, shell: cfg.shell, target: cfg.target, ...this.opts.mirror });
     const mgr = new SessionManager({ projectsRoot: mirror.projectsDir, passive: true, backlogLoader: this.opts.backlogLoader });
     mgr.followActive = false;
     mgr.notifyAttention = this.attention;
@@ -122,6 +122,10 @@ export class SshService extends EventEmitter {
       this.emit('sessions');
       this.emit('overview');
       this.emit('inbox');
+    });
+    mirror.on('shell', (shell: RemoteShell) => {
+      h.cfg = { ...h.cfg, shell };
+      this.save();
     });
     mgr.on('sessions', () => this.emit('sessions'));
     mgr.on('changed', () => (h.dirty = true));

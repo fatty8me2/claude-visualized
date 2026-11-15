@@ -2,12 +2,14 @@
 // Requests run one at a time. No Electron imports: tests drive it with a local `sh` instead of ssh.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { FULL_DAYS, parseListLine, QUICK_MINUTES, REMOTE_SCRIPT, safeRel, type RemoteFile } from '@core/sshRemote';
+import { listCommand, parseListLine, remoteScript, safeRel, type RemoteFile, type RemoteShell } from '@core/sshRemote';
 
 export interface SpawnSpec {
   command: string;
   args: string[];
   env?: NodeJS.ProcessEnv;
+  /** what the command runs on the other side (default 'sh') */
+  shell?: RemoteShell;
 }
 
 export interface ListResult {
@@ -59,16 +61,12 @@ export class SshConn extends EventEmitter {
         this.stderr = (this.stderr + d.toString('utf8')).slice(-STDERR_KEEP);
       });
       proc.stdin.on('error', () => {});
-      proc.stdin.write(REMOTE_SCRIPT);
+      proc.stdin.write(remoteScript(this.spec.shell ?? 'sh'));
     });
   }
 
-  /** 'full': every transcript file touched in the last FULL_DAYS days; 'quick': only the last few minutes. */
   list(kind: 'full' | 'quick'): Promise<ListResult> {
-    return this.request(
-      (resolve, reject) => ({ kind: 'list', files: [], resolve, reject }),
-      kind === 'full' ? `cv_list -mtime -${FULL_DAYS}` : `cv_list -mmin -${QUICK_MINUTES}`,
-    );
+    return this.request((resolve, reject) => ({ kind: 'list', files: [], resolve, reject }), listCommand(this.spec.shell ?? 'sh', kind));
   }
 
   read(rel: string, offset: number, max: number): Promise<ReadResult> {

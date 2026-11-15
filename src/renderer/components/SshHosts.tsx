@@ -74,9 +74,9 @@ export function SshHosts() {
         <b>Watch a computer without the app</b>
       </header>
       <p className="note">
-        For a Mac or Linux computer you can already reach with <code>ssh</code>. Nothing is installed there: this computer logs in with your own SSH key, reads
-        its Claude Code transcripts and keeps a copy of the recent ones in its app data folder. It is read-only, and it never asks for or stores a password.
-        Usage meters stay per computer.
+        For a Mac, Linux or Windows computer you can already reach with <code>ssh</code>. Nothing is installed there: this computer logs in with your own SSH
+        key, reads its Claude Code transcripts and keeps a copy of the recent ones in its app data folder. It is read-only, and it never asks for or stores a
+        password. Usage meters stay per computer.
       </p>
       {hosts && hosts.length > 0 && hosts.map((h) => <HostRow key={h.id} h={h} />)}
       <div className="row pair-form">
@@ -100,8 +100,8 @@ export function SshHosts() {
         </div>
       )}
       <p className="note">
-        On a Mac, turn on System Settings → General → Sharing → Remote Login. If this computer has never connected to it, run <code>ssh user@host</code> once in
-        a terminal first and accept its key.
+        On a Mac, turn on System Settings → General → Sharing → Remote Login; on Windows, install and start the OpenSSH Server. If this computer has never
+        connected to it, run <code>ssh user@host</code> once in a terminal first and accept its key.
       </p>
     </section>
   );

@@ -231,11 +231,22 @@ const pingCfg = (): Partial<SchedulerConfig> => {
   // at most one ping per interval, whatever asks (a click, a wake); none while no session is active; no burst-triggered extra read
   return { activeMs: iv, idleMs: iv, minGapMs: iv, manualGapMs: iv, debounceMs: 1e12 };
 };
-const pingScheduler: UsageScheduler = new UsageScheduler({ poll: pollPingOnce, onChange: hintOnChange(), canRun: () => pingScheduler.status().active }, schedCfg({ debounceMs: 1e12 }));
+const pingScheduler: UsageScheduler = new UsageScheduler(
+  { poll: pollPingOnce, onChange: hintOnChange(), canRun: () => pingScheduler.status().active },
+  schedCfg({ debounceMs: 1e12 }),
+);
 /** ping on: the usage endpoint is a rare secondary for the per-model weekly windows (every 30 min, backing off hard on a 429) */
 const modelScheduler = new UsageScheduler(
   { poll: pollUsageOnce },
-  schedCfg({ activeMs: 1_800_000, idleMs: 1_800_000, activeForMs: 1_800_000, debounceMs: 1_800_000, minGapMs: 60_000, rateLimitBaseMs: 3_600_000, rateLimitMaxMs: 14_400_000 }),
+  schedCfg({
+    activeMs: 1_800_000,
+    idleMs: 1_800_000,
+    activeForMs: 1_800_000,
+    debounceMs: 1_800_000,
+    minGapMs: 60_000,
+    rateLimitBaseMs: 3_600_000,
+    rateLimitMaxMs: 14_400_000,
+  }),
 );
 
 let pingUnavailable = false;
@@ -258,7 +269,9 @@ const eachScheduler = (f: (s: UsageScheduler) => void) => [usageScheduler, pingS
 
 /** Click on the meters: read now if allowed, otherwise say when it will be. */
 function pollUsageApi() {
-  return process.env.CLAUDE_VIS_NO_USAGE_API ? Promise.resolve({ ran: false, nextAllowedAt: null }) : (pingActive() && pingScheduler.status().active ? pingScheduler : usageScheduler).request();
+  return process.env.CLAUDE_VIS_NO_USAGE_API
+    ? Promise.resolve({ ran: false, nextAllowedAt: null })
+    : (pingActive() && pingScheduler.status().active ? pingScheduler : usageScheduler).request();
 }
 
 function setUsage(next: UsageView) {
@@ -280,7 +293,8 @@ function shownUsage(): UsageView {
   // the estimator learns from every authoritative view (incl. paired machines' readings) and extends it with the tokens seen since
   usageEstimator.observe(merged);
   const est = usageEstimator.estimate(Date.now());
-  const shownApi = merged.api && merged.api.state !== 'ok' && pingActive() && pingFresh() ? { ...merged.api, state: 'ok' as const, message: 'ping' } : merged.api;
+  const shownApi =
+    merged.api && merged.api.state !== 'ok' && pingActive() && pingFresh() ? { ...merged.api, state: 'ok' as const, message: 'ping' } : merged.api;
   const withHint = schedulerHint && shownApi ? { ...merged, api: { ...shownApi, ...schedulerHint } } : shownApi ? { ...merged, api: shownApi } : merged;
   return { ...withHint, estimate: est };
 }
@@ -817,7 +831,7 @@ if (!app.requestSingleInstanceLock()) {
       hosts: process.env.CLAUDE_VIS_NO_SSH ? [] : config.sshHosts,
       save: (hosts) => updateConfig({ sshHosts: hosts }),
       // tests: a local shell stands in for the ssh client (ignored in an installed build)
-      spawn: testOverride('CLAUDE_VIS_SSH_CMD') ? () => ({ command: testOverride('CLAUDE_VIS_SSH_CMD')!, args: [] }) : undefined,
+      spawn: testOverride('CLAUDE_VIS_SSH_CMD') ? (_h, shell) => ({ command: testOverride('CLAUDE_VIS_SSH_CMD')!, args: [], shell }) : undefined,
     });
     ssh.setNotify(config.notifyAttention, config.notifyAgentDone);
     manager.addRemote(ssh);

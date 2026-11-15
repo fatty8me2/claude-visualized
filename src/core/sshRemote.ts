@@ -13,7 +13,11 @@ export interface SshHostConfig {
   label?: string;
   /** the other computer's own hostname, learned on the first connection */
   hostname?: string;
+  /** what runs on the other side: 'sh' (macOS, Linux; tried first) or 'powershell' (Windows), learned on the first connection */
+  shell?: RemoteShell;
 }
+
+export type RemoteShell = 'sh' | 'powershell';
 
 export type SshHostState = 'connecting' | 'syncing' | 'online' | 'offline';
 
@@ -48,7 +52,7 @@ export function parseSshTarget(input: string, port?: number | null): { ok: true;
   return { ok: true, target, port };
 }
 
-export function sshArgs(h: Pick<SshHostConfig, 'target' | 'port'>): string[] {
+export function sshArgs(h: Pick<SshHostConfig, 'target' | 'port'>, shell: RemoteShell = 'sh'): string[] {
   return [
     '-T',
     // never prompt: a password or an unknown host key fails with a message instead of hanging
@@ -62,7 +66,7 @@ export function sshArgs(h: Pick<SshHostConfig, 'target' | 'port'>): string[] {
     'ServerAliveCountMax=3',
     ...(h.port ? ['-p', String(h.port)] : []),
     h.target,
-    'sh',
+    ...(shell === 'powershell' ? ['powershell', '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '-'] : ['sh']),
   ];
 }
 
@@ -100,6 +104,37 @@ export const REMOTE_SCRIPT =
     '}',
     'echo "CVREADY $(hostname 2>/dev/null || uname -n)"',
   ].join('\n') + '\n';
+
+/**
+ * The same two requests for a Windows remote, sent to `powershell -Command -` on stdin (Windows PowerShell 5.1 or newer).
+ * Every statement is one line: in this mode PowerShell runs a line as soon as it is complete. Output goes through the raw stdout
+ * stream, so file bytes arrive untouched.
+ *  cv_list <minutes>              -> as above, for files changed in the last <minutes>
+ *  cv_read <path> <offset> <max>  -> as above
+ */
+export const REMOTE_SCRIPT_PS =
+  [
+    "$ErrorActionPreference = 'SilentlyContinue'; $ProgressPreference = 'SilentlyContinue'",
+    '$cv_o = [Console]::OpenStandardOutput()',
+    "$cv_root = if ($env:CLAUDE_CONFIG_DIR) { Join-Path $env:CLAUDE_CONFIG_DIR 'projects' } else { Join-Path $env:USERPROFILE '.claude\\projects' }",
+    '$cv_epoch = New-Object DateTime 1970, 1, 1, 0, 0, 0, ([DateTimeKind]::Utc)',
+    'function cv_w([string]$s) { $b = [Text.Encoding]::UTF8.GetBytes($s + "`n"); $cv_o.Write($b, 0, $b.Length); $cv_o.Flush() }',
+    "function cv_list([double]$minutes) { $sb = New-Object Text.StringBuilder; $now = [DateTime]::UtcNow; if ([IO.Directory]::Exists($cv_root)) { $full = [IO.Path]::GetFullPath($cv_root).TrimEnd([char]92); $cut = $now.AddMinutes(-$minutes); try { foreach ($p in [IO.Directory]::EnumerateFiles($full, '*.json*', [IO.SearchOption]::AllDirectories)) { try { $f = New-Object IO.FileInfo $p; if (($f.Extension -eq '.jsonl' -or $f.Extension -eq '.json') -and $f.LastWriteTimeUtc -gt $cut) { [void]$sb.Append([int64]($f.LastWriteTimeUtc - $cv_epoch).TotalSeconds).Append(' ').Append($f.Length).Append(' ./').Append($p.Substring($full.Length + 1).Replace([char]92, [char]47)).Append(\"`n\") } } catch { } } } catch { } }; [void]$sb.Append('CVEND ').Append([int64]($now - $cv_epoch).TotalSeconds); cv_w $sb.ToString() }",
+    // the transcript stays writable (and deletable) by Claude Code while it is read
+    'function cv_read([string]$rel, [int64]$off, [int64]$max) { $fs = $null; try { $fs = [IO.File]::Open((Join-Path $cv_root $rel), [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)) } catch { cv_w \'CVD -1 0\'; return }; try { $s = $fs.Length; $n = $s - $off; if ($n -lt 0) { cv_w "CVD -2 $s"; return }; if ($n -gt $max) { $n = $max }; $buf = New-Object byte[] $n; $fs.Position = $off; $got = 0; while ($got -lt $n) { $r = $fs.Read($buf, $got, $n - $got); if ($r -le 0) { break }; $got += $r }; cv_w "CVD $n $s"; if ($n -gt 0) { $cv_o.Write($buf, 0, $n); $cv_o.Flush() } } finally { $fs.Close() } }',
+    'cv_w ("CVREADY " + $env:COMPUTERNAME)',
+  ].join('\n') + '\n';
+
+export const remoteScript = (shell: RemoteShell): string => (shell === 'powershell' ? REMOTE_SCRIPT_PS : REMOTE_SCRIPT);
+
+/** 'full': every transcript file touched in the last FULL_DAYS days; 'quick': only the last few minutes. */
+export function listCommand(shell: RemoteShell, kind: 'full' | 'quick'): string {
+  if (shell === 'powershell') return `cv_list ${kind === 'full' ? FULL_DAYS * 24 * 60 : QUICK_MINUTES}`;
+  return kind === 'full' ? `cv_list -mtime -${FULL_DAYS}` : `cv_list -mmin -${QUICK_MINUTES}`;
+}
+
+/** True when stderr says the remote login shell does not know `sh`: a Windows computer (cmd or PowerShell). */
+export const noPosixShell = (stderr: string): boolean => /is not recognized|command not found|sh: not found/i.test(stderr);
 
 export interface RemoteFile {
   /** path under the remote projects folder, '/'-separated */
@@ -252,7 +287,7 @@ export function sshErrorText(stderr: string, target: string): string {
   if (/Could not resolve hostname/i.test(s)) return `Could not find ${target}.`;
   if (/timed out|Connection refused|No route to host|Network is unreachable/i.test(s))
     return `Could not reach ${target}. Is it on, and is Remote Login (SSH) enabled there?`;
-  if (/not recognized|command not found|sh: not found/i.test(s)) return `${target} has no POSIX shell: SSH remotes need macOS or Linux on the other side.`;
+  if (noPosixShell(s)) return `${target} has neither a POSIX shell nor PowerShell to read its transcripts with.`;
   const last = s.split(/\r?\n/).filter(Boolean).pop();
   return last ? last.slice(0, 200) : 'The SSH connection closed.';
 }

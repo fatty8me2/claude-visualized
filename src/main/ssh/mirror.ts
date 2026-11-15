@@ -4,13 +4,16 @@
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { planFetch, sshErrorText, type FetchTask, type LocalFile, type RemoteFile, type SshHostState } from '@core/sshRemote';
+import { noPosixShell, planFetch, sshErrorText, type FetchTask, type LocalFile, type RemoteFile, type RemoteShell, type SshHostState } from '@core/sshRemote';
 import { SshConn, type SpawnSpec } from './conn';
 
 export interface MirrorOptions {
   /** this host's mirror folder; transcripts go under <dir>/projects */
   dir: string;
-  spec: SpawnSpec;
+  /** how to start the connection for a remote running that shell */
+  spec: (shell: RemoteShell) => SpawnSpec;
+  /** the shell found on an earlier connection ('sh' is tried first) */
+  shell?: RemoteShell;
   target: string;
   /** time between listings of recently changed files (default 1.5 s) */
   quickMs?: number;
@@ -30,7 +33,7 @@ interface Local extends LocalFile {
   part: boolean;
 }
 
-/** Events: 'status' (state, error, progress or hostname changed), 'settled' (a live or pinned session is fully copied). */
+/** Events: 'status' (state, error, progress or hostname changed), 'settled' (a live or pinned session is fully copied), 'shell' (the remote is Windows). */
 export class HostMirror extends EventEmitter {
   readonly projectsDir: string;
   state: SshHostState = 'connecting';
@@ -38,6 +41,8 @@ export class HostMirror extends EventEmitter {
   offlineSince: number | null = null;
   pendingBytes = 0;
   hostname = '';
+  /** 'sh' until the other computer turns out to be Windows */
+  shell: RemoteShell;
   /** sessions whose every file should be copied although they are not live (the selected one) */
   pinned = new Set<string>();
   /** live and pinned sessions that were fully copied at least once */
@@ -52,6 +57,7 @@ export class HostMirror extends EventEmitter {
   constructor(private opts: MirrorOptions) {
     super();
     this.projectsDir = path.join(opts.dir, 'projects');
+    this.shell = opts.shell ?? 'sh';
   }
 
   start() {
@@ -100,11 +106,13 @@ export class HostMirror extends EventEmitter {
     await this.scanLocal();
     let retry = this.opts.retryMs ?? 2000;
     while (!this.stopped) {
-      const conn = new SshConn(this.opts.spec);
+      const conn = new SshConn(this.opts.spec(this.shell));
       this.conn = conn;
       let error: string;
+      let started = false;
       try {
         const hostname = await conn.start();
+        started = true;
         if (hostname && hostname !== this.hostname) {
           this.hostname = hostname;
           this.emit('status');
@@ -118,6 +126,12 @@ export class HostMirror extends EventEmitter {
       conn.close();
       this.conn = null;
       if (this.stopped) break;
+      // a Windows computer answers "'sh' is not recognized": talk to its PowerShell instead, from now on
+      if (!started && this.shell === 'sh' && noPosixShell(error)) {
+        this.shell = 'powershell';
+        this.emit('shell', this.shell);
+        continue;
+      }
       this.pendingBytes = 0;
       this.set('offline', sshErrorText(error, this.opts.target));
       await this.sleep(Math.round(retry * (0.8 + Math.random() * 0.4)));
