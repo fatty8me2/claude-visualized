@@ -347,6 +347,9 @@ function fullyIn(box: { x: number; y: number; w: number; h: number }, wrap: HTML
   );
 }
 
+/** how long before the latest prompt a subagent must have finished to fold into the chip */
+const FINISHED_LINGER_MS = 10 * 60_000;
+
 export function AgentGraph({
   view,
   now,
@@ -419,21 +422,33 @@ export function AgentGraph({
   }, [view.agents]);
   // columns follow the real width: a wide tree wraps into more rows (and fits at a readable scale) instead of scrolling sideways
   const pad = embedded ? 14 : 36;
+  // finished agents that ended well before the latest prompt are leftovers of earlier work: they fold into the "N finished"
+  // chip. Tied to the prompt, not the clock, so an old or replayed session keeps the agents it ended with.
+  const staleBefore = view.turnStartedAt ? view.turnStartedAt - FINISHED_LINGER_MS : 0;
   const colsFor = (o: LayoutOptions) => columnsForWidth(wrapW || 1000, o.nodeW, Math.max(o.gapX, 20), pad);
   const colsFull = colsFor(DEFAULT_LAYOUT);
   const colsCompact = colsFor(COMPACT_LAYOUT);
   const build = (base: LayoutOptions, rows: number, maxCols: number) =>
-    layoutAgents(view.agents, { ...base, maxCols, nodeH: base.nodeH + rows, mainH: base.mainH + (rows ? rows + 22 : 0), showFinished, expanded, folded });
+    layoutAgents(view.agents, {
+      ...base,
+      maxCols,
+      nodeH: base.nodeH + rows,
+      mainH: base.mainH + (rows ? rows + 22 : 0),
+      showFinished,
+      expanded,
+      folded,
+      staleBefore,
+    });
   const layoutFull = useMemo(
     () => build(DEFAULT_LAYOUT, extra, colsFull),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [structureKey, extra, showFinished, expanded, folded, colsFull],
+    [structureKey, extra, showFinished, expanded, folded, colsFull, staleBefore],
   );
   const wantCompact = embedded || cardMode === 'compact';
   const layoutCompact0 = useMemo(
     () => (wantCompact ? build(COMPACT_LAYOUT, 0, colsCompact) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wantCompact, structureKey, showFinished, expanded, folded, colsCompact],
+    [wantCompact, structureKey, showFinished, expanded, folded, colsCompact, staleBefore],
   );
   // fill: spend spare panel height on the gaps between generations (a little: capped), so the tree does not float in a tall panel
   const spareGap = useMemo(() => {

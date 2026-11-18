@@ -48,6 +48,8 @@ export interface LayoutOptions {
   expanded?: ReadonlySet<string>;
   /** parents the user folded: their finished children go into a chip even when the group is small */
   folded?: ReadonlySet<string>;
+  /** finished agents that ended before this (well before the latest prompt) always fold into the chip unless expanded */
+  staleBefore?: number;
 }
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
@@ -134,9 +136,12 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
     const crowded =
       !opt.expanded?.has(a.id) &&
       ((children.length > opt.collapseAbove && finishedLeaves.length > 1) || (!!opt.folded?.has(a.id) && finishedLeaves.length > 0));
-    if (!opt.showFinished || crowded) {
-      if (finishedLeaves.length > 0) {
-        const ids = new Set(finishedLeaves.map((c) => c.id));
+    // finished before the current prompt or long ago: leftovers, not part of what is happening now
+    const stale = opt.expanded?.has(a.id) ? [] : finishedLeaves.filter((c) => (c.endedAt ?? c.lastActivity) < (opt.staleBefore ?? 0));
+    const fold = !opt.showFinished || crowded ? finishedLeaves : stale;
+    {
+      if (fold.length > 0) {
+        const ids = new Set(fold.map((c) => c.id));
         for (const id of ids) hide(id, seen);
         children = children.filter((c) => !ids.has(c.id));
         collapsedBox = {
