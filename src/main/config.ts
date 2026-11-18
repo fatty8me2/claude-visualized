@@ -14,6 +14,8 @@ export interface AppConfig {
   miniAlwaysOnTop: boolean;
   launchAtLogin: boolean;
   autoDownloadUpdates: boolean;
+  /** pop up "Update available" in the window when an update is found (Settings > Updates) */
+  notifyUpdates: boolean;
   miniHotkey: string;
   onboardingDone?: boolean;
   onboardingVersion?: number;
@@ -45,6 +47,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   miniAlwaysOnTop: true,
   launchAtLogin: false,
   autoDownloadUpdates: true,
+  notifyUpdates: true,
   miniHotkey: DEFAULT_MINI_HOTKEY,
   localModels: DEFAULT_LOCAL_CONFIG,
   shareEnabled: false,

@@ -23,6 +23,9 @@ import { Icon } from './Icon';
 import { agentBasis, agentLeftLabel, fmtClock, fmtLeft, useEtaPriors } from '../eta';
 import { agentEta, type EtaPriors, type PromptEta } from '@core/eta';
 import { useGraphPrefs, useGroupFolds } from '../state/graphPrefs';
+import type { CmdPriors } from '@core/cmdEta';
+import { agentCmdEta, cmdStripKey, cmdStripModel, sessionProject, useCmdPriors } from '../cmdEta';
+import { CmdEtaStrip } from './CmdEtaStrip';
 
 const LOCAL_ROWS_H = 30;
 
@@ -142,8 +145,11 @@ interface KidStats {
 }
 
 /** everything on a card that depends on the clock; compact cards show less, so they re-render less */
-function cardTime(a: AgentNode, now: number, kids: KidStats, compact: boolean, priors: EtaPriors) {
+function cardTime(a: AgentNode, now: number, kids: KidStats, compact: boolean, priors: EtaPriors, cmdPriors: CmdPriors, project: string | null) {
   const st = displayStatus(a, now);
+  // the shell command it is running, counting down to its expected end (src/core/cmdEta.ts)
+  const cmd = st === 'running' || st === 'quiet' ? cmdStripModel(agentCmdEta(a, now, cmdPriors, project)) : null;
+  const cmdKey = cmdStripKey(cmd);
   // open but not doing anything itself (waiting on its subagents, or quiet): the card is toned down
   const resting = (st === 'running' || st === 'quiet') && a.kind !== 'workflow' && !isWorking(a, now, kids.running);
   const act = describeActivity(a, { now, runningChildren: kids.running, totalChildren: kids.total });
@@ -157,7 +163,8 @@ function cardTime(a: AgentNode, now: number, kids: KidStats, compact: boolean, p
       dur,
       spark: [] as number[],
       bar: null as BarEst | null,
-      key: `${st}|${resting}|${act.kind}|${act.phrase}|${dur}`,
+      cmd,
+      key: `${st}|${resting}|${act.kind}|${act.phrase}|${dur}|${cmdKey}`,
     };
   const elapsed = (a.endedAt ?? (st === 'running' || st === 'waiting' ? now : a.lastActivity)) - a.startedAt;
   const elapsedText = formatDuration(elapsed);
@@ -171,7 +178,8 @@ function cardTime(a: AgentNode, now: number, kids: KidStats, compact: boolean, p
     dur,
     spark,
     bar: est,
-    key: `${st}|${resting}|${elapsedText}|${act.kind}|${act.line}|${dur}|${spark.join(',')}|${etaKey}`,
+    cmd,
+    key: `${st}|${resting}|${elapsedText}|${act.kind}|${act.line}|${dur}|${spark.join(',')}|${etaKey}|${cmdKey}`,
   };
 }
 
@@ -192,6 +200,8 @@ const NodeCard = memo(function NodeCard({
   kidsRunning,
   clock,
   priors,
+  cmdPriors,
+  project,
   mainBar,
   motion,
   x,
@@ -212,6 +222,9 @@ const NodeCard = memo(function NodeCard({
   clock: Clock;
   /** history the estimates compare with (one object shared by all cards) */
   priors: EtaPriors;
+  /** past shell-command durations, and the session's project, for the running-command countdown */
+  cmdPriors: CmdPriors;
+  project: string | null;
   /** the main card's prompt estimate, as primitives-only data that changes about once a minute; null elsewhere */
   mainBar: BarEst | null;
   motion: MotionTracker;
@@ -228,8 +241,8 @@ const NodeCard = memo(function NodeCard({
   onFold: (id: string) => void;
 }) {
   const kids = { total: kidsTotal, running: kidsRunning };
-  const now = useClockKey(clock, (n) => cardTime(a, n, kids, compact, priors).key);
-  const { st, resting, elapsedText, act, dur, spark, bar } = cardTime(a, now, kids, compact, priors);
+  const now = useClockKey(clock, (n) => cardTime(a, n, kids, compact, priors, cmdPriors, project).key);
+  const { st, resting, elapsedText, act, dur, spark, bar, cmd } = cardTime(a, now, kids, compact, priors, cmdPriors, project);
   const isMain = a.kind === 'main';
   const model = a.model ? modelLabel(a.model) : a.kind === 'workflow' ? 'workflow' : '—';
   const plan = mode === 'plan';
@@ -265,14 +278,18 @@ const NodeCard = memo(function NodeCard({
           {fold}
           <StatusLabel st={st} enabled={fxOn} />
         </div>
-        <div className={`now ${act.kind}`} title={act.line} data-testid="now">
-          <span className="lbl">{isMain ? model : (kind ?? '')}</span>
-          <span className="sep"> · </span>
-          <Fade k={`${act.kind}|${act.phrase}`} enabled={fxOn}>
-            {act.phrase}
-          </Fade>
-          {dur && <span className="dur"> · {dur}</span>}
-        </div>
+        {cmd ? (
+          <CmdEtaStrip m={cmd} variant="compact" />
+        ) : (
+          <div className={`now ${act.kind}`} title={act.line} data-testid="now">
+            <span className="lbl">{isMain ? model : (kind ?? '')}</span>
+            <span className="sep"> · </span>
+            <Fade k={`${act.kind}|${act.phrase}`} enabled={fxOn}>
+              {act.phrase}
+            </Fade>
+            {dur && <span className="dur"> · {dur}</span>}
+          </div>
+        )}
       </div>
     );
   }
@@ -306,14 +323,19 @@ const NodeCard = memo(function NodeCard({
       {isLocalModel(a.model) && <LocalLinkLine agent={a} />}
       <Bar status={st} est={isMain ? mainBar : bar} />
       {!isMain && <div className="desc">{(a.prompt && a.prompt !== a.description ? a.prompt : a.lastText) || ''}</div>}
-      <div className={`now ${act.kind}`} title={act.line} data-testid="now">
-        <span className="lbl">now:</span>{' '}
-        <Fade k={`${act.kind}|${act.phrase}`} enabled={fxOn}>
-          {act.phrase}
-        </Fade>
-        {dur && <span className="dur"> · {dur}</span>}
-      </div>
-      {!isMain && (
+      {cmd ? (
+        // a subagent card gives it two lines (in place of "now" and "says"); the main card has room for one
+        <CmdEtaStrip m={cmd} variant={isMain ? 'line' : 'tall'} />
+      ) : (
+        <div className={`now ${act.kind}`} title={act.line} data-testid="now">
+          <span className="lbl">now:</span>{' '}
+          <Fade k={`${act.kind}|${act.phrase}`} enabled={fxOn}>
+            {act.phrase}
+          </Fade>
+          {dur && <span className="dur"> · {dur}</span>}
+        </div>
+      )}
+      {!isMain && !cmd && (
         <div className="says" title={a.lastText ?? ''}>
           {says ? <>says: {says}</> : null}
         </div>
@@ -504,6 +526,8 @@ export function AgentGraph({
   }, [view.agents]);
   // the clock is pushed to the cards through a store so a per-second tick does not re-render every card
   const priors = useEtaPriors();
+  const cmdPriors = useCmdPriors();
+  const project = sessionProject(view.cwd);
   // the main card's estimate, reduced to a stable object that changes only when its text does (about once a minute)
   const mainEst = embedded ? null : promptBarEst(prompt, now);
   const mainKey = mainEst ? `${mainEst.fraction}|${mainEst.mode}|${mainEst.label}|${mainEst.title}` : '';
@@ -843,6 +867,8 @@ export function AgentGraph({
                 kidsRunning={kidStats.get(a.id)?.running ?? 0}
                 clock={clock}
                 priors={priors}
+                cmdPriors={cmdPriors}
+                project={project}
                 mainBar={n.id === MAIN ? mainBar : null}
                 motion={motion}
                 x={n.x}

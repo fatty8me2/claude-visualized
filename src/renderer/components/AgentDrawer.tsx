@@ -14,6 +14,8 @@ import { Icon, type IconName } from './Icon';
 import { isLocalModel, LocalLinkLine } from './LocalBits';
 import { agentBasis, fmtClock, fmtLeft, fmtSpan, useAgentEta } from '../eta';
 import type { FinishLine, PromptEta } from '@core/eta';
+import { agentCmdEta, sessionProject, useCmdPriors } from '../cmdEta';
+import { CmdEtaBlock } from './CmdEtaStrip';
 
 const TOOL_ICON: Record<ToolCategory, IconName> = {
   search: 'search',
@@ -131,6 +133,13 @@ const FINISH_LINE: Record<FinishLine, string> = {
   commit: 'committed',
   turn: 'turn over',
 };
+
+/** the shell command the agent is running, when past runs of it say when it should end */
+function DrawerCmdEta({ a, now, cwd }: { a: AgentNode; now: number; cwd: string | null }) {
+  const p = useCmdPriors();
+  const e = agentCmdEta(a, now, p, sessionProject(cwd));
+  return e ? <CmdEtaBlock e={e} /> : null;
+}
 
 /** a subagent's time estimate: running (from history), or how long a finished one took */
 function AgentEtaBlock({ a, now, end }: { a: AgentNode; now: number; end: number }) {
@@ -316,6 +325,7 @@ export function AgentDrawer({
             <span className="lbl">now:</span> {act.phrase}
             {act.since != null && <span className="dur"> · {formatDuration(now - act.since)}</span>}
           </div>
+          {live && <DrawerCmdEta a={a} now={now} cwd={view.cwd} />}
           {a.kind === 'main' ? <PromptEtaBlock p={promptEta} now={now} /> : <AgentEtaBlock a={a} now={now} end={end} />}
           <div className="d-tiles">
             <div className="d-tile" data-k="tools">

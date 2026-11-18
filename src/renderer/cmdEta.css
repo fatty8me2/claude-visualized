@@ -1,0 +1,314 @@
+/* The running-command countdown (src/core/cmdEta.ts, components/CmdEtaStrip.tsx). Every class starts with cmd-eta-.
+   On a card: a capsule that is its own progress bar. The fill grows toward the command's expected end with a bright leading
+   edge (the "energy front") and a slow sweep; amber and pulsing once the command runs longer than nearly every past run.
+   Animated properties are transform / opacity only; calm mode and prefers-reduced-motion hold them still. */
+
+.cmd-eta {
+  --cmd-c: var(--fam, var(--accent, #7aa2ff));
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 18px;
+  margin: -1px 0;
+  padding: 0 7px 0 6px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--cmd-c) 55%, transparent);
+  background: color-mix(in srgb, var(--cmd-c) 8%, var(--track, rgba(255, 255, 255, 0.04)));
+  box-shadow:
+    0 0 10px -3px color-mix(in srgb, var(--cmd-c) 55%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--text);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cmd-eta > .cmd-eta-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--cmd-c) 10%, transparent),
+    color-mix(in srgb, var(--cmd-c) 34%, transparent) 85%,
+    color-mix(in srgb, var(--cmd-c) 55%, transparent)
+  );
+  transition: width 0.9s var(--ease-out, ease-out);
+  pointer-events: none;
+}
+/* the leading edge: a bright line where the fill stops */
+.cmd-eta > .cmd-eta-fill::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--cmd-c);
+  box-shadow: 0 0 8px 1px var(--cmd-c);
+}
+/* a slow sweep through the filled part */
+.cmd-eta > .cmd-eta-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22) 50%, transparent);
+  transform: translateX(-100%);
+  animation: cmd-eta-sweep 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes cmd-eta-sweep {
+  to {
+    transform: translateX(240%);
+  }
+}
+.cmd-eta > span {
+  position: relative;
+  z-index: 1;
+}
+.cmd-eta .cmd-eta-glyph {
+  flex-shrink: 0;
+  color: var(--cmd-c);
+  font-weight: 700;
+  letter-spacing: -0.06em;
+}
+.cmd-eta .cmd-eta-cmd {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-weight: 600;
+}
+.cmd-eta .cmd-eta-left {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--text);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--cmd-c) 70%, transparent);
+}
+.cmd-eta .cmd-eta-when {
+  font-weight: 400;
+  color: var(--text-2);
+  text-shadow: none;
+}
+/* subagent cards: two lines, in place of "now" and "says" */
+.cmd-eta.cmd-eta-tall {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  height: 38px;
+  margin: 0;
+  padding: 1px 8px 2px 7px;
+}
+.cmd-eta-tall .cmd-eta-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  line-height: 15px;
+}
+.cmd-eta-tall .cmd-eta-left {
+  font-size: 13.5px;
+  line-height: 18px;
+  letter-spacing: -0.01em;
+}
+.cmd-eta-tall .cmd-eta-when {
+  flex-shrink: 0;
+}
+.cmd-eta.cmd-eta-compact {
+  height: 16px;
+  margin: 0;
+  font-size: 9.5px;
+  line-height: 14px;
+  gap: 5px;
+  padding: 0 5px;
+}
+
+/* running long: amber, the fill nearly full and breathing */
+.cmd-eta.cmd-eta-over {
+  --cmd-c: var(--warn, #e6a23c);
+}
+.cmd-eta.cmd-eta-over > .cmd-eta-fill {
+  animation: cmd-eta-breathe 1.8s ease-in-out infinite;
+}
+.cmd-eta.cmd-eta-over > .cmd-eta-fill::after {
+  animation-duration: 3.6s;
+}
+.cmd-eta.cmd-eta-over .cmd-eta-left {
+  color: var(--warn, #e6a23c);
+}
+@keyframes cmd-eta-breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ---- the drawer block ---- */
+.cmd-eta-d {
+  --cmd-c: var(--fam, var(--accent, #7aa2ff));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 10px 8px;
+  border-radius: var(--r-2, 6px);
+  border: 1px solid color-mix(in srgb, var(--cmd-c) 40%, var(--line, transparent));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cmd-c) 12%, transparent), color-mix(in srgb, var(--bg-2, transparent) 60%, transparent));
+  overflow: hidden;
+}
+.cmd-eta-d.cmd-eta-over {
+  --cmd-c: var(--warn, #e6a23c);
+}
+.cmd-eta-d .cmd-eta-d-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+.cmd-eta-d .cmd-eta-d-k,
+.cmd-eta-d .cmd-eta-d-tag {
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cmd-eta-d .cmd-eta-d-cmd {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cmd-c);
+}
+.cmd-eta-d .cmd-eta-d-big {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg, 15px);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cmd-eta-d.cmd-eta-over .cmd-eta-d-big {
+  color: var(--warn, #e6a23c);
+}
+.cmd-eta-d .cmd-eta-d-in {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.cmd-eta-d .cmd-eta-d-bar {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--cmd-c) 14%, var(--track, rgba(255, 255, 255, 0.05)));
+}
+.cmd-eta-d .cmd-eta-d-bar > b {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cmd-c) 50%, transparent), var(--cmd-c));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--cmd-c) 50%, transparent);
+  transition: width 0.9s var(--ease-out, ease-out);
+}
+.cmd-eta-d .cmd-eta-d-row {
+  font-size: var(--fs-xs, 11px);
+  color: var(--text-2);
+}
+.cmd-eta-d .cmd-eta-d-row .mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.cmd-eta-d .cmd-eta-d-sep {
+  color: var(--faint);
+}
+.cmd-eta-d .cmd-eta-d-basis {
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+/* ---- the prompt strip: a glowing tick where a running command should end, and its row in the hover card ---- */
+.cmd-eta-pp-mark {
+  --cmd-c: var(--fam, var(--accent, #7aa2ff));
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--cmd-c);
+  box-shadow: 0 0 6px var(--cmd-c);
+  z-index: 2;
+}
+.cmd-eta-pp-mark.cmd-eta-over {
+  --cmd-c: var(--warn, #e6a23c);
+}
+.cmd-eta-pp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cmd-eta-pp-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+}
+.cmd-eta-pp-list .cmd-eta-pp-cmd {
+  font-family: var(--font-mono);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.cmd-eta-pp-list .cmd-eta-pp-when {
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  color: var(--text-2);
+}
+.cmd-eta-pp-list li.cmd-eta-over .cmd-eta-pp-when {
+  color: var(--warn, #e6a23c);
+}
+
+.graph-canvas.calm .cmd-eta > .cmd-eta-fill::after,
+.graph-canvas.calm .cmd-eta.cmd-eta-over > .cmd-eta-fill {
+  animation: none;
+}
+.graph-canvas.calm .cmd-eta > .cmd-eta-fill::after {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmd-eta > .cmd-eta-fill,
+  .cmd-eta-d .cmd-eta-d-bar > b {
+    transition: none;
+  }
+  .cmd-eta > .cmd-eta-fill::after {
+    animation: none;
+    display: none;
+  }
+  .cmd-eta.cmd-eta-over > .cmd-eta-fill {
+    animation: none;
+  }
+}

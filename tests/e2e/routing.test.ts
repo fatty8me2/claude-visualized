@@ -68,7 +68,7 @@ describe('connector routing (9 running + 39 finished)', () => {
     });
     page = await app.firstWindow();
     await page.setViewportSize({ width: 1700, height: 1100 }).catch(() => {});
-    await page.evaluate(() => localStorage.setItem('cvis.graph.v1', JSON.stringify({ zoom: 'fit', compact: 'off', hideFinished: false })));
+    await page.evaluate(() => localStorage.setItem('cvis.graph.v1', JSON.stringify({ zoom: 'fit', compact: 'off', showFinished: true })));
     await page.reload();
   });
 

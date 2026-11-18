@@ -1,9 +1,11 @@
 // A live session for the time-estimate UI (tests/e2e/eta.test.ts), built relative to "now": a prompt 16 minutes in,
 // a desktop-app task list (two steps done, one in progress, "Commit and release" planned), two builder agents running
-// in the background, a finished Explore agent, and the main agent reading a file. Plus fixed priors to compare with.
+// in the background (one running the end-to-end tests, one watching CI), a finished Explore agent, and the main agent
+// reading a file. Plus fixed priors to compare with, for the agents and prompts and for the shell commands.
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildEtaPriors, type EtaPriors, type PriorRun } from '@core/eta';
+import { buildCmdPriors, type CmdPriors } from '@core/cmdEta';
 
 export const ETA_SID = '77777777-7777-4777-8777-777777777777';
 export const ETA_PROJECT = 'C--demo-ship';
@@ -95,10 +97,12 @@ export function writeEtaFixture(home: string, now: number): { mainFile: string }
         }),
       )
       .join('\n') + '\n';
-  const work = (agentId: string, model: string, start: number, end: number, done: boolean, file: string) => {
+  /** `open`: a shell command the agent started `minAgo` minutes ago and is still waiting on */
+  const work = (agentId: string, model: string, start: number, end: number, done: boolean, file: string, open?: { minAgo: number; input: unknown }) => {
     const steps: [number, unknown][] = [[start, { type: 'user', message: { role: 'user', content: `Task for ${agentId}` } }]];
     let k = 0;
-    for (let t = start - 0.3; t > end; t -= 0.45) {
+    const until = open ? open.minAgo + 0.05 : end;
+    for (let t = start - 0.3; t > until; t -= 0.45) {
       const id = `toolu_${agentId}_${++k}`;
       const name = k % 3 === 0 ? 'Bash' : k % 3 === 1 ? 'Read' : 'Edit';
       const input = name === 'Bash' ? { command: 'npx tsc --noEmit' } : { file_path: `C:\\demo\\ship\\src\\renderer\\${file}` };
@@ -106,8 +110,16 @@ export function writeEtaFixture(home: string, now: number): { mainFile: string }
         t,
         { type: 'assistant', message: { id: `m_${agentId}_${k}`, model, role: 'assistant', content: [toolUse(id, name, input)], usage: usage(2000, 90) } },
       ]);
-      if (t - 0.2 > end || done) steps.push([t - 0.2, { type: 'user', message: { role: 'user', content: [toolResult(id)] } }]);
+      if (t - 0.2 > until || done || open) steps.push([t - 0.2, { type: 'user', message: { role: 'user', content: [toolResult(id)] } }]);
     }
+    if (open)
+      steps.push([
+        open.minAgo,
+        {
+          type: 'assistant',
+          message: { id: `m_${agentId}_cmd`, model, role: 'assistant', content: [toolUse(`toolu_${agentId}_cmd`, 'Bash', open.input)], usage: usage(2000, 90) },
+        },
+      ]);
     if (done)
       steps.push([
         end,
@@ -128,9 +140,21 @@ export function writeEtaFixture(home: string, now: number): { mainFile: string }
   const meta = (id: string, agentType: string, description: string, toolUseId: string) =>
     fs.writeFileSync(path.join(sub, `agent-${id}.meta.json`), JSON.stringify({ agentType, description, toolUseId, spawnDepth: 1, requestShape: 'background' }));
   meta('a1', 'general-purpose', 'Build the agent card time bars', 'toolu_A1');
-  fs.writeFileSync(path.join(sub, 'agent-a1.jsonl'), work('a1', 'claude-sonnet-5-5', 6.5, 0.1, false, 'components\\AgentGraph.tsx'));
+  fs.writeFileSync(
+    path.join(sub, 'agent-a1.jsonl'),
+    work('a1', 'claude-sonnet-5-5', 6.5, 0.1, false, 'components\\AgentGraph.tsx', {
+      minAgo: 1.5,
+      input: { command: 'cd /c/demo/ship && npm run test:e2e 2>&1 | tail -40', description: 'Run the end-to-end tests', timeout: 600000 },
+    }),
+  );
   meta('a2', 'general-purpose', 'Build the overview estimate line', 'toolu_A2');
-  fs.writeFileSync(path.join(sub, 'agent-a2.jsonl'), work('a2', 'claude-sonnet-5-5', 6.4, 0.2, false, 'components\\Overview.tsx'));
+  fs.writeFileSync(
+    path.join(sub, 'agent-a2.jsonl'),
+    work('a2', 'claude-sonnet-5-5', 6.4, 0.2, false, 'components\\Overview.tsx', {
+      minAgo: 4.5,
+      input: { command: 'gh run watch 4242 --exit-status', description: 'Watch the CI run' },
+    }),
+  );
   meta('a3', 'Explore', 'Find where the mini view gets its data', 'toolu_A3');
   fs.writeFileSync(path.join(sub, 'agent-a3.jsonl'), work('a3', 'claude-haiku-5-5', 6.3, 3.6, true, 'components\\MiniView.tsx'));
   return { mainFile };
@@ -146,6 +170,18 @@ export function etaFixturePriors(now: number): EtaPriors {
       ...runs('Explore', 'haiku', 'search', [1, 2, 2, 3, 3, 4, 5, 6]),
     ],
     [10, 14, 18, 22, 25, 30, 35, 40, 48, 60].map((m) => ({ project: 'ship', ms: m * MIN })),
+    now,
+  );
+}
+
+/** Past shell-command durations for the test: this project's end-to-end runs take 3-5 minutes, CI watches 1-3 minutes. */
+export function cmdFixturePriors(now: number): CmdPriors {
+  const runs = (key: string, project: string, minutes: number[]) => minutes.map((m) => ({ key, project, ms: m * MIN }));
+  return buildCmdPriors(
+    [
+      ...runs('npm run test:e2e', 'ship', [3, 3.2, 3.5, 3.6, 3.8, 4, 4.1, 4.3, 4.6, 5, 3.4, 3.9, 4.4, 4.8]),
+      ...runs('gh run watch', 'ship', [1, 1.2, 1.5, 1.8, 2, 2.2, 2.5, 3]),
+    ],
     now,
   );
 }

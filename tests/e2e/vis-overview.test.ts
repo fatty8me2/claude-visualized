@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import { showFinishedAgents } from '../fixtures/graphPrefs';
 import { PROJECT, SID, writeFixture } from '../fixtures/build';
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -99,6 +100,7 @@ async function launch(n: number, port: number, idle = 1): Promise<Run> {
     } as Record<string, string>,
   });
   const page = await app.firstWindow();
+  await showFinishedAgents(page);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setContentSize(1920, 1080));
   await page.setViewportSize({ width: 1920, height: 1080 }).catch(() => {});
   await page.locator('[data-agent="a1"]').first().waitFor({ timeout: 20_000 });

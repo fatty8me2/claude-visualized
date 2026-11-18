@@ -21,6 +21,8 @@ export interface AppConfigView {
   miniAlwaysOnTop: boolean;
   launchAtLogin: boolean;
   autoDownloadUpdates: boolean;
+  /** pop up "Update available" in the window (Settings > Updates) */
+  notifyUpdates: boolean;
   miniHotkey: string;
   onboardingDone?: boolean;
   onboardingVersion?: number;
@@ -187,6 +189,8 @@ export interface VisApi {
   historyRebuild(): Promise<void>;
   /** past agent runs and prompts the time estimates compare with (see eta.ts); empty when the index is unavailable */
   etaPriors(): Promise<import('./eta').EtaPriors>;
+  /** past shell-command durations the running-command countdown compares with (see cmdEta.ts) */
+  cmdPriors(): Promise<import('./cmdEta').CmdPriors>;
   onHistory(cb: (s: HistoryStatus) => void): () => void;
   /** open the session in the Claude desktop app (claude:// deep link) */
   openInClaude(id: string): Promise<OpenInClaudeResult>;
@@ -236,6 +240,8 @@ export interface VisApi {
   /** quit and install the downloaded update */
   installUpdate(): Promise<boolean>;
   onUpdates(cb: (u: UpdateView) => void): () => void;
+  /** the main window was shown (start, or opened again from the tray): the update pop-up may come back */
+  onWindowShown(cb: () => void): () => void;
   /** SSH remotes: computers watched without the app installed on them */
   getSshHosts(): Promise<SshHostView[]>;
   onSshHosts(cb: (hosts: SshHostView[]) => void): () => void;

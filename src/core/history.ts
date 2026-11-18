@@ -3,8 +3,9 @@
 // transcript lines, and full-text search query building. No I/O here; the SQLite layer lives in src/main/historyDb.ts.
 
 import { classifyGoal, toolCategory, type Goal, type ToolMix } from './goal';
+import { cmdResultInfo, shellCall } from './cmdEta';
 import { classifyModel } from './models';
-import { normalizeLine, cleanPrompt } from './normalize';
+import { normalizeLine, cleanPrompt, parseTs } from './normalize';
 import { modelFamily, summarizeTool, toolLabel } from './summarize';
 
 // ---------- dates (local timezone) ----------
@@ -359,8 +360,23 @@ export interface AgentDelta {
   docs: DocRow[];
 }
 
+/** A timed shell call (cmdEta.ts): its start, its end, or both when both were in the lines read. */
+export interface CmdDelta {
+  agentId: string;
+  key: string | null;
+  /** start time; 0 when the start was read earlier (the end completes a row already in the index) */
+  start: number;
+  /** end time; 0 while still running */
+  end: number;
+  error: boolean;
+  /** not a run to learn from (interrupted, moved to the background, held for permission): drop it */
+  skip: boolean;
+}
+
 export interface FileDelta {
   agents: Map<string, AgentDelta>;
+  /** timed shell calls by tool_use id */
+  cmds: Map<string, CmdDelta>;
   cwd: string | null;
   entrypoint: string | null;
   title: { title: string; rank: 2 | 3 } | null;
@@ -415,8 +431,8 @@ function assistantTexts(line: string): string[] {
  * Fold new transcript lines of ONE file into a delta. `fileAgentId` is the agent the file belongs to (null = main transcript).
  * Usage is keyed by message id (the last line of a message wins) exactly as reducer.ts does, so a message split over several lines counts once.
  */
-export function extractDelta(sessionId: string, fileAgentId: string | null, lines: Iterable<string>): FileDelta {
-  const d: FileDelta = { agents: new Map(), cwd: null, entrypoint: null, title: null, costUsd: null, firstTs: 0, lastTs: 0, lines: 0 };
+export function extractDelta(sessionId: string, fileAgentId: string | null, lines: Iterable<string>, pendingCmds?: ReadonlySet<string>): FileDelta {
+  const d: FileDelta = { agents: new Map(), cmds: new Map(), cwd: null, entrypoint: null, title: null, costUsd: null, firstTs: 0, lastTs: 0, lines: 0 };
   const agent = (id: string | null): AgentDelta => {
     const key = id ?? MAIN_AGENT;
     let a = d.agents.get(key);
@@ -429,7 +445,9 @@ export function extractDelta(sessionId: string, fileAgentId: string | null, line
   const ctx = { sessionId, agentId: fileAgentId };
   const seenTools = new Set<string>();
   for (const line of lines) {
-    if (!line || skipLine(line)) continue;
+    if (!line) continue;
+    if (line.includes('"type":"tool_result"')) cmdEnds(line, d, pendingCmds);
+    if (skipLine(line)) continue;
     d.lines++;
     const events = normalizeLine(line, ctx, 0);
     let hasText = false;
@@ -474,6 +492,8 @@ export function extractDelta(sessionId: string, fileAgentId: string | null, line
             const k = `${dayKey(e.ts)}\t${e.name}`;
             a.toolDays.set(k, (a.toolDays.get(k) ?? 0) + 1);
           }
+          const sh = e.ts > 0 ? shellCall(e.name, e.input) : null;
+          if (sh) d.cmds.set(e.toolUseId, { agentId: a.agentId, key: sh.key, start: e.ts, end: 0, error: false, skip: false });
           const sum = summarizeTool(e.name, e.input);
           a.docs.push({ ts: e.ts, kind: 'tool', text: `${toolLabel(e.name)}${sum ? ' ' + sum : ''}`.slice(0, TOOL_DOC_CAP) });
           break;
@@ -508,6 +528,39 @@ export function extractDelta(sessionId: string, fileAgentId: string | null, line
     }
   }
   return d;
+}
+
+const RESULT_ID = /"tool_use_id":"([^"]+)"/g;
+
+/**
+ * The ends of timed shell calls in a tool-result line. Result lines can be large, so only those naming a call started in
+ * these lines (or one the index has open, `pending`) are parsed.
+ */
+function cmdEnds(line: string, d: FileDelta, pending: ReadonlySet<string> | undefined) {
+  let want = false;
+  for (const m of line.matchAll(RESULT_ID)) {
+    const c = d.cmds.get(m[1]);
+    if ((c && !c.end) || pending?.has(m[1])) want = true;
+  }
+  if (!want) return;
+  let o: Record<string, unknown>;
+  try {
+    o = JSON.parse(line);
+  } catch {
+    return;
+  }
+  const ts = parseTs(o?.timestamp, 0);
+  const content = (o?.message as { content?: unknown } | undefined)?.content;
+  if (!ts || !Array.isArray(content)) return;
+  for (const b of content as Record<string, unknown>[]) {
+    if (b?.type !== 'tool_result' || typeof b.tool_use_id !== 'string') continue;
+    const id = b.tool_use_id;
+    const c = d.cmds.get(id);
+    if (c ? c.end : !pending?.has(id)) continue;
+    const info = cmdResultInfo(o, b);
+    if (c) Object.assign(c, { end: ts, error: info.error, skip: info.skip });
+    else d.cmds.set(id, { agentId: '', key: null, start: 0, end: ts, error: info.error, skip: info.skip });
+  }
 }
 
 /** "C--Users-me-Desktop-my-app" -> "my-app" when no cwd is known. */

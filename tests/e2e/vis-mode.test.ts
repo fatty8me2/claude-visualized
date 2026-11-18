@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { showFinishedAgents } from '../fixtures/graphPrefs';
 import { PROJECT, SID, writeFixture } from '../fixtures/build';
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -44,6 +45,7 @@ describe('mode panel visuals', () => {
       } as Record<string, string>,
     });
     page = await app.firstWindow();
+    await showFinishedAgents(page);
     await page.setViewportSize({ width: 1440, height: 1500 }).catch(() => {});
     await page.locator('[data-agent="a1"]').waitFor({ timeout: 20_000 });
   });

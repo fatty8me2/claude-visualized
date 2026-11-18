@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { showFinishedAgents } from '../fixtures/graphPrefs';
 import { addRunningBash, CHILD, finishBash, MAIN, OC_TITLE, seedDb } from '../fixtures/opencode/build';
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -36,6 +37,7 @@ async function launch(name: string, claudeHome: string, ocDir: string | null, ho
   if (ocDir) env.CLAUDE_VIS_OPENCODE_HOME = ocDir;
   const app = await electron.launch({ args: [ROOT], cwd: ROOT, env });
   const page = await app.firstWindow();
+  await showFinishedAgents(page);
   await page.setViewportSize({ width: 1440, height: 920 }).catch(() => {});
   return { app, page, userData };
 }

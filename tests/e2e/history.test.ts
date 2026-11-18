@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { showFinishedAgents } from '../fixtures/graphPrefs';
 import { SID, writeFixture } from '../fixtures/build';
 import { writeSecondFixture } from '../fixtures/history';
 
@@ -30,6 +31,7 @@ async function launch(env: Record<string, string>) {
     } as Record<string, string>,
   });
   const page = await app.firstWindow();
+  await showFinishedAgents(page);
   await page.setViewportSize({ width: 1440, height: 1500 }).catch(() => {});
   return { app, page, userData };
 }

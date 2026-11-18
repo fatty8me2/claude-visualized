@@ -8,15 +8,17 @@ export interface GraphPrefs {
   zoom: 'fit' | number;
   /** compact cards: automatic when fit would shrink full cards below the readable floor */
   compact: CompactPref;
-  hideFinished: boolean;
+  /** keep finished subagents on the canvas; off by default: they fold into their parent's "N finished" chip as soon as they end.
+   * (Replaces the old `hideFinished`, which defaulted to showing them and was saved along with every zoom change.) */
+  showFinished: boolean;
 }
 
-const store = createPersisted<GraphPrefs>('cvis.graph.v1', { zoom: 'fit', compact: 'auto', hideFinished: false }, (raw) => {
+const store = createPersisted<GraphPrefs>('cvis.graph.v1', { zoom: 'fit', compact: 'auto', showFinished: false }, (raw) => {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   return {
     zoom: typeof o.zoom === 'number' && o.zoom > 0 ? o.zoom : 'fit',
     compact: o.compact === 'on' || o.compact === 'off' ? o.compact : 'auto',
-    hideFinished: o.hideFinished === true,
+    showFinished: o.showFinished === true,
   };
 });
 

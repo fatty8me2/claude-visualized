@@ -93,7 +93,7 @@ describe('connector effects (fixture data)', () => {
     });
     page = await app.firstWindow();
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(2100, 1250));
-    await page.evaluate(() => localStorage.setItem('cvis.graph.v1', JSON.stringify({ zoom: 'fit', compact: 'off', hideFinished: false })));
+    await page.evaluate(() => localStorage.setItem('cvis.graph.v1', JSON.stringify({ zoom: 'fit', compact: 'off', showFinished: true })));
     await page.reload();
     cdp = await page.context().newCDPSession(page);
   });

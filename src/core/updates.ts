@@ -183,3 +183,66 @@ export function describeUpdate(s: UpdateView): string {
       return 'Not checked yet.';
   }
 }
+
+// ---- the "update available" pop-up (src/renderer/components/UpdatePopup.tsx) and the re-check when the window is shown again ----
+
+/** found: a new version is known (manual mode stays here); downloading: progress; ready: downloaded, restart to install */
+export type UpdatePopupStage = 'found' | 'downloading' | 'ready';
+
+export interface UpdatePopupModel {
+  stage: UpdatePopupStage;
+  mode: UpdateMode;
+  version: string;
+  releaseNotes?: string;
+  percent: number;
+  releaseUrl?: string;
+}
+
+/** What the pop-up shows for this state, or null when there is nothing to announce (idle, checking, error, disabled). */
+export function updatePopupModel(v: UpdateView | null): UpdatePopupModel | null {
+  if (!v || !v.version || v.mode === 'disabled') return null;
+  const stage: UpdatePopupStage | null =
+    v.status === 'available' ? 'found' : v.status === 'downloading' ? 'downloading' : v.status === 'downloaded' ? 'ready' : null;
+  if (!stage) return null;
+  return {
+    stage,
+    mode: v.mode,
+    version: v.version,
+    releaseNotes: v.releaseNotes,
+    percent: stage === 'ready' ? 100 : Math.max(0, Math.min(100, Math.round(v.percent ?? 0))),
+    releaseUrl: v.releaseUrl ?? releaseUrlFor(v.version),
+  };
+}
+
+/** "Later" was pressed for this version during this window-show (the renderer counts shows: app start and every re-show from the tray). */
+export interface UpdatePopupDismissal {
+  version: string;
+  showEpoch: number;
+}
+
+/**
+ * Whether the pop-up is up. It announces an update until "Later" is pressed; "Later" hides that version for the rest of this
+ * window-show, and it comes back the next time the window is opened (app start, or re-shown from the tray) while still pending.
+ */
+export function shouldShowUpdatePopup(
+  v: UpdateView | null,
+  o: { enabled: boolean; showEpoch: number; dismissed: UpdatePopupDismissal | null },
+): boolean {
+  if (!o.enabled) return false;
+  const m = updatePopupModel(v);
+  if (!m) return false;
+  return !(o.dismissed && o.dismissed.version === m.version && o.dismissed.showEpoch === o.showEpoch);
+}
+
+/** Minimum gap between checks triggered by re-showing the window (the 6-hourly timer still runs). */
+export const RECHECK_ON_SHOW_MS = 30 * 60_000;
+
+/**
+ * When the window is shown again (from the tray), check now if the last check started at least `minGapMs` ago. Never while one
+ * is running, before the first scheduled check, or when an update is already known (the pop-up already has something to show).
+ */
+export function shouldCheckOnShow(v: UpdateView, lastCheckAt: number | undefined, now: number, minGapMs = RECHECK_ON_SHOW_MS): boolean {
+  if (v.mode === 'disabled' || lastCheckAt === undefined) return false;
+  if (v.status === 'checking' || v.status === 'available' || v.status === 'downloading' || v.status === 'downloaded') return false;
+  return now - lastCheckAt >= minGapMs;
+}

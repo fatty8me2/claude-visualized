@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { NO_PRIORS, type EtaPriors } from '@core/eta';
+import { NO_CMD_PRIORS, type CmdPriors } from '@core/cmdEta';
 import type { SearchArgs, SummaryArgs } from '@core/history';
 import { HistoryService } from '../history';
 import { projectsDir, testOverride } from '../paths';
@@ -23,6 +24,16 @@ export const registerHistoryIpc: IpcRegistrar = () => {
       return await service.etaPriors();
     } catch {
       return NO_PRIORS;
+    }
+  });
+  // the same for running shell commands (src/core/cmdEta.ts)
+  const fixedCmdPriors = testOverride('CLAUDE_VIS_CMD_PRIORS');
+  ipcMain.handle('history:cmdPriors', async (): Promise<CmdPriors> => {
+    if (fixedCmdPriors) return JSON.parse(fs.readFileSync(fixedCmdPriors, 'utf8')) as CmdPriors;
+    try {
+      return await service.cmdPriors();
+    } catch {
+      return NO_CMD_PRIORS;
     }
   });
   ipcMain.handle('history:rebuild', () => service.rebuild());

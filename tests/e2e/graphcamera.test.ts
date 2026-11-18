@@ -62,7 +62,7 @@ describe('graph camera (fixture data)', () => {
     });
     page = await app.firstWindow();
     await page.setViewportSize({ width: 1440, height: 920 }).catch(() => {});
-    await page.evaluate(() => localStorage.setItem('cvis.graph.v1', JSON.stringify({ zoom: 1, compact: 'off', hideFinished: false })));
+    await page.evaluate(() => localStorage.setItem('cvis.graph.v1', JSON.stringify({ zoom: 1, compact: 'off', showFinished: true })));
     await page.reload();
   });
 

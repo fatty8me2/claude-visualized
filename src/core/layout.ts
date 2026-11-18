@@ -138,7 +138,8 @@ export function layoutAgents(agents: Record<string, AgentNode>, opt: LayoutOptio
       ((children.length > opt.collapseAbove && finishedLeaves.length > 1) || (!!opt.folded?.has(a.id) && finishedLeaves.length > 0));
     // finished before the current prompt or long ago: leftovers, not part of what is happening now
     const stale = opt.expanded?.has(a.id) ? [] : finishedLeaves.filter((c) => (c.endedAt ?? c.lastActivity) < (opt.staleBefore ?? 0));
-    const fold = !opt.showFinished || crowded ? finishedLeaves : stale;
+    // a group the user opened from its chip stays open, also while finished agents are hidden everywhere else
+    const fold = opt.expanded?.has(a.id) ? [] : !opt.showFinished || crowded ? finishedLeaves : stale;
     {
       if (fold.length > 0) {
         const ids = new Set(fold.map((c) => c.id));

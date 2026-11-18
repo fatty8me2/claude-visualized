@@ -90,7 +90,7 @@ describe('agent card motion (fixture data)', () => {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1500, 1000)).catch(() => {});
     await page.setViewportSize({ width: 1440, height: 920 }).catch(() => {});
     // these tests are about the full cards' motion: keep the graph from switching to compact cards in a narrow panel
-    await page.evaluate(() => localStorage.setItem('cvis.graph.v1', JSON.stringify({ zoom: 'fit', compact: 'off', hideFinished: false })));
+    await page.evaluate(() => localStorage.setItem('cvis.graph.v1', JSON.stringify({ zoom: 'fit', compact: 'off', showFinished: true })));
     await page.reload();
     cdp = await page.context().newCDPSession(page);
     // record (and optionally freeze) every Web Animations call made on a card

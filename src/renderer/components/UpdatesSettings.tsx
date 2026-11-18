@@ -96,6 +96,15 @@ export function UpdatesSettings({ config }: { config: AppConfigView }) {
         />
         Automatically download updates (installed when you restart the app)
       </label>
+      <label className="chk">
+        <input
+          type="checkbox"
+          checked={config.notifyUpdates ?? true}
+          disabled={u.mode === 'disabled'}
+          onChange={(e) => void window.api.setConfig({ notifyUpdates: e.target.checked })}
+        />
+        Notify me when an update is available (a pop-up when the app opens)
+      </label>
     </div>
   );
 }

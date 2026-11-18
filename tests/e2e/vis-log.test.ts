@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { showFinishedAgents } from '../fixtures/graphPrefs';
 import { SID, writeFixture } from '../fixtures/build';
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -42,6 +43,7 @@ describe('session log + timeline visuals (fixture data)', () => {
       } as Record<string, string>,
     });
     page = await app.firstWindow();
+    await showFinishedAgents(page);
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1800, 1000));
     await page.setViewportSize({ width: 1800, height: 1000 }).catch(() => {});
   });

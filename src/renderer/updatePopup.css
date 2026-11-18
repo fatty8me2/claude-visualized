@@ -1,0 +1,242 @@
+/* "Update available" pop-up (components/UpdatePopup.tsx): a glass card in the bottom-right corner with an energy rim, a glowing
+   orb, and a charging progress bar. Every class starts with upd-pop- (renderer CSS is global). */
+
+.upd-pop-card {
+  --upd-pop-accent: var(--opus);
+  position: fixed;
+  right: 18px;
+  bottom: 40px; /* clear of the status bar */
+  z-index: 70;
+  width: min(360px, calc(100vw - 36px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px 14px;
+  font-family: var(--font-ui);
+  color: var(--text);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--upd-pop-accent) 9%, transparent), transparent 90px),
+    color-mix(in srgb, var(--panel) 92%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--upd-pop-accent) 45%, var(--line-2));
+  border-radius: var(--r-3);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent),
+    0 0 26px -8px color-mix(in srgb, var(--upd-pop-accent) 55%, transparent),
+    0 24px 60px -18px rgb(0 0 0 / 0.75),
+    0 0 0 1px rgb(0 0 0 / 0.25);
+  overflow: hidden;
+  animation: upd-pop-in 300ms var(--ease-spring) both;
+}
+.upd-pop-card[data-stage='ready'] {
+  --upd-pop-accent: var(--ok);
+}
+
+/* a slow light sweep along the top edge */
+.upd-pop-glow {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--upd-pop-accent), transparent);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: upd-pop-sweep 3.2s linear infinite;
+  opacity: 0.9;
+}
+
+.upd-pop-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.upd-pop-orb {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--upd-pop-accent);
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--upd-pop-accent) 32%, transparent), transparent 70%);
+  border: 1px solid color-mix(in srgb, var(--upd-pop-accent) 70%, transparent);
+  box-shadow:
+    0 0 14px -2px color-mix(in srgb, var(--upd-pop-accent) 70%, transparent),
+    inset 0 0 10px -3px color-mix(in srgb, var(--upd-pop-accent) 80%, transparent);
+  animation: upd-pop-pulse 2.4s var(--ease-out) infinite;
+}
+.upd-pop-titles {
+  min-width: 0;
+}
+.upd-pop-kicker {
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.upd-pop-title {
+  margin: 1px 0 0;
+  font-size: var(--fs-lg);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--upd-pop-accent) 40%, transparent);
+}
+.upd-pop-line {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  line-height: 1.45;
+}
+.upd-pop-notes {
+  margin: 0;
+  max-height: 110px;
+  overflow: auto;
+  padding: 7px 9px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  border: 1px solid var(--line);
+  border-left: 2px solid color-mix(in srgb, var(--upd-pop-accent) 70%, transparent);
+  border-radius: var(--r-2);
+}
+
+/* download progress: a charging bar with a moving sheen */
+.upd-pop-meter {
+  position: relative;
+  height: 16px;
+  border-radius: var(--r-pill);
+  background: var(--track);
+  border: 1px solid var(--line-2);
+  overflow: hidden;
+}
+.upd-pop-fill {
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--text) 30%, transparent) 50%, transparent 100%) 0 0 / 40% 100% no-repeat,
+    linear-gradient(90deg, color-mix(in srgb, var(--upd-pop-accent) 55%, var(--track)), var(--upd-pop-accent));
+  box-shadow: 0 0 12px -2px color-mix(in srgb, var(--upd-pop-accent) 75%, transparent);
+  transition: width var(--dur-3) var(--ease-out);
+  animation: upd-pop-sheen 1.6s linear infinite;
+}
+.upd-pop-pct {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  color: var(--text);
+  text-shadow: 0 0 4px rgb(0 0 0 / 0.8);
+}
+
+.upd-pop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+.upd-pop-actions button,
+.upd-pop-linkbtn {
+  padding: 4px 14px;
+}
+.upd-pop-go {
+  box-shadow: 0 0 14px -4px color-mix(in srgb, var(--upd-pop-accent) 70%, transparent);
+}
+.upd-pop-card[data-stage='ready'] .upd-pop-go {
+  border-color: color-mix(in srgb, var(--ok) 70%, var(--line-2));
+  background-color: color-mix(in srgb, var(--ok) 16%, var(--panel-2));
+}
+.upd-pop-card[data-stage='ready'] .upd-pop-go:hover {
+  border-color: var(--ok);
+  background-color: color-mix(in srgb, var(--ok) 24%, var(--panel-2));
+}
+/* the release-page link (unsigned macOS) looks like the primary button */
+.upd-pop-linkbtn {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--opus) 70%, var(--line-2));
+  border-radius: var(--r-2);
+  background-color: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+  line-height: 1.45;
+  text-decoration: none;
+  transition:
+    background-color var(--dur-1),
+    border-color var(--dur-1);
+}
+.upd-pop-linkbtn:hover {
+  border-color: var(--opus);
+  background-color: color-mix(in srgb, var(--opus) 24%, var(--panel-2));
+}
+.upd-pop-actions button:focus-visible,
+.upd-pop-linkbtn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@keyframes upd-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes upd-pop-sweep {
+  from {
+    background-position: -50% 0;
+  }
+  to {
+    background-position: 150% 0;
+  }
+}
+@keyframes upd-pop-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 10px -3px color-mix(in srgb, var(--upd-pop-accent) 60%, transparent),
+      inset 0 0 10px -3px color-mix(in srgb, var(--upd-pop-accent) 80%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 20px 0 color-mix(in srgb, var(--upd-pop-accent) 75%, transparent),
+      inset 0 0 12px -2px color-mix(in srgb, var(--upd-pop-accent) 90%, transparent);
+  }
+}
+@keyframes upd-pop-sheen {
+  from {
+    background-position:
+      -40% 0,
+      0 0;
+  }
+  to {
+    background-position:
+      140% 0,
+      0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upd-pop-card,
+  .upd-pop-glow,
+  .upd-pop-orb,
+  .upd-pop-fill {
+    animation: none;
+  }
+  .upd-pop-fill {
+    transition: none;
+  }
+}

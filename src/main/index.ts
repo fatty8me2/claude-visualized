@@ -448,6 +448,12 @@ function createMain() {
       mainWin?.hide();
     }
   });
+  // opening the window counts as "opening the app" (closeToTray only hides it): the renderer may bring back the update pop-up,
+  // and a stale update check (older than 30 min) runs again
+  mainWin.on('show', () => {
+    if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('window:shown');
+    updater?.checkIfStale();
+  });
   mainWin.on('closed', () => (mainWin = null));
   // F11 toggles fullscreen whatever has focus in the page. Escape is left alone: dialogs own it.
   const win = mainWin;

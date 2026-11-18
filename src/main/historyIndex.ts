@@ -261,7 +261,7 @@ async function indexSession(db: HistoryDb, s: SessionFiles, probes: Probe[], res
     const from = reset || !p.row ? 0 : p.row.offset;
     const r = await readNew(p, from);
     bytes += r.bytes;
-    const delta = extractDelta(s.id, p.agentId, r.lines);
+    const delta = extractDelta(s.id, p.agentId, r.lines, reset || !p.row ? undefined : db.pendingCmds(s.id));
     const meta = p.agentId ? await readMeta(p.file) : null;
     db.transaction(() => {
       db.applyDelta(ref, delta, meta, p.agentId, now);

@@ -62,6 +62,10 @@ describe('app smoke (fixture data)', () => {
 
   it('shows the session, mode and the agent tree', async () => {
     await page.getByText('Retry + docs').first().waitFor({ timeout: 20_000 });
+    // by default a finished agent folds into its parent's "N finished" chip right away; the rest of this suite looks at them
+    await page.locator('.node.collapsed').first().waitFor();
+    expect(await page.locator('[data-agent="a1"]').count()).toBe(0);
+    await page.getByRole('button', { name: 'show finished' }).click();
     await page.locator('[data-agent="a1"]').waitFor();
     expect(await page.locator('.modebox .big').innerText()).toBe('PLAN MODE');
     for (const id of ['main', 'a1', 'a2', 'a3', 'wf:wf_x', 'w2']) expect(await page.locator(`[data-agent="${id}"]`).count(), id).toBe(1);

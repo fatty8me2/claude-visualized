@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { showFinishedAgents } from '../fixtures/graphPrefs';
 import { PROJECT, SID, writeFixture } from '../fixtures/build';
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -60,6 +61,7 @@ describe('all-sessions overview (fixture data, 4 live sessions)', () => {
       } as Record<string, string>,
     });
     page = await app.firstWindow();
+    await showFinishedAgents(page);
     await page.setViewportSize({ width: 1440, height: 920 }).catch(() => {});
     await page.locator('[data-agent="a1"]').first().waitFor({ timeout: 20_000 });
     await openOverview();

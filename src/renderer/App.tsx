@@ -4,6 +4,7 @@ import { SetupWizard } from './components/SetupWizard';
 import { SessionList } from './components/SessionList';
 import { SettingsDialog } from './components/SettingsDialog';
 import { UpdatePill, useUpdates } from './components/UpdatesSettings';
+import { UpdatePopup } from './components/UpdatePopup';
 import { useConfig, useHookServer, useInbox, useLiveState, useNow, usePeers, useSelected, useSessions } from './hooks';
 import { useToasts } from './state/toast';
 import { SidebarResizeHandle, usePanelLayout } from './layout';
@@ -130,6 +131,7 @@ export function App() {
         })}
       </ErrorBoundary>
       <UpdatePill updates={updates} />
+      <UpdatePopup updates={updates} enabled={config?.notifyUpdates ?? true} suppressed={showSettings || onboarding !== 'none'} />
       {toasts.length > 0 && (
         <div className="toasts" role="status">
           {toasts.map((t) => (

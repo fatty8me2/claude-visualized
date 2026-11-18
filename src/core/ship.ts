@@ -14,7 +14,7 @@ const obj = (v: unknown): Obj => (v && typeof v === 'object' ? (v as Obj) : {});
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 
 /** heredoc / here-string bodies and quoted strings say what a command is about (a commit message), not what it runs */
-function commandWords(cmd: string): string {
+export function commandWords(cmd: string): string {
   return cmd
     .replace(/<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\1[^\n]*\n[\s\S]*?\n[ \t]*\2[ \t]*(?=\n|$|\))/g, ' ')
     .replace(/@(['"])\r?\n[\s\S]*?\r?\n\1@/g, ' ')

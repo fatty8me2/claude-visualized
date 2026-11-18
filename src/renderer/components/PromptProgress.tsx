@@ -10,6 +10,9 @@ import { agentBasis, agentLeftLabel, fmtClock, fmtLeft, fmtSpan } from '../eta';
 import { famClass } from '../util';
 import { workCounts, workText, type WorkCounts } from '@core/work';
 import { Icon } from './Icon';
+import { agentCmdEta, cmdLeft, sessionProject, useCmdPriors } from '../cmdEta';
+import type { CmdEta } from '@core/cmdEta';
+import '../cmdEta.css';
 
 const LINE: Record<Exclude<FinishLine, 'turn'>, { label: string; title: string }> = {
   release: { label: 'ready for updates', title: 'The release is published: installed apps get it at their next update check' },
@@ -107,8 +110,17 @@ export function PromptProgress({ view, eta, now, stale, onSelectAgent }: PromptP
   const t0 = eta.startedAt;
   const over = eta.state === 'done' || stale;
   const est = !over && eta.finishAt !== null;
-  // the time axis: the prompt's start to whichever comes last (its end, the finish line, an agent due later), plus a margin
-  const ends = [eta.finishAt ?? 0, ...eta.stages.map((s) => s.at ?? 0), ...eta.agents.map((m) => m.at ?? 0)];
+  // shell commands running now with an expected end (src/core/cmdEta.ts)
+  const cmdPriors = useCmdPriors();
+  const project = sessionProject(view.cwd);
+  const cmds: { id: string; e: CmdEta }[] = [];
+  if (!over)
+    for (const a of Object.values(view.agents)) {
+      const e = a.status === 'running' ? agentCmdEta(a, now, cmdPriors, project) : null;
+      if (e) cmds.push({ id: a.id, e });
+    }
+  // the time axis: the prompt's start to whichever comes last (its end, the finish line, an agent or a command due later), plus a margin
+  const ends = [eta.finishAt ?? 0, ...eta.stages.map((s) => s.at ?? 0), ...eta.agents.map((m) => m.at ?? 0), ...cmds.map((c) => c.e.at)];
   const last = over ? Math.max(eta.finishAt ?? view.lastActivity ?? now, ...ends) : Math.max(now, ...ends);
   const span = Math.max(60_000, (last - t0) * (over ? 1.02 : 1.06));
   const pct = (t: number) => `${(clamp01((t - t0) / span) * 100).toFixed(2)}%`;
@@ -215,6 +227,15 @@ export function PromptProgress({ view, eta, now, stale, onSelectAgent }: PromptP
             />
           ),
         )}
+        {cmds.map(({ id, e }) => (
+          <i
+            key={`cmd-${id}`}
+            className={`cmd-eta-pp-mark ${famClass(view.agents[id]?.model)}${e.overdue ? ' cmd-eta-over' : ''}`}
+            style={{ left: pct(e.at) }}
+            title={`${e.key}: ${e.overdue ? 'running long' : `${cmdLeft(e.remaining)} left · ${fmtClock(e.at)} (est.)`}`}
+            data-testid="cmd-eta-pp-mark"
+          />
+        ))}
         {!over && <i className="pp-now" style={{ left: pct(now) }} aria-hidden />}
         {est && <i className={`pp-flag${eta.finishLine !== 'turn' && !later.length ? ' ship' : ''}`} style={{ left: pct(eta.finishAt!) }} aria-hidden />}
       </div>
@@ -259,6 +280,21 @@ export function PromptProgress({ view, eta, now, stale, onSelectAgent }: PromptP
                 ))}
             </ul>
             {eta.agents.length > 12 && <div className="pp-more">+{eta.agents.length - 12} more</div>}
+          </>
+        )}
+        {cmds.length > 0 && (
+          <>
+            <h5>commands running</h5>
+            <ul className="cmd-eta-pp-list">
+              {cmds.map(({ id, e }) => (
+                <li key={id} className={e.overdue ? 'cmd-eta-over' : undefined}>
+                  <span className="cmd-eta-pp-cmd">{e.key}</span>
+                  <span className="cmd-eta-pp-when">
+                    {e.overdue ? `running long · ${fmtSpan(e.elapsed)}` : `${cmdLeft(e.remaining)} left · ${fmtClock(e.at)}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </>
         )}
         {shipStages.length > 0 && (

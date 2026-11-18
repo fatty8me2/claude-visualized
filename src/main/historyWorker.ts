@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { parentPort, workerData } from 'node:worker_threads';
 import type { HistoryStatus, SearchArgs, SummaryArgs } from '@core/history';
 import { NO_PRIORS, type EtaPriors } from '@core/eta';
+import { NO_CMD_PRIORS, type CmdPriors } from '@core/cmdEta';
 import { HistoryDb } from './historyDb';
 import { runIndex, type IndexProgress } from './historyIndex';
 
@@ -15,6 +16,7 @@ let cancel = false;
 let waiters: (() => void)[] = [];
 const ETA_CACHE_MS = 5 * 60_000;
 let etaCache: { at: number; value: EtaPriors } | null = null;
+let cmdCache: { at: number; value: CmdPriors } | null = null;
 const status: HistoryStatus = {
   state: 'starting',
   phase: null,
@@ -98,6 +100,7 @@ async function rebuild(): Promise<void> {
   db?.close();
   db = null;
   etaCache = null;
+  cmdCache = null;
   for (const suffix of ['', '-wal', '-shm']) fs.rmSync(dbPath + suffix, { force: true });
   open();
   push();
@@ -124,6 +127,12 @@ const methods: Record<string, (args: any) => unknown> = {
     // a few hundred ms of SQL: answer from the last result for a while (the estimates move slowly)
     if (!etaCache || now - etaCache.at > ETA_CACHE_MS || etaCache.value.at === 0) etaCache = { at: now, value: db.etaPriors(now) };
     return etaCache.value;
+  },
+  cmdPriors: () => {
+    if (!db) return NO_CMD_PRIORS;
+    const now = Date.now();
+    if (!cmdCache || now - cmdCache.at > ETA_CACHE_MS || cmdCache.value.at === 0) cmdCache = { at: now, value: db.cmdPriors(now) };
+    return cmdCache.value;
   },
   search: (a: SearchArgs) => db!.search(a),
   close: () => {

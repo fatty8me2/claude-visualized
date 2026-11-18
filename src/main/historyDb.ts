@@ -34,12 +34,13 @@ import {
 import type { Goal, ToolMix } from '@core/goal';
 import { projectName } from '@core/history';
 import { activeTimes, buildEtaPriors, turnTimes, type EtaPriors } from '@core/eta';
+import { buildCmdPriors, CMD_MAX_MS, type CmdPriors } from '@core/cmdEta';
 
 /** how far back the time estimates look for similar agents and prompts */
 const ETA_WINDOW_MS = 120 * 86_400_000;
 
 /** Bump when the schema or what is extracted changes; an old database is rebuilt. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
 create table if not exists meta (key text primary key, value text);
@@ -78,6 +79,11 @@ create table if not exists tool_calls (session_id text not null, day text not nu
 create index if not exists tool_calls_day on tool_calls(day);
 create table if not exists docs (id integer primary key, session_id text not null, agent_id text not null, ts integer not null, kind text not null, text text not null);
 create index if not exists docs_session on docs(session_id);
+create table if not exists cmd_runs (
+  session_id text not null, tool_use_id text not null, agent_id text not null, key text not null, ts integer not null, ms integer, ok integer,
+  primary key (session_id, tool_use_id)
+) without rowid;
+create index if not exists cmd_runs_ts on cmd_runs(ts);
 create virtual table if not exists docs_fts using fts5(text, content='docs', content_rowid='id', tokenize='unicode61 remove_diacritics 2');
 create trigger if not exists docs_ai after insert on docs begin insert into docs_fts(rowid, text) values (new.id, new.text); end;
 create trigger if not exists docs_ad after delete on docs begin insert into docs_fts(docs_fts, rowid, text) values ('delete', old.id, old.text); end;
@@ -85,7 +91,7 @@ create trigger if not exists docs_ad after delete on docs begin insert into docs
 
 const DROP_ALL = `
 drop trigger if exists docs_ai; drop trigger if exists docs_ad;
-drop table if exists docs_fts; drop table if exists docs; drop table if exists tool_calls; drop table if exists activity; drop table if exists usage_daily;
+drop table if exists docs_fts; drop table if exists docs; drop table if exists cmd_runs; drop table if exists tool_calls; drop table if exists activity; drop table if exists usage_daily;
 drop table if exists usage_msgs; drop table if exists agents; drop table if exists sessions; drop table if exists files; drop table if exists meta;
 `;
 
@@ -214,7 +220,7 @@ export class HistoryDb {
   /** Forget everything known about a session (before re-reading it from the start). */
   dropSession(id: string) {
     for (const d of this.stmt('select distinct day from usage_msgs where session_id = ?').all(id) as Row[]) this.dirtyDays.add(d.day);
-    for (const t of ['usage_msgs', 'agents', 'tool_calls', 'docs', 'files']) this.stmt(`delete from ${t} where session_id = ?`).run(id);
+    for (const t of ['usage_msgs', 'agents', 'tool_calls', 'docs', 'cmd_runs', 'files']) this.stmt(`delete from ${t} where session_id = ?`).run(id);
     this.stmt('delete from sessions where id = ?').run(id);
   }
 
@@ -239,6 +245,8 @@ export class HistoryDb {
     now = Date.now(),
   ) {
     const sid = ref.id;
+    // result lines only complete shell calls (and count for nothing else)
+    this.applyCmds(sid, d);
     if (d.lines === 0 && d.agents.size === 0) return;
     const s = this.stmt('select * from sessions where id = ?').get(sid) as Row | undefined;
     const cwd = s?.cwd ?? d.cwd;
@@ -281,6 +289,31 @@ export class HistoryDb {
     );
 
     for (const a of d.agents.values()) this.applyAgent(sid, a, a.agentId === (fileAgentId ?? MAIN_AGENT) ? meta : null, now);
+  }
+
+  /** Timed shell calls: a start adds a row (still open), an end fills in how long it took; skipped calls are dropped. */
+  private applyCmds(sid: string, d: FileDelta) {
+    if (!d.cmds.size) return;
+    const ins = this.stmt('insert or ignore into cmd_runs(session_id, tool_use_id, agent_id, key, ts, ms, ok) values (?,?,?,?,?,?,?)');
+    const end = this.stmt('update cmd_runs set ms = max(0, ? - ts), ok = ? where session_id = ? and tool_use_id = ? and ms is null');
+    const del = this.stmt('delete from cmd_runs where session_id = ? and tool_use_id = ?');
+    for (const [id, c] of d.cmds) {
+      if (c.skip) {
+        if (!c.start) del.run(sid, id);
+        continue;
+      }
+      if (c.start && c.key) {
+        const ms = c.end ? c.end - c.start : null;
+        // a negative or absurd span (clock skew, a call left open for days) says nothing
+        if (ms !== null && !(ms >= 0 && ms <= CMD_MAX_MS)) continue;
+        ins.run(sid, id, c.agentId, c.key, c.start, ms, c.end ? (c.error ? 0 : 1) : null);
+      } else if (c.end) end.run(c.end, c.error ? 0 : 1, sid, id);
+    }
+  }
+
+  /** tool_use ids of this session's shell calls whose end has not been read yet */
+  pendingCmds(sid: string): Set<string> {
+    return new Set((this.stmt('select tool_use_id id from cmd_runs where session_id = ? and ms is null').all(sid) as Row[]).map((r) => String(r.id)));
   }
 
   private applyAgent(sid: string, a: AgentDelta, meta: { agentType?: string; description?: string; phase?: string } | null, now: number) {
@@ -546,6 +579,20 @@ export class HistoryDb {
     return buildEtaPriors(
       runs,
       turnTimes(prompts, msgs, (s) => projects.get(s) ?? ''),
+      now,
+    );
+  }
+
+  /** What running shell calls are compared with (src/core/cmdEta.ts): durations of past calls by key and project, last 120 days. */
+  cmdPriors(now = Date.now()): CmdPriors {
+    const rows = this.db
+      .prepare(
+        `select c.key key, s.project project, c.ms ms from cmd_runs c join sessions s on s.id = c.session_id
+         where c.ms is not null and c.ts >= ? order by c.ts desc limit 60000`,
+      )
+      .all(now - ETA_WINDOW_MS) as Row[];
+    return buildCmdPriors(
+      rows.map((r) => ({ key: String(r.key), project: String(r.project ?? ''), ms: Number(r.ms) })),
       now,
     );
   }

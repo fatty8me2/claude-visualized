@@ -25,6 +25,7 @@ export const SYNC_CONFIG_KEYS = {
   notifyAgentDone: 'boolean',
   miniAlwaysOnTop: 'boolean',
   autoDownloadUpdates: 'boolean',
+  notifyUpdates: 'boolean',
 } as const;
 
 /** documented, and asserted by tests never to appear in the allowlist */

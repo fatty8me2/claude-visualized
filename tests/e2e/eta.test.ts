@@ -1,13 +1,14 @@
 // The time estimates in the app: the prompt's progress strip, the agent cards and drawer, the overview line, and the strip
 // following commit -> push -> release -> publish as hooks report them. Fixed priors (CLAUDE_VIS_ETA_PRIORS) keep the
-// numbers independent of the fixture history. Screenshots -> tests/e2e/artifacts/eta-*.png.
+// numbers independent of the fixture history; CLAUDE_VIS_CMD_PRIORS does the same for the running-command countdown.
+// Screenshots -> tests/e2e/artifacts/eta-*.png.
 // Windows stay off-screen (vitest.e2e.config.ts). Run `npx electron-vite build` first.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { ETA_SID, etaFixturePriors, writeEtaFixture } from '../fixtures/eta';
+import { cmdFixturePriors, ETA_SID, etaFixturePriors, writeEtaFixture } from '../fixtures/eta';
 
 const ROOT = path.resolve(__dirname, '../..');
 const ART = path.join(ROOT, 'tests/e2e/artifacts');
@@ -40,6 +41,8 @@ describe('time estimates', () => {
     writeEtaFixture(home, now);
     const priorsFile = path.join(userData, 'eta-priors.json');
     fs.writeFileSync(priorsFile, JSON.stringify(etaFixturePriors(now)));
+    const cmdPriorsFile = path.join(userData, 'cmd-priors.json');
+    fs.writeFileSync(cmdPriorsFile, JSON.stringify(cmdFixturePriors(now)));
     app = await electron.launch({
       args: [ROOT],
       cwd: ROOT,
@@ -49,6 +52,7 @@ describe('time estimates', () => {
         CLAUDE_VIS_USER_DATA: userData,
         CLAUDE_VIS_PORT: String(PORT),
         CLAUDE_VIS_ETA_PRIORS: priorsFile,
+        CLAUDE_VIS_CMD_PRIORS: cmdPriorsFile,
         CLAUDE_VIS_NO_EXTERNAL: '1',
         CLAUDE_VIS_NO_SYSTEM_INTEGRATION: '1',
         CLAUDE_VIS_NO_USAGE_API: '1',
@@ -110,11 +114,52 @@ describe('time estimates', () => {
     await page.keyboard.press('Escape');
   });
 
+  it('counts down the shell command an agent is running', async () => {
+    // a1 is 1.5 min into the end-to-end tests, which took 3-5 min in this project
+    const strip = page.locator('[data-agent="a1"] [data-testid="cmd-eta"]');
+    await strip.waitFor({ timeout: 10_000 });
+    const text = (await strip.textContent()) ?? '';
+    expect(text).toContain('npm run test:e2e');
+    expect(text).toMatch(/≈ \d{1,2}:\d{2}/);
+    expect(text).toMatch(/~\d+ min left/);
+    expect(Number(await strip.getAttribute('aria-valuenow'))).toBeGreaterThan(15);
+    expect(Number(await strip.getAttribute('aria-valuenow'))).toBeLessThan(60);
+    // a2 has watched CI for 4.5 min, longer than any past watch
+    const over = page.locator('[data-agent="a2"] [data-testid="cmd-eta"]');
+    await over.waitFor({ timeout: 5000 });
+    expect(await over.textContent()).toContain('gh run watch');
+    expect(await over.textContent()).toContain('running long');
+    expect(await over.getAttribute('class')).toContain('cmd-eta-over');
+    // the prompt strip marks where each should end
+    expect(await page.getByTestId('cmd-eta-pp-mark').count()).toBe(2);
+    await page.mouse.move(5, 900);
+    await page.waitForTimeout(300);
+    await shot('cmd-card', '[data-agent="a1"]');
+    await shot('cmd-card-over', '[data-agent="a2"]');
+    await page.locator('[data-agent="a1"]').first().click();
+    const d = page.getByTestId('drawer-cmd-eta');
+    await d.waitFor({ timeout: 5000 });
+    const dt = (await d.textContent()) ?? '';
+    expect(dt).toContain('based on 14 past runs of npm run test:e2e in this project, typically');
+    expect(dt).toMatch(/done ≈/);
+    expect(dt).toContain('its timeout');
+    await shot('cmd-drawer', '.drawer');
+    await page.keyboard.press('Escape');
+    // and the strip's hover card lists them
+    await page.getByTestId('prompt-progress').hover({ position: { x: 300, y: 10 } });
+    await vi.waitFor(async () => expect(await page.getByTestId('pp-pop').evaluate((e) => getComputedStyle(e).opacity)).toBe('1'), { timeout: 3000 });
+    expect(await page.getByTestId('pp-pop').textContent()).toContain('commands running');
+    await shot('cmd-popover');
+    await page.mouse.move(5, 900);
+  });
+
   it('shows a line per session on the overview', async () => {
     await page.getByRole('button', { name: /all sessions/ }).click();
     const line = page.getByTestId('eta-line').first();
     await line.waitFor({ timeout: 15_000 });
     expect(await line.textContent()).toMatch(/~\d+ min|estimating|<1 min/);
+    // the compact cards of the overview graph count the commands down too
+    await page.locator('.node.compact [data-testid="cmd-eta"]').first().waitFor({ timeout: 10_000 });
     await shot('overview');
   });
 

@@ -1,6 +1,15 @@
 import { app } from 'electron';
 import type { AppUpdater, UpdateInfo } from 'electron-updater';
-import { decideUpdateMode, initialUpdateView, reduceUpdate, releaseNotesSnippet, type UpdateAction, type UpdateView } from '@core/updates';
+import {
+  decideUpdateMode,
+  initialUpdateView,
+  RECHECK_ON_SHOW_MS,
+  reduceUpdate,
+  releaseNotesSnippet,
+  shouldCheckOnShow,
+  type UpdateAction,
+  type UpdateView,
+} from '@core/updates';
 
 const FIRST_CHECK_MS = 30_000;
 const CHECK_EVERY_MS = 6 * 60 * 60_000;
@@ -27,6 +36,9 @@ export class Updater {
   private first: NodeJS.Timeout | null = null;
   private every: NodeJS.Timeout | null = null;
   private busy = false;
+  /** when the last check started (undefined until the first scheduled or manual one) */
+  private lastCheckAt: number | undefined;
+  private readonly recheckMs = process.env.CLAUDE_VIS_UPDATE_RECHECK_MS ? Number(process.env.CLAUDE_VIS_UPDATE_RECHECK_MS) : RECHECK_ON_SHOW_MS;
   private readonly feedUrl = process.env.CLAUDE_VIS_UPDATE_URL;
 
   constructor(private deps: UpdaterDeps) {
@@ -97,6 +109,7 @@ export class Updater {
     if (this.view.mode === 'disabled' || this.busy) return this.view;
     if (this.view.status === 'downloading' || this.view.status === 'downloaded') return this.view;
     this.busy = true;
+    this.lastCheckAt = Date.now();
     try {
       const au = await this.updater();
       await au.checkForUpdates();
@@ -107,6 +120,15 @@ export class Updater {
       this.busy = false;
     }
     return this.view;
+  }
+
+  /**
+   * The main window was shown again (from the tray): check now if the last check is older than 30 minutes. Does nothing before
+   * the first scheduled check, while one is running, or when an update is already known. See shouldCheckOnShow.
+   */
+  checkIfStale(now = Date.now()): void {
+    if (this.busy || !shouldCheckOnShow(this.view, this.lastCheckAt, now, this.recheckMs)) return;
+    void this.check();
   }
 
   /** Start the download (when "Automatically download updates" is off, or for a retry). Manual mode never downloads. */
