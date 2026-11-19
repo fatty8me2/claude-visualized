@@ -50,6 +50,8 @@ const LIVENESS_MS = 5_000;
 /** another computer's runs (an SSH mirror): their pids mean nothing here, so a run this quiet is treated as lost */
 const REMOTE_QUIET_MS = 30 * 60_000;
 const MAX_SESSIONS = 200;
+/** a followed session that has not claimed a run in its folder this long after it started does not own it */
+const UNCLAIMED_MS = 60_000;
 
 interface Link {
   runId: string;
@@ -178,7 +180,7 @@ export class KilnSource {
       const key = `${w.sessionId}:${toolUseId}`;
       let l = links.get(toolUseId);
       if (!l) {
-        const r = matchKilnRun({ toolUseId, agentId: c.agentId, ts: c.ts, task: c.task, cwd: c.cwd }, runs.values(), (id) => {
+        const r = matchKilnRun({ toolUseId, agentId: c.agentId, ts: c.ts, task: c.task, cwd: c.cwd, endTs: c.endTs }, runs.values(), (id) => {
           const by = this.claimed.get(id);
           return !!by && by !== key;
         });
@@ -217,16 +219,19 @@ export class KilnSource {
 
   /**
    * Runs no Claude session claims, as sidebar rows. A run is left out when a Claude session in the same folder was active
-   * since it started: opening that session shows it (its watcher claims it then).
+   * since it started and is not followed yet: opening that session shows it (its watcher claims it then). A session that is
+   * followed had its chance: a run it has not claimed a minute after starting gets its own row rather than vanishing.
    */
-  scan(claude: readonly SessionSummary[]): SessionSummary[] {
+  scan(claude: readonly SessionSummary[], followed: (sessionId: string) => boolean = () => false): SessionSummary[] {
     if (!this.file) {
       this.summaryCache = [];
       return this.summaryCache;
     }
     const now = Date.now();
     const runs = this.runs().filter((r) => r.task && !this.claimed.has(r.id));
-    const orphans = runs.filter((r) => !claude.some((s) => s.cwd && sameDir(s.cwd, r.cwd) && s.mtime >= r.startedAt - 60_000)).slice(0, MAX_SESSIONS);
+    const accounted = (r: KilnRun) =>
+      claude.some((s) => s.cwd && sameDir(s.cwd, r.cwd) && s.mtime >= r.startedAt - 60_000 && !(followed(s.id) && now - r.startedAt > UNCLAIMED_MS));
+    const orphans = runs.filter((r) => !accounted(r)).slice(0, MAX_SESSIONS);
     const key = this.log.version + ':' + orphans.map((r) => r.id).join(',') + ':' + orphans.filter((r) => now - r.lastAt < LIVE_MS).length;
     if (key === this.summaryKey) return this.summaryCache;
     this.summaryKey = key;

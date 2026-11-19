@@ -238,16 +238,28 @@ export interface KilnCall {
   /** the first 300 characters of the brief (normalize.ts compactInput) */
   task: string;
   cwd: string;
+  /** when the call returned, if it has */
+  endTs?: number;
 }
 
-const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
+/** whitespace evened out, and the ellipsis Kiln puts on a clipped field (events.py _trunc) dropped */
+const norm = (s: string) =>
+  s
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/…$/, '')
+    .trimEnd();
 export const sameDir = (a: string, b: string) => {
   const n = (p: string) => p.replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase();
   return !!a && !!b && n(a) === n(b);
 };
 
-/** the call reaches Kiln's process this long after the transcript's timestamp at most */
-const MATCH_AFTER_MS = 3 * 60_000;
+/**
+ * A run can start long after its call: Claude Code runs MCP tools one at a time, so when Claude hands off several tasks at once
+ * the later ones wait for the earlier ones. A run belongs to a call when it started before the call returned; while the call
+ * is still waiting, up to this long after it.
+ */
+const MATCH_PENDING_MS = 6 * 3_600_000;
 /** clocks and message timestamps can be a little off */
 const MATCH_BEFORE_MS = 15_000;
 
@@ -266,7 +278,8 @@ export function matchKilnRun(call: KilnCall, runs: Iterable<KilnRun>, taken: (ru
   for (const r of runs) {
     if (!r.task || taken(r.id)) continue;
     const dt = r.startedAt - call.ts;
-    if (dt < -MATCH_BEFORE_MS || dt > MATCH_AFTER_MS) continue;
+    const latest = call.endTs !== undefined ? Math.max(0, call.endTs - call.ts) + MATCH_BEFORE_MS : MATCH_PENDING_MS;
+    if (dt < -MATCH_BEFORE_MS || dt > latest) continue;
     if (!sameTask(call.task, r.task)) continue;
     const score = Math.abs(dt) + (call.cwd && r.cwd && !sameDir(call.cwd, r.cwd) ? 10 * 60_000 : 0);
     if (score < bestScore) {
@@ -400,12 +413,21 @@ export function withKilnRuns(events: AgentEvent[], runs: readonly KilnRun[], ses
   if (!runs.length) return events;
   const used = new Set<string>();
   const extra: AgentEvent[] = [];
+  const ends = new Map<string, number>();
+  for (const e of events) if (e.k === 'tool.end' && !ends.has(e.toolUseId)) ends.set(e.toolUseId, e.ts);
   let cwd = '';
   for (const e of events) {
     if (e.k === 'session.meta' && e.cwd) cwd = e.cwd;
     if (e.k !== 'tool.start' || !isKilnDelegate(e.name)) continue;
     const i = obj(e.input);
-    const call: KilnCall = { toolUseId: e.toolUseId, agentId: e.ref.agentId ?? 'main', ts: e.ts, task: str(i.task), cwd: str(i.cwd) || cwd };
+    const call: KilnCall = {
+      toolUseId: e.toolUseId,
+      agentId: e.ref.agentId ?? 'main',
+      ts: e.ts,
+      task: str(i.task),
+      cwd: str(i.cwd) || cwd,
+      endTs: ends.get(e.toolUseId),
+    };
     const r = matchKilnRun(call, runs, (id) => used.has(id));
     if (!r) continue;
     used.add(r.id);

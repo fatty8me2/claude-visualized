@@ -354,8 +354,14 @@ export class SessionManager extends EventEmitter {
     this.scanKiln();
   }
 
+  /** a Claude session this manager follows and has read (so it would have claimed its Kiln runs) */
+  private followed = (id: string): boolean => {
+    const w = this.watchers.get(id);
+    return !!w && w.primed && w instanceof SessionWatcher;
+  };
+
   private scanKiln() {
-    const next = this.kiln.scan(this.claudeSummaries);
+    const next = this.kiln.scan(this.claudeSummaries, this.followed);
     if (next === this.kilnSummaries) return;
     this.kilnSummaries = next;
     this.mergeSummaries();
@@ -397,7 +403,7 @@ export class SessionManager extends EventEmitter {
   private async scan() {
     try {
       this.claudeSummaries = await this.indexer.scan();
-      if (this.kilnOn) this.kilnSummaries = this.kiln.scan(this.claudeSummaries);
+      if (this.kilnOn) this.kilnSummaries = this.kiln.scan(this.claudeSummaries, this.followed);
       this.mergeSummaries();
     } catch (e) {
       console.error('scan failed', e);

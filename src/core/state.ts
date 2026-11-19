@@ -191,6 +191,8 @@ export interface KilnCallRec {
   ts: number;
   task: string;
   cwd: string;
+  /** when the call returned (its tool result); the run it started began before that */
+  endTs?: number;
 }
 
 export const KILN_CALLS_CAP = 200;

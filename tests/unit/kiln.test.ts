@@ -114,6 +114,46 @@ describe('matching a run to its delegate_task call', () => {
     expect(matchKilnRun(call, log.runs.values(), () => false)!.id).toBe('right');
     expect(matchKilnRun(call, log.runs.values(), (id) => id === 'right')!.id).toBe('other-dir');
   });
+
+  it('matches hand-offs queued behind each other (Claude Code runs MCP tools one at a time)', () => {
+    // Claude hands three tasks to Kiln in one message; each run starts only when the previous call returns
+    const briefs = ['Write tests for parser.py', 'Write tests for lexer.py', 'Write tests for emitter.py'];
+    const s = newSession('S');
+    const ref = { sessionId: 'S', agentId: null };
+    apply(s, { ts: T0 * 1000 - 5000, src: 'transcript', ref, k: 'session.meta', cwd: CWD });
+    briefs.forEach((task, i) =>
+      apply(s, { ts: T0 * 1000 + i, src: 'transcript', ref, k: 'tool.start', toolUseId: `tu${i}`, name: 'mcp__kiln__delegate_task', input: { task, cwd: CWD } }),
+    );
+    // runs at +1 s, +8 min, +16 min, each 8 minutes long
+    const log = logOf(...briefs.map((task, i) => spec({ id: `w${i}`, task, start: T0 + 1 + i * 480, finish: { ok: true, seconds: 470 } })));
+    const call = (i: number) => ({ ...s.internal.kilnCalls![`tu${i}`], toolUseId: `tu${i}` });
+    expect(briefs.map((_, i) => matchKilnRun(call(i), log.runs.values(), () => false)?.id)).toEqual(['w0', 'w1', 'w2']);
+    // the first returned at +8 min: the reducer records that, and a later run with its brief is not its
+    apply(s, { ts: (T0 + 475) * 1000, src: 'transcript', ref, k: 'tool.end', toolUseId: 'tu0', ok: true });
+    expect(s.internal.kilnCalls!.tu0.endTs).toBe((T0 + 475) * 1000);
+    // replay pairs them the same way
+    const evs: AgentEvent[] = [
+      { ts: T0 * 1000 - 5000, src: 'transcript', ref, k: 'session.meta', cwd: CWD },
+      ...briefs.map((task, i): AgentEvent => ({ ts: T0 * 1000 + i, src: 'transcript', ref, k: 'tool.start', toolUseId: `tu${i}`, name: 'mcp__kiln__delegate_task', input: { task, cwd: CWD } })),
+    ];
+    const spawned = withKilnRuns(evs, [...log.runs.values()], 'S').filter((e) => e.k === 'agent.spawn');
+    expect(spawned.map((e) => e.ref.agentId)).toEqual(['kiln-w0', 'kiln-w1', 'kiln-w2']);
+  });
+
+  it('gives a retried brief the run that started before each call returned', () => {
+    const log = logOf(spec({ id: 'first', start: T0 + 2, finish: { ok: false, error: 'boom', seconds: 60 } }), spec({ id: 'retry', start: T0 + 302 }));
+    const first = { toolUseId: 'tu1', agentId: MAIN, ts: T0 * 1000, task: BRIEF.slice(0, 300), cwd: CWD, endTs: (T0 + 63) * 1000 };
+    const second = { toolUseId: 'tu2', agentId: MAIN, ts: (T0 + 300) * 1000, task: BRIEF.slice(0, 300), cwd: CWD };
+    expect(matchKilnRun(first, log.runs.values(), () => false)!.id).toBe('first');
+    // the retry's run started after the first call had returned: never the first call's
+    expect(matchKilnRun(first, log.runs.values(), (id) => id === 'first')).toBeNull();
+    expect(matchKilnRun(second, log.runs.values(), (id) => id === 'first')!.id).toBe('retry');
+  });
+
+  it('matches a brief Kiln clipped with an ellipsis', () => {
+    expect(sameTask('Rename foo to bar everywhere in src', 'Rename foo to bar…')).toBe(true);
+    expect(sameTask('Rename foo to baz everywhere in src', 'Rename foo to bar…')).toBe(false);
+  });
 });
 
 describe('a run as agent events', () => {
@@ -271,6 +311,8 @@ describe('KilnSource', () => {
     // a Claude session active in that folder since the run started will show it instead
     const claude = { id: 'S', file: 'x', projectDir: '', project: 'proj', cwd: CWD, title: null, mtime: (T0 + 30) * 1000, size: 0, live: false, entrypoint: 'cli' };
     expect(src.scan([claude])).toHaveLength(0);
+    // ... unless that session is followed and still has not claimed it: then it is not that session's, so it gets its row
+    expect(src.scan([claude], (id) => id === 'S')).toHaveLength(1);
     const w = src.watcher(kilnSessionId('abc123'));
     expect(await w.poll()).toBe(true);
     expect(w.state.agents[MAIN].kiln?.ok).toBe(true);

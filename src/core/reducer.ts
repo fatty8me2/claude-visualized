@@ -362,6 +362,8 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
         if (a.currentTool?.id === e.toolUseId) refreshCurrentTool(s, a);
         touch(s, a, ts);
       }
+      const kc = s.internal.kilnCalls?.[e.toolUseId];
+      if (kc && kc.endTs === undefined) kc.endTs = ts;
       if (name === 'ExitPlanMode' && s.plan?.exitToolUseId === e.toolUseId) s.plan.approved = e.ok;
       const r = (e.result ?? null) as Json | null;
       if (r && typeof r === 'object') onToolResult(s, a, name, e.toolUseId, r, e.ok, ts, p?.input);
