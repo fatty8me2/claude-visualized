@@ -1,4 +1,5 @@
-// One SSH connection to a remote `sh`, speaking the two read-only requests of core/sshRemote.ts (list, read a byte range).
+// One SSH connection to a remote `sh`, speaking the read-only requests of core/sshRemote.ts (list, read a byte range of a
+// transcript or of Kiln's events file).
 // Requests run one at a time. No Electron imports: tests drive it with a local `sh` instead of ssh.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -73,6 +74,12 @@ export class SshConn extends EventEmitter {
     if (!safeRel(rel) || !Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(max) || max < 1)
       return Promise.reject(new Error('bad read request'));
     return this.request((resolve, reject) => ({ kind: 'read', want: -1, size: 0, resolve, reject }), `cv_read '${rel}' ${offset} ${max}`);
+  }
+
+  /** A byte range of Kiln's events file on the other computer (`rotated`: its one rotation, events.jsonl.1). */
+  readKiln(rotated: boolean, offset: number, max: number): Promise<ReadResult> {
+    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(max) || max < 1) return Promise.reject(new Error('bad read request'));
+    return this.request((resolve, reject) => ({ kind: 'read', want: -1, size: 0, resolve, reject }), `cv_kread ${rotated ? 1 : 0} ${offset} ${max}`);
   }
 
   close() {

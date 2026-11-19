@@ -77,6 +77,7 @@ export const QUICK_MINUTES = 3;
  * Sent to the remote `sh` on stdin. Defines the two read-only requests and reports ready.
  *  cv_list <find test> <value>  -> "<mtime s> <size> ./<path>" per transcript file, then "CVEND <remote epoch s>"
  *  cv_read <path> <offset> <max> -> "CVD <n> <size>" followed by exactly n bytes; n is -1 for a missing file, -2 for one that shrank
+ *  cv_kread <0|1> <offset> <max> -> the same for Kiln's events file (1: its rotation, events.jsonl.1), found the way Kiln finds it
  * Works with GNU and BSD (macOS) tools.
  */
 export const REMOTE_SCRIPT =
@@ -89,8 +90,13 @@ export const REMOTE_SCRIPT =
     '  fi',
     '  echo "CVEND $(date +%s)"',
     '}',
-    'cv_read() {',
-    '  cv_s=$(wc -c < "$cv_root/$1" 2>/dev/null) || cv_s=',
+    // Kiln's events file (kiln/events.py events_path): KILN_EVENTS_PATH, else $XDG_CONFIG_HOME/kiln, else ~/.config/kiln
+    'cv_kf="${KILN_EVENTS_PATH:-${XDG_CONFIG_HOME:-$HOME/.config}/kiln/events.jsonl}"',
+    'case "$cv_kf" in "~/"*) cv_kf="$HOME/${cv_kf#??}";; esac',
+    'cv_read() { cv_rd "$cv_root/$1" "$2" "$3"; }',
+    'cv_kread() { if [ "$1" = 1 ]; then cv_rd "$cv_kf.1" "$2" "$3"; else cv_rd "$cv_kf" "$2" "$3"; fi; }',
+    'cv_rd() {',
+    '  cv_s=$(wc -c < "$1" 2>/dev/null) || cv_s=',
     '  cv_s=$(echo $cv_s)',
     '  case "$cv_s" in',
     "    ''|*[!0-9]*) echo 'CVD -1 0'; return;;",
@@ -100,7 +106,7 @@ export const REMOTE_SCRIPT =
     '  if [ "$cv_n" -gt "$3" ]; then cv_n=$3; fi',
     '  echo "CVD $cv_n $cv_s"',
     // padded with zero bytes so exactly n bytes always follow, even if the file shrinks between the two commands
-    '  if [ "$cv_n" -gt 0 ]; then { tail -c "+$(($2 + 1))" "$cv_root/$1" 2>/dev/null; head -c "$cv_n" /dev/zero; } | head -c "$cv_n"; fi',
+    '  if [ "$cv_n" -gt 0 ]; then { tail -c "+$(($2 + 1))" "$1" 2>/dev/null; head -c "$cv_n" /dev/zero; } | head -c "$cv_n"; fi',
     '}',
     'echo "CVREADY $(hostname 2>/dev/null || uname -n)"',
   ].join('\n') + '\n';
@@ -111,6 +117,7 @@ export const REMOTE_SCRIPT =
  * stream, so file bytes arrive untouched.
  *  cv_list <minutes>              -> as above, for files changed in the last <minutes>
  *  cv_read <path> <offset> <max>  -> as above
+ *  cv_kread <0|1> <offset> <max>  -> as above
  */
 export const REMOTE_SCRIPT_PS =
   [
@@ -120,8 +127,12 @@ export const REMOTE_SCRIPT_PS =
     '$cv_epoch = New-Object DateTime 1970, 1, 1, 0, 0, 0, ([DateTimeKind]::Utc)',
     'function cv_w([string]$s) { $b = [Text.Encoding]::UTF8.GetBytes($s + "`n"); $cv_o.Write($b, 0, $b.Length); $cv_o.Flush() }',
     "function cv_list([double]$minutes) { $sb = New-Object Text.StringBuilder; $now = [DateTime]::UtcNow; if ([IO.Directory]::Exists($cv_root)) { $full = [IO.Path]::GetFullPath($cv_root).TrimEnd([char]92); $cut = $now.AddMinutes(-$minutes); try { foreach ($p in [IO.Directory]::EnumerateFiles($full, '*.json*', [IO.SearchOption]::AllDirectories)) { try { $f = New-Object IO.FileInfo $p; if (($f.Extension -eq '.jsonl' -or $f.Extension -eq '.json') -and $f.LastWriteTimeUtc -gt $cut) { [void]$sb.Append([int64]($f.LastWriteTimeUtc - $cv_epoch).TotalSeconds).Append(' ').Append($f.Length).Append(' ./').Append($p.Substring($full.Length + 1).Replace([char]92, [char]47)).Append(\"`n\") } } catch { } } } catch { } }; [void]$sb.Append('CVEND ').Append([int64]($now - $cv_epoch).TotalSeconds); cv_w $sb.ToString() }",
+    // Kiln's events file, found the way Kiln finds it (KILN_EVENTS_PATH, XDG_CONFIG_HOME, ~/.config)
+    "$cv_kf = if ($env:KILN_EVENTS_PATH) { $env:KILN_EVENTS_PATH -replace '^~(?=[\\\\/]|$)', $HOME } elseif ($env:XDG_CONFIG_HOME) { Join-Path $env:XDG_CONFIG_HOME 'kiln/events.jsonl' } else { Join-Path $HOME '.config/kiln/events.jsonl' }",
+    'function cv_read([string]$rel, [int64]$off, [int64]$max) { cv_rd (Join-Path $cv_root $rel) $off $max }',
+    'function cv_kread([int]$which, [int64]$off, [int64]$max) { if ($which -eq 1) { cv_rd ($cv_kf + ".1") $off $max } else { cv_rd $cv_kf $off $max } }',
     // the transcript stays writable (and deletable) by Claude Code while it is read
-    'function cv_read([string]$rel, [int64]$off, [int64]$max) { $fs = $null; try { $fs = [IO.File]::Open((Join-Path $cv_root $rel), [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)) } catch { cv_w \'CVD -1 0\'; return }; try { $s = $fs.Length; $n = $s - $off; if ($n -lt 0) { cv_w "CVD -2 $s"; return }; if ($n -gt $max) { $n = $max }; $buf = New-Object byte[] $n; $fs.Position = $off; $got = 0; while ($got -lt $n) { $r = $fs.Read($buf, $got, $n - $got); if ($r -le 0) { break }; $got += $r }; cv_w "CVD $n $s"; if ($n -gt 0) { $cv_o.Write($buf, 0, $n); $cv_o.Flush() } } finally { $fs.Close() } }',
+    'function cv_rd([string]$path, [int64]$off, [int64]$max) { $fs = $null; try { $fs = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)) } catch { cv_w \'CVD -1 0\'; return }; try { $s = $fs.Length; $n = $s - $off; if ($n -lt 0) { cv_w "CVD -2 $s"; return }; if ($n -gt $max) { $n = $max }; $buf = New-Object byte[] $n; $fs.Position = $off; $got = 0; while ($got -lt $n) { $r = $fs.Read($buf, $got, $n - $got); if ($r -le 0) { break }; $got += $r }; cv_w "CVD $n $s"; if ($n -gt 0) { $cv_o.Write($buf, 0, $n); $cv_o.Flush() } } finally { $fs.Close() } }',
     'cv_w ("CVREADY " + $env:COMPUTERNAME)',
   ].join('\n') + '\n';
 

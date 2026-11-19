@@ -47,6 +47,8 @@ const QUIET_MS = 20_000;
 /** a run with no end after this long is treated as lost, whatever its pid says (pids get reused) */
 const STALE_MS = 6 * 3_600_000;
 const LIVENESS_MS = 5_000;
+/** another computer's runs (an SSH mirror): their pids mean nothing here, so a run this quiet is treated as lost */
+const REMOTE_QUIET_MS = 30 * 60_000;
 const MAX_SESSIONS = 200;
 
 interface Link {
@@ -69,6 +71,8 @@ const stampOf = (r: KilnRun) => `${r.steps.length}|${r.finishedAt ?? ''}|${r.los
 export class KilnSource {
   log = new KilnLog();
   file: string | null = null;
+  /** the file is a copy of another computer's (pids cannot be checked) */
+  private remote = false;
   private tail: FileTail | null = null;
   private busy = false;
   private lastLiveness = 0;
@@ -80,7 +84,13 @@ export class KilnSource {
   private summaryKey = '';
 
   setConfig(o: KilnOptions) {
-    this.file = o.enabled ? kilnEventsPath(o.file) : null;
+    this.useFile(o.enabled ? kilnEventsPath(o.file) : null);
+  }
+
+  /** Follow this events file as it is (an SSH remote's mirrored copy: `remote`), or nothing. */
+  useFile(file: string | null, remote = false) {
+    this.file = file;
+    this.remote = remote;
     this.tail = null;
     this.log = new KilnLog();
     this.claimed.clear();
@@ -145,7 +155,7 @@ export class KilnSource {
     const now = Date.now();
     for (const r of this.log.runs.values()) {
       if (runEnded(r) || now - r.lastAt < QUIET_MS) continue;
-      if (now - r.lastAt > STALE_MS || !alive(r.pid)) {
+      if (now - r.lastAt > (this.remote ? REMOTE_QUIET_MS : STALE_MS) || (!this.remote && !alive(r.pid))) {
         r.lost = true;
         this.log.version++;
       }

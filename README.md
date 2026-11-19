@@ -165,7 +165,7 @@ Claude Code can run against local models through a gateway or proxy (LiteLLM, Ol
   - **On the Local models page**: Kiln's last model check (profile, model, reachable) and its newest run.
   - **In History**: search finds the local model's briefs, answers and messages.
   - **Runs no Claude session can claim** (another MCP client, a session in a folder the app does not see) get a session of their own, with a "KILN" badge.
-- **Where it reads**: Kiln's events file, `~/.config/kiln/events.jsonl` (or `$KILN_EVENTS_PATH`, `$XDG_CONFIG_HOME/kiln/events.jsonl`), and its one rotation `events.jsonl.1`. It is read only, never written, and the app never talks to Kiln or its model server. Kiln has to run on the same computer as the app.
+- **Where it reads**: Kiln's events file, `~/.config/kiln/events.jsonl` (or `$KILN_EVENTS_PATH`, `$XDG_CONFIG_HOME/kiln/events.jsonl`), and its one rotation `events.jsonl.1`. It is read only, never written, and the app never talks to Kiln or its model server. Kiln can run on this computer or on one watched over SSH (its events file is copied with the transcripts) or through the peer link.
 - **Matching**: a run belongs to the delegate_task call with the same brief, made in the same folder shortly before the run started. A run whose Kiln process is gone without finishing shows as failed.
 - **Settings**: "Show Kiln runs" (on by default; does nothing until Kiln has written its events file) and "Kiln events file" (empty = Kiln's default).
 - **Tests**: `tests/fixtures/kiln.ts` writes Kiln event lines. `CLAUDE_VIS_KILN_EVENTS` points the app at a file. When `CLAUDE_VIS_HOME` is set for a test and this is not, Kiln's file is not read at all.

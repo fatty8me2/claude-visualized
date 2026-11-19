@@ -71,6 +71,7 @@ export class SshService extends EventEmitter {
   private selected: { deviceId: string; id: string } | null = null;
   private attention = true;
   private agentDone = false;
+  private kiln = true;
 
   constructor(private opts: SshServiceOptions) {
     super();
@@ -101,6 +102,17 @@ export class SshService extends EventEmitter {
     }
   }
 
+  /** Settings: "Show Kiln runs" applies to SSH remotes too (their Kiln events file is copied and followed). */
+  setKiln(on: boolean) {
+    if (on === this.kiln) return;
+    this.kiln = on;
+    for (const h of this.hosts.values()) {
+      h.mirror.copyKiln = on;
+      h.mgr.useKilnFile(on ? h.mirror.kilnFile : null);
+    }
+    this.emit('sessions');
+  }
+
   // ======================= hosts =======================
 
   private name(h: Host): string {
@@ -111,7 +123,9 @@ export class SshService extends EventEmitter {
     const dir = path.join(this.opts.root, cfg.id);
     const spec = (shell: RemoteShell): SpawnSpec => this.opts.spawn?.(cfg, shell) ?? { command: sshCommand(), args: sshArgs(cfg, shell), shell };
     const mirror = new HostMirror({ dir, spec, shell: cfg.shell, target: cfg.target, ...this.opts.mirror });
-    const mgr = new SessionManager({ projectsRoot: mirror.projectsDir, passive: true, backlogLoader: this.opts.backlogLoader });
+    mirror.copyKiln = this.kiln;
+    const mgr = new SessionManager({ projectsRoot: mirror.projectsDir, passive: true, kilnFile: mirror.kilnFile, backlogLoader: this.opts.backlogLoader });
+    if (!this.kiln) mgr.useKilnFile(null);
     mgr.followActive = false;
     mgr.notifyAttention = this.attention;
     mgr.notifyAgentDone = this.agentDone;

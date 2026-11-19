@@ -63,6 +63,8 @@ export interface SessionManagerOptions {
   projectsRoot?: string;
   /** a source for another component to read: no OpenCode, no desktop-app index, and it never selects a session by itself */
   passive?: boolean;
+  /** an SSH remote's mirrored copy of Kiln's events file: its runs are shown in that remote's sessions */
+  kilnFile?: string;
   /** how a session's backlog is first read (default: on a worker thread) */
   backlogLoader?: BacklogLoader;
 }
@@ -70,6 +72,8 @@ export interface SessionManagerOptions {
 export class SessionManager extends EventEmitter {
   private indexer: SessionIndexer;
   private passive: boolean;
+  /** Kiln runs are followed: always for this computer, for an SSH remote when it has a kilnFile */
+  private kilnOn: boolean;
   private loader: BacklogLoader;
   private watchers = new Map<string, Follower>();
   private oc = new OpenCodeSource();
@@ -95,6 +99,8 @@ export class SessionManager extends EventEmitter {
   constructor(opts: SessionManagerOptions = {}) {
     super();
     this.passive = !!opts.passive;
+    this.kilnOn = !this.passive || !!opts.kilnFile;
+    if (opts.kilnFile) this.kiln.useFile(opts.kilnFile, true);
     this.loader = opts.backlogLoader ?? loadBacklogInWorker;
     this.indexer = new SessionIndexer(opts.projectsRoot, !this.passive);
   }
@@ -136,8 +142,8 @@ export class SessionManager extends EventEmitter {
     if (!this.passive) {
       this.timers.push(setInterval(() => void this.pollAll(true), OC_POLL_MS));
       this.timers.push(setInterval(() => this.scanOpenCode(), OC_SCAN_MS));
-      this.timers.push(setInterval(() => void this.pollKiln(), KILN_POLL_MS));
     }
+    if (this.kilnOn) this.timers.push(setInterval(() => void this.pollKiln(), KILN_POLL_MS));
     this.timers.push(
       setInterval(() => {
         if (this.dirty) {
@@ -328,6 +334,17 @@ export class SessionManager extends EventEmitter {
   /** Settings: show Kiln runs (local-model hand-offs) or not, and where its events file is ('' = Kiln's default). */
   setKiln(o: KilnOptions) {
     this.kiln.setConfig(o);
+    this.resetKiln();
+  }
+
+  /** An SSH remote's mirrored Kiln events file, or null to stop showing its runs. */
+  useKilnFile(file: string | null) {
+    if (!this.kilnOn) return;
+    this.kiln.useFile(file, true);
+    this.resetKiln();
+  }
+
+  private resetKiln() {
     for (const [id, w] of [...this.watchers]) if (w instanceof KilnWatcher) this.watchers.delete(id);
     this.scanKiln();
   }
@@ -380,7 +397,7 @@ export class SessionManager extends EventEmitter {
   private async scan() {
     try {
       this.claudeSummaries = await this.indexer.scan();
-      if (!this.passive) this.kilnSummaries = this.kiln.scan(this.claudeSummaries);
+      if (this.kilnOn) this.kilnSummaries = this.kiln.scan(this.claudeSummaries);
       this.mergeSummaries();
     } catch (e) {
       console.error('scan failed', e);
@@ -453,7 +470,7 @@ export class SessionManager extends EventEmitter {
       try {
         changed = await w.poll();
         // the local-model runs this session handed to Kiln, as child agents
-        if (w instanceof SessionWatcher && !this.passive && this.kiln.link(w)) changed = true;
+        if (w instanceof SessionWatcher && this.kilnOn && this.kiln.link(w)) changed = true;
       } catch (e) {
         console.error('poll failed', w.sessionId, e);
         continue;
@@ -553,6 +570,6 @@ export class SessionManager extends EventEmitter {
     if (f.startsWith('opencode:')) return this.oc.watcher(id).collectAllEvents();
     if (f.startsWith('kiln:')) return this.kiln.watcher(id).collectAllEvents();
     const events = await new SessionWatcher(id, f, this.loader).collectAllEvents();
-    return this.passive ? events : this.kiln.withRuns(events, id);
+    return this.kilnOn ? this.kiln.withRuns(events, id) : events;
   }
 }

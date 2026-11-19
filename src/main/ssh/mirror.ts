@@ -1,6 +1,7 @@
 // Keeps a local copy of one SSH remote's recent Claude Code transcripts (see core/sshRemote.ts for what is copied and in which order).
 // The copy has the same layout as ~/.claude/projects, so a SessionManager can follow it like local sessions.
 // A file that is not here yet is downloaded as <name>.part and renamed when complete, so nothing downstream sees half a backlog.
+// Kiln's events file (local-model hand-offs, see main/kiln.ts) is copied too, to <dir>/kiln/events.jsonl, with its rotation.
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -36,6 +37,8 @@ interface Local extends LocalFile {
 /** Events: 'status' (state, error, progress or hostname changed), 'settled' (a live or pinned session is fully copied), 'shell' (the remote is Windows). */
 export class HostMirror extends EventEmitter {
   readonly projectsDir: string;
+  /** the local copy of the other computer's Kiln events file (it exists once Kiln has written something there) */
+  readonly kilnFile: string;
   state: SshHostState = 'connecting';
   error: string | null = null;
   offlineSince: number | null = null;
@@ -47,16 +50,22 @@ export class HostMirror extends EventEmitter {
   pinned = new Set<string>();
   /** live and pinned sessions that were fully copied at least once */
   readonly settled = new Set<string>();
+  /** copy Kiln's events file too (Settings: "Show Kiln runs") */
+  copyKiln = true;
   private remote = new Map<string, RemoteFile>();
   private local = new Map<string, Local>();
   private conn: SshConn | null = null;
   private stopped = true;
   private wake: (() => void) | null = null;
   private clockOffset = 0;
+  /** bytes of Kiln's events file copied so far */
+  private kilnSize = 0;
+  private kilnDue = 0;
 
   constructor(private opts: MirrorOptions) {
     super();
     this.projectsDir = path.join(opts.dir, 'projects');
+    this.kilnFile = path.join(opts.dir, 'kiln', 'events.jsonl');
     this.shell = opts.shell ?? 'sh';
   }
 
@@ -160,6 +169,7 @@ export class HostMirror extends EventEmitter {
         this.clockOffset = r.now - lastQuick;
         for (const f of r.files) this.remote.set(f.rel, f);
       }
+      if (this.copyKiln && Date.now() >= this.kilnDue) await this.syncKiln(conn, quickMs, fullMs);
       const plan = planFetch(this.remote, (rel) => this.local.get(rel), { now: Date.now() + this.clockOffset, pinned: this.pinned });
       for (const id of plan.settled) {
         if (this.settled.has(id)) continue;
@@ -213,6 +223,43 @@ export class HostMirror extends EventEmitter {
     return 'ok';
   }
 
+  /**
+   * Copy the next piece of Kiln's events file. Kiln only appends, except when it rotates the file at 5 MB (events.jsonl ->
+   * events.jsonl.1): then the local copy is rotated the same way and the rest of the old file is read from the remote .1, so
+   * KilnSource sees what it would see on the other computer.
+   */
+  private async syncKiln(conn: SshConn, quickMs: number, fullMs: number) {
+    const chunk = this.opts.chunk ?? 2 * 1024 * 1024;
+    const r = await conn.readKiln(false, this.kilnSize, chunk);
+    if (r === 'missing') {
+      // no Kiln on the other computer (or nothing written yet): look again now and then
+      this.kilnDue = Date.now() + fullMs;
+      return;
+    }
+    await fs.mkdir(path.dirname(this.kilnFile), { recursive: true });
+    if (r === 'shrunk') {
+      const old = this.kilnSize;
+      await fs.rm(this.kilnFile + '.1', { force: true });
+      await fs.rename(this.kilnFile, this.kilnFile + '.1').catch(() => {});
+      this.kilnSize = 0;
+      for (let off = old; ; ) {
+        const rest = await conn.readKiln(true, off, chunk);
+        if (typeof rest === 'string' || !rest.data.length) break;
+        await fs.appendFile(this.kilnFile + '.1', rest.data);
+        off += rest.data.length;
+        if (off >= rest.size) break;
+      }
+      this.kilnDue = 0;
+      return;
+    }
+    if (r.data.length) {
+      await fs.appendFile(this.kilnFile, r.data);
+      this.kilnSize += r.data.length;
+    }
+    // a backlog is read chunk after chunk; after that, as often as the quick listing
+    this.kilnDue = this.kilnSize < r.size ? 0 : Date.now() + quickMs;
+  }
+
   private async drop(rel: string) {
     this.local.delete(rel);
     const file = this.file(rel);
@@ -254,5 +301,10 @@ export class HostMirror extends EventEmitter {
       }
     };
     await visit(this.projectsDir, '', 0);
+    try {
+      this.kilnSize = (await fs.stat(this.kilnFile)).size;
+    } catch {
+      this.kilnSize = 0;
+    }
   }
 }

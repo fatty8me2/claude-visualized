@@ -721,6 +721,7 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
   if (patch.kilnEnabled !== undefined || patch.kilnEventsFile !== undefined) {
     config.kilnEventsFile = String(config.kilnEventsFile ?? '').trim();
     manager.setKiln({ enabled: config.kilnEnabled, file: config.kilnEventsFile });
+    ssh?.setKiln(config.kilnEnabled !== false);
   }
   if (patch.localModels !== undefined) {
     config.localModels = normalizeLocalConfig(patch.localModels);
@@ -845,6 +846,7 @@ if (!app.requestSingleInstanceLock()) {
       spawn: testOverride('CLAUDE_VIS_SSH_CMD') ? (_h, shell) => ({ command: testOverride('CLAUDE_VIS_SSH_CMD')!, args: [], shell }) : undefined,
     });
     ssh.setNotify(config.notifyAttention, config.notifyAgentDone);
+    ssh.setKiln(config.kilnEnabled !== false);
     manager.addRemote(ssh);
     const remoteInbox = () => inbox.setRemote([...peers.remoteInbox(), ...ssh.remoteInbox()]);
     ssh.on('status', (st) => broadcast('ssh', st));

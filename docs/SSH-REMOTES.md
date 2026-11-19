@@ -23,8 +23,9 @@ to PowerShell and remembers that for the computer.
 
 - The app starts the system `ssh` client (`ssh -T -o BatchMode=yes user@host sh`, or `... powershell -NoProfile -Command -` for Windows). `BatchMode` means ssh never prompts: a missing key or
   an unknown host key fails with a message on the Devices page. The app never sees, asks for or stores a password or a key.
-- The remote shell is sent a small script (`REMOTE_SCRIPT` / `REMOTE_SCRIPT_PS` in `src/core/sshRemote.ts`) with two read-only requests: list the transcript
-  files under `~/.claude/projects` with their size and time, and read a byte range of one of them. Nothing is installed, written or
+- The remote shell is sent a small script (`REMOTE_SCRIPT` / `REMOTE_SCRIPT_PS` in `src/core/sshRemote.ts`) with three read-only requests: list the transcript
+  files under `~/.claude/projects` with their size and time, read a byte range of one of them, and read a byte range of
+  [Kiln](https://github.com/fatty8me2/kiln)'s events file (or its rotation `events.jsonl.1`), found the way Kiln finds it. Nothing is installed, written or
   changed on the other computer, and nothing keeps running there after the connection closes.
 - What is new is copied into a mirror folder in this computer's app data folder (`ssh-mirror/<id>/projects`), laid out like
   `~/.claude/projects`. A second, passive session manager follows that folder exactly like local sessions, and the main one merges it
@@ -37,6 +38,10 @@ to PowerShell and remembers that for the computer.
 - **Live sessions** (active in the last 15 minutes) and **the session you select**: the main transcript, subagent transcripts, workflow
   journals and titles.
 - **The 30 most recent other sessions**: the main transcript and title only, enough for the session list.
+- **Kiln's events file** (local-model hand-offs), when the other computer has one: the new bytes as often as the quick listing, into
+  `ssh-mirror/<id>/kiln/`. When Kiln rotates it, the local copy is rotated too and the rest of the old file is read from `.1`. Runs
+  show under the remote session that handed them off, and runs nobody claims get a Kiln session of their own. A run with no news for
+  30 minutes counts as failed (its process cannot be checked from here). "Show Kiln runs" in Settings switches this off too.
 - Transcripts only grow, so only the new bytes are fetched. A file that is not here yet is downloaded as `.part` and renamed when
   complete. Copies of files the other computer no longer lists (deleted, or older than 14 days) are removed.
 - Removing the remote on the Devices page deletes its whole mirror folder.
