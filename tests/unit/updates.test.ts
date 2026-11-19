@@ -3,8 +3,11 @@ import {
   decideUpdateMode,
   describeUpdate,
   initialUpdateView,
+  isNewerVersion,
   isNoReleasesError,
+  NO_FEED_ERROR,
   reduceUpdate,
+  updateChipModel,
   releaseNotesSnippet,
   type ModeInput,
   type UpdateView,
@@ -24,11 +27,11 @@ describe('decideUpdateMode', () => {
     expect(decideUpdateMode({ ...base, isPackaged: false }).mode).toBe('disabled');
     expect(decideUpdateMode({ ...base, isPackaged: false, feedOverride: true }).mode).toBe('auto');
   });
-  it('unsigned macOS is manual, signed macOS is auto', () => {
-    const d = decideUpdateMode({ ...base, platform: 'darwin' });
-    expect(d.mode).toBe('manual');
-    expect(d.reason).toMatch(/not signed/);
-    expect(decideUpdateMode({ ...base, platform: 'darwin', macSigned: true }).mode).toBe('auto');
+  it('unsigned macOS updates itself unless something blocks the swap; then it is manual with the reason', () => {
+    expect(decideUpdateMode({ ...base, platform: 'darwin', macBlocker: null }).mode).toBe('auto');
+    const d = decideUpdateMode({ ...base, platform: 'darwin', macBlocker: 'running from the disk image' });
+    expect(d).toEqual({ mode: 'manual', reason: 'running from the disk image' });
+    expect(decideUpdateMode({ ...base, platform: 'darwin', macSigned: true, macBlocker: 'x' }).mode).toBe('auto');
   });
 });
 
@@ -56,11 +59,19 @@ describe('reduceUpdate', () => {
     expect(reduceUpdate(d, { type: 'not-available', at: 1 })).toBe(d);
     expect(reduceUpdate(d, { type: 'error', message: 'net down', at: 1 })).toBe(d);
   });
-  it('404 / no releases is not an error', () => {
+  it('a 404 (the releases went out of reach, e.g. a private repo) is a visible error, not a calm state', () => {
     const s = reduceUpdate(idle(), { type: 'error', message: 'Cannot find latest.yml in the latest release artifacts (404)', at: 3 });
-    expect(s).toMatchObject({ status: 'idle', noReleases: true });
-    expect(s.error).toBeUndefined();
-    expect(describeUpdate(s)).toBe('No releases published yet.');
+    expect(s).toMatchObject({ status: 'error', noReleases: true, error: NO_FEED_ERROR });
+    expect(describeUpdate(s)).toMatch(/could not be found.*private/);
+    expect(updateChipModel(s)).toMatchObject({ state: 'error', label: 'Updates unreachable' });
+  });
+  it('"Update now" is remembered until the download fails', () => {
+    let s = reduceUpdate(idle(), { type: 'available', version: '0.2.0' });
+    s = reduceUpdate(s, { type: 'install-when-ready', on: true });
+    expect(s.installWhenReady).toBe(true);
+    expect(reduceUpdate(s, { type: 'install-when-ready', on: true })).toBe(s);
+    s = reduceUpdate(s, { type: 'error', message: 'socket hang up', at: 1 });
+    expect(s.installWhenReady).toBeUndefined();
   });
   it('other failures are errors, truncated', () => {
     const s = reduceUpdate(idle(), { type: 'error', message: 'x'.repeat(1000), at: 3 });
@@ -71,6 +82,18 @@ describe('reduceUpdate', () => {
     const d = initialUpdateView('0.1.0', { mode: 'disabled', reason: 'off' });
     expect(reduceUpdate(d, { type: 'checking' })).toBe(d);
     expect(describeUpdate(d)).toBe('off');
+  });
+  it('the title bar chip: one per actionable state, none when idle or for a passing network error', () => {
+    expect(updateChipModel(idle())).toBeNull();
+    expect(updateChipModel(idle({ upToDate: true }))).toBeNull();
+    const a = reduceUpdate(idle(), { type: 'available', version: '0.2.0' });
+    expect(updateChipModel(a)).toMatchObject({ state: 'available', label: 'Update to v0.2.0' });
+    expect(updateChipModel({ ...a, mode: 'manual' })).toMatchObject({ state: 'available', label: 'Get v0.2.0' });
+    const d = reduceUpdate(a, { type: 'progress', percent: 41.6 });
+    expect(updateChipModel(d)).toMatchObject({ state: 'downloading', label: 'Updating 42%' });
+    expect(updateChipModel(reduceUpdate(d, { type: 'downloaded', version: '0.2.0' }))).toMatchObject({ state: 'ready', label: 'Restart to update' });
+    expect(updateChipModel(reduceUpdate(idle(), { type: 'error', message: 'getaddrinfo ENOTFOUND github.com', at: 1 }))).toBeNull();
+    expect(updateChipModel(initialUpdateView('0.1.0', { mode: 'disabled' }))).toBeNull();
   });
   it('manual mode describes the release page', () => {
     const s = reduceUpdate(idle({ mode: 'manual' }), { type: 'available', version: '0.3.0' });
@@ -84,6 +107,14 @@ describe('helpers', () => {
     expect(isNoReleasesError('Unable to find latest version on GitHub')).toBe(true);
     expect(isNoReleasesError('ERR_UPDATER_CHANNEL_FILE_NOT_FOUND')).toBe(true);
     expect(isNoReleasesError('getaddrinfo ENOTFOUND github.com')).toBe(false);
+  });
+  it('compares versions for the one-time "Updated to"', () => {
+    expect(isNewerVersion('0.13.0', '0.12.2')).toBe(true);
+    expect(isNewerVersion('0.12.10', '0.12.9')).toBe(true);
+    expect(isNewerVersion('1.0.0', '0.99.99')).toBe(true);
+    expect(isNewerVersion('0.12.2', '0.12.2')).toBe(false);
+    expect(isNewerVersion('0.12.1', '0.12.2')).toBe(false);
+    expect(isNewerVersion('0.12.2', undefined)).toBe(false);
   });
   it('reduces release notes to plain text', () => {
     expect(releaseNotesSnippet('<p>Fixes &amp; things</p><ul><li>one</li><li>two</li></ul>')).toBe('Fixes & things\n- one\n- two');

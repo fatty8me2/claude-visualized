@@ -8,8 +8,7 @@
   --act-b: var(--faint);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--act) 5%, transparent), transparent 70%),
-    linear-gradient(90deg, color-mix(in srgb, var(--opus) 4%, transparent), transparent 40%, color-mix(in srgb, var(--haiku) 4%, transparent)),
-    var(--bg-2);
+    linear-gradient(90deg, color-mix(in srgb, var(--opus) 4%, transparent), transparent 40%, color-mix(in srgb, var(--haiku) 4%, transparent)), var(--bg-2);
   overflow: visible;
 }
 .titlebar[data-activity='live'] {
@@ -186,9 +185,7 @@
   padding: 0 11px 0 10px;
   height: 24px;
   border-color: color-mix(in srgb, var(--lvl) 26%, var(--line-2));
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--lvl) 9%, transparent), transparent 80%),
-    color-mix(in srgb, var(--panel) 78%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lvl) 9%, transparent), transparent 80%), color-mix(in srgb, var(--panel) 78%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition: border-color 0.3s;
 }
@@ -403,9 +400,7 @@
   align-items: stretch;
   line-height: 24px;
   font-family: var(--font-mono);
-  background:
-    linear-gradient(0deg, color-mix(in srgb, var(--opus) 4%, transparent), transparent),
-    var(--bg-2);
+  background: linear-gradient(0deg, color-mix(in srgb, var(--opus) 4%, transparent), transparent), var(--bg-2);
 }
 /* a hairline of energy along the top edge */
 .statusbar::before {
@@ -416,7 +411,13 @@
   top: -1px;
   height: 1px;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--opus) 45%, transparent) 20%, color-mix(in srgb, var(--haiku) 45%, transparent) 80%, transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--opus) 45%, transparent) 20%,
+    color-mix(in srgb, var(--haiku) 45%, transparent) 80%,
+    transparent
+  );
   opacity: 0.45;
 }
 .statusbar > span:not(.spacer) {
@@ -539,5 +540,83 @@
   .usage .meter.warn::before,
   .usage .meter.hot::before {
     opacity: 0.55;
+  }
+}
+
+/* The title bar's update corner (components/UpdatesSettings.tsx UpdateChip): the version, and a glowing chip while an update
+   waits. Every class starts with tb-upd- (renderer CSS is global). */
+.tb-upd {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.tb-upd-ver {
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  cursor: pointer;
+}
+.tb-upd-ver:hover {
+  color: var(--text-2);
+  border-color: var(--line-2);
+}
+.tb-upd-chip {
+  --tb-upd-c: var(--opus);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px 2px 8px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--tb-upd-c) 60%, transparent);
+  background: color-mix(in srgb, var(--tb-upd-c) 14%, transparent);
+  color: var(--tb-upd-c);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 0 12px -3px color-mix(in srgb, var(--tb-upd-c) 70%, transparent);
+  animation: tb-upd-breathe 2.6s ease-in-out infinite;
+}
+.tb-upd-chip i {
+  font-style: normal;
+  font-family: var(--font-mono);
+}
+.tb-upd-chip:hover {
+  background: color-mix(in srgb, var(--tb-upd-c) 24%, transparent);
+}
+.tb-upd-chip[data-state='ready'] {
+  --tb-upd-c: var(--ok);
+}
+.tb-upd-chip[data-state='error'] {
+  --tb-upd-c: var(--warn);
+  animation: none;
+}
+.tb-upd-chip[data-state='downloading'] {
+  animation: none;
+}
+.tb-upd-fill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--tb-upd-c);
+  transition: width 300ms ease-out;
+}
+@keyframes tb-upd-breathe {
+  50% {
+    box-shadow: 0 0 18px -2px color-mix(in srgb, var(--tb-upd-c) 90%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-upd-chip {
+    animation: none;
   }
 }

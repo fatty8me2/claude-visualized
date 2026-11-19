@@ -3,6 +3,7 @@ import type { AppUpdater, UpdateInfo } from 'electron-updater';
 import {
   decideUpdateMode,
   initialUpdateView,
+  isNewerVersion,
   RECHECK_ON_SHOW_MS,
   reduceUpdate,
   releaseNotesSnippet,
@@ -10,9 +11,10 @@ import {
   type UpdateAction,
   type UpdateView,
 } from '@core/updates';
+import { MacSelfUpdater, type MacFeedInfo } from './macUpdate';
 
 const FIRST_CHECK_MS = 30_000;
-const CHECK_EVERY_MS = 6 * 60 * 60_000;
+const CHECK_EVERY_MS = 60 * 60_000;
 
 /** Flip to true once the macOS build is signed with a Developer ID (then Squirrel.Mac can update it). See RELEASING.md. */
 const MAC_SIGNED = false;
@@ -24,6 +26,8 @@ export interface UpdaterDeps {
   onChange: (v: UpdateView) => void;
   /** lets the window-close handler stand aside while the installer takes over */
   beforeInstall: () => void;
+  /** the version that ran before this one (config.lastRunVersion) */
+  previousVersion?: string;
 }
 
 /**
@@ -40,6 +44,11 @@ export class Updater {
   private lastCheckAt: number | undefined;
   private readonly recheckMs = process.env.CLAUDE_VIS_UPDATE_RECHECK_MS ? Number(process.env.CLAUDE_VIS_UPDATE_RECHECK_MS) : RECHECK_ON_SHOW_MS;
   private readonly feedUrl = process.env.CLAUDE_VIS_UPDATE_URL;
+  /** unsigned macOS: the app replaces its own bundle (Squirrel.Mac would refuse) */
+  private readonly mac: MacSelfUpdater | null =
+    process.platform === 'darwin' && !MAC_SIGNED ? new MacSelfUpdater(app.getPath('userData'), process.execPath, this.feedUrl) : null;
+  /** the release the last check found (what the Mac self-update downloads) */
+  private latest: MacFeedInfo | null = null;
 
   constructor(private deps: UpdaterDeps) {
     const decision = decideUpdateMode({
@@ -48,8 +57,10 @@ export class Updater {
       envDisabled: !!process.env.CLAUDE_VIS_NO_UPDATES,
       feedOverride: !!this.feedUrl,
       macSigned: MAC_SIGNED,
+      macBlocker: this.mac?.blocker() ?? null,
     });
     this.view = initialUpdateView(app.getVersion(), decision);
+    if (isNewerVersion(app.getVersion(), deps.previousVersion)) this.view = { ...this.view, updatedFrom: deps.previousVersion };
   }
 
   get state(): UpdateView {
@@ -93,12 +104,13 @@ export class Updater {
     }
     autoUpdater.on('checking-for-update', () => this.dispatch({ type: 'checking' }));
     autoUpdater.on('update-available', (info: UpdateInfo) => {
+      this.latest = { version: info.version, files: info.files };
       this.dispatch({ type: 'available', version: info.version, releaseNotes: releaseNotesSnippet(info.releaseNotes) });
       if (this.view.mode === 'auto' && this.deps.autoDownload()) void this.download();
     });
     autoUpdater.on('update-not-available', () => this.dispatch({ type: 'not-available', at: Date.now() }));
     autoUpdater.on('download-progress', (p) => this.dispatch({ type: 'progress', percent: p.percent }));
-    autoUpdater.on('update-downloaded', (info: UpdateInfo) => this.dispatch({ type: 'downloaded', version: info.version }));
+    autoUpdater.on('update-downloaded', (info: UpdateInfo) => this.onDownloaded(info.version));
     autoUpdater.on('error', (e: Error) => this.dispatch({ type: 'error', message: String(e?.message ?? e), at: Date.now() }));
     this.au = autoUpdater;
     return autoUpdater;
@@ -136,19 +148,53 @@ export class Updater {
     if (this.view.mode !== 'auto' || this.view.status !== 'available' || !this.au) return this.view;
     this.dispatch({ type: 'progress', percent: 0 });
     try {
-      await this.au.downloadUpdate();
+      if (this.mac) {
+        const info = this.latest;
+        if (!info) throw new Error('No release to download.');
+        await this.mac.download(info, (percent) => this.dispatch({ type: 'progress', percent }));
+        this.onDownloaded(info.version);
+      } else await this.au.downloadUpdate();
     } catch (e) {
       this.dispatch({ type: 'error', message: (e as Error).message, at: Date.now() });
     }
     return this.view;
   }
 
-  /** "Restart & update": quit, run the installer, relaunch. Only meaningful once downloaded. */
+  private onDownloaded(version: string) {
+    this.dispatch({ type: 'downloaded', version });
+    if (this.view.installWhenReady) this.install();
+  }
+
+  /** One click: restart now when the update is downloaded, otherwise download it and restart as soon as it is done. */
+  async updateNow(): Promise<UpdateView> {
+    if (this.view.mode !== 'auto') return this.view;
+    if (this.view.status === 'downloaded') {
+      this.install();
+      return this.view;
+    }
+    if (this.view.status !== 'available' && this.view.status !== 'downloading') return this.view;
+    this.dispatch({ type: 'install-when-ready', on: true });
+    if (this.view.status === 'available') await this.download();
+    return this.view;
+  }
+
+  /** "Restart & update": quit, install, relaunch. Only meaningful once downloaded. */
   install(): boolean {
     if (this.view.status !== 'downloaded' || !this.au) return false;
+    if (this.mac) {
+      if (!this.mac.launchSwap(true)) return false;
+      this.deps.beforeInstall();
+      app.quit();
+      return true;
+    }
     this.deps.beforeInstall();
     // not silent (shows the NSIS progress), and relaunch afterwards
     this.au.quitAndInstall(false, true);
     return true;
+  }
+
+  /** The app is quitting: a downloaded Mac update is put in place without reopening (Windows' installer does the same itself). */
+  onQuit(): void {
+    if (this.mac && this.view.status === 'downloaded') this.mac.launchSwap(false);
   }
 }

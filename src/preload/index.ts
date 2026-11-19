@@ -73,6 +73,7 @@ const api: VisApi = {
   checkForUpdates: () => ipcRenderer.invoke('updates:check'),
   downloadUpdate: () => ipcRenderer.invoke('updates:download'),
   installUpdate: () => ipcRenderer.invoke('updates:install'),
+  updateNow: () => ipcRenderer.invoke('updates:now'),
   onUpdates: (cb) => on('updates', cb),
   onWindowShown: (cb) => on<void>('window:shown', () => cb()),
   getSshHosts: () => ipcRenderer.invoke('ssh:status'),

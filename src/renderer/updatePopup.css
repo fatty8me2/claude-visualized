@@ -15,8 +15,7 @@
   font-family: var(--font-ui);
   color: var(--text);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--upd-pop-accent) 9%, transparent), transparent 90px),
-    color-mix(in srgb, var(--panel) 92%, transparent);
+    linear-gradient(180deg, color-mix(in srgb, var(--upd-pop-accent) 9%, transparent), transparent 90px), color-mix(in srgb, var(--panel) 92%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   backdrop-filter: blur(18px) saturate(1.2);
   border: 1px solid color-mix(in srgb, var(--upd-pop-accent) 45%, var(--line-2));
@@ -160,7 +159,30 @@
   border-color: var(--ok);
   background-color: color-mix(in srgb, var(--ok) 24%, var(--panel-2));
 }
-/* the release-page link (unsigned macOS) looks like the primary button */
+/* "updated" is calm green; a failing feed (opened from the title bar) is amber */
+.upd-pop-card[data-stage='updated'] {
+  --upd-pop-accent: var(--ok);
+}
+.upd-pop-card[data-tone='error'] {
+  --upd-pop-accent: var(--warn);
+}
+.upd-pop-reason {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  line-height: 1.45;
+}
+/* "What's new": a quiet link on the left of the buttons */
+.upd-pop-link {
+  margin-right: auto;
+  align-self: center;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.upd-pop-link:hover {
+  color: var(--text);
+}
+/* the release-page link (a copy that cannot update itself) looks like the primary button */
 .upd-pop-linkbtn {
   display: inline-flex;
   align-items: center;

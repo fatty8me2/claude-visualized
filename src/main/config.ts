@@ -16,6 +16,8 @@ export interface AppConfig {
   autoDownloadUpdates: boolean;
   /** pop up "Update available" in the window when an update is found (Settings > Updates) */
   notifyUpdates: boolean;
+  /** the app version that ran last (to say "Updated to …" once after an update) */
+  lastRunVersion?: string;
   miniHotkey: string;
   onboardingDone?: boolean;
   onboardingVersion?: number;

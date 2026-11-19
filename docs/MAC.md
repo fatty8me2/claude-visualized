@@ -50,7 +50,10 @@ notarized**. The first time you open it, macOS refuses. Use one of these:
   xattr -dr com.apple.quarantine "/Applications/Claude Visualized.app"
   ```
 
-In-app updates on an unsigned Mac build don't install themselves: the app shows "Download vX…" and opens the release page instead.
+**Updates install themselves** once the app is in Applications: when a new version is out, the title bar shows "Update to vX". Click it
+and the app downloads the update, checks it, and restarts into the new version. Quitting the app also installs a downloaded update. A copy
+run straight from the `.dmg` or from Downloads can't replace itself; it shows "Get vX" and the reason, so move it to Applications first.
+Versions up to 0.12.2 only link to the release page, so install the first version after 0.12.2 by hand once.
 
 ## Share this Mac's sessions with your Windows PC
 

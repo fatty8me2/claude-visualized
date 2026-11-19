@@ -582,13 +582,14 @@ ${u}`
   );
 }
 
-/** Tray entry for updates: restart when ready, the release page on unsigned macOS, otherwise a manual check. Nothing when disabled. */
+/** Tray entry for updates: restart when ready, update now when found, the release page when this copy cannot update itself, otherwise a check. */
 function updateTrayItems(): Electron.MenuItemConstructorOptions[] {
   const u = updater?.state;
   if (!u || u.status === 'disabled') return [];
   if (u.status === 'downloaded') return [{ type: 'separator' }, { label: `Restart to update to v${u.version}`, click: () => updater.install() }];
   if (u.status === 'available' && u.mode === 'manual')
     return [{ type: 'separator' }, { label: `Download v${u.version}…`, click: () => void shell.openExternal(u.releaseUrl ?? RELEASES_URL) }];
+  if (u.status === 'available') return [{ type: 'separator' }, { label: `Update to v${u.version} and restart`, click: () => void updater.updateNow() }];
   if (u.status === 'downloading') return [{ type: 'separator' }, { label: `Downloading update… ${u.percent ?? 0}%`, enabled: false }];
   return [{ type: 'separator' }, { label: 'Check for updates', enabled: u.status !== 'checking', click: () => void updater.check() }];
 }
@@ -808,7 +809,12 @@ if (!app.requestSingleInstanceLock()) {
       beforeInstall: () => {
         quitting = true;
       },
+      previousVersion: config.lastRunVersion,
     });
+    if (config.lastRunVersion !== app.getVersion()) {
+      config = { ...config, lastRunVersion: app.getVersion() };
+      saveConfig(config);
+    }
     manager.setOpenCode({ enabled: config.opencodeEnabled, dir: config.opencodeDir });
     manager.setKiln({ enabled: config.kilnEnabled !== false, file: String(config.kilnEventsFile ?? '') });
     manager.followActive = config.followActive;
@@ -958,6 +964,7 @@ if (!app.requestSingleInstanceLock()) {
     inbox?.stop();
     localMonitor?.stop();
     updater?.stop();
+    updater?.onQuit();
     hookServer.stop();
     void peers?.stop();
     ssh?.stop();

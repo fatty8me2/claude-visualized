@@ -75,7 +75,11 @@ async function launch(env: Record<string, string>, config?: object) {
 
 /** What the tray does: the X hides the window (closeToTray), the tray icon shows it again. */
 async function hideAndReshow(app: ElectronApplication) {
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w.isVisible())?.hide());
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((w) => w.isVisible())
+      ?.hide(),
+  );
   await new Promise((r) => setTimeout(r, 300));
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.showInactive());
 }
@@ -90,10 +94,7 @@ describe('update pop-up', () => {
     const feed = await startFeed(true);
     cleanup.push(feed.close);
     // auto-download off, so the flow stops at "available" instead of fetching the fake installer
-    const { app, page, userData, home } = await launch(
-      { CLAUDE_VIS_UPDATE_URL: feed.url, CLAUDE_VIS_UPDATE_DELAY_MS: '500' },
-      { autoDownloadUpdates: false },
-    );
+    const { app, page, userData, home } = await launch({ CLAUDE_VIS_UPDATE_URL: feed.url, CLAUDE_VIS_UPDATE_DELAY_MS: '500' }, { autoDownloadUpdates: false });
     cleanup.push(async () => {
       await app.close();
       fs.rmSync(userData, { recursive: true, force: true });
@@ -105,7 +106,10 @@ describe('update pop-up', () => {
     expect(await page.getByTestId('update-popup-title').innerText()).toBe('Update available: v9.9.9');
     expect(await page.getByTestId('update-popup-notes').innerText()).toContain('Faster things');
     expect(await pop.getAttribute('data-stage')).toBe('found');
-    expect(await pop.getByRole('button', { name: 'Download' }).count()).toBe(1);
+    expect(await pop.getByRole('button', { name: 'Update now' }).count()).toBe(1);
+    // the title bar says so too, next to the version
+    expect(await page.getByTestId('tb-update').innerText()).toContain('Update to v9.9.9');
+    expect(await page.getByTestId('tb-update').getAttribute('data-state')).toBe('available');
     await page.waitForTimeout(1_500); // let the entrance animation settle
     fs.mkdirSync(ART, { recursive: true });
     await page.screenshot({ path: path.join(ART, 'update-popup-found.png') });
@@ -153,10 +157,11 @@ describe('update pop-up', () => {
       fs.rmSync(userData, { recursive: true, force: true });
       fs.rmSync(home, { recursive: true, force: true });
     });
-    // the startup check finds nothing (404: no releases yet)
+    // the startup check finds nothing (404): an error never pops up on its own, the title bar says it instead
     await expect.poll(() => feed.state.ymlRequests, { timeout: 20_000 }).toBeGreaterThan(0);
     await page.waitForTimeout(1_000);
     expect(await page.getByTestId('update-popup').count()).toBe(0);
+    expect(await page.getByTestId('tb-update').getAttribute('data-state')).toBe('error');
     const before = feed.state.ymlRequests;
 
     // a release goes out while the app sits in the tray; opening the window checks again
@@ -188,14 +193,18 @@ describe('update pop-up', () => {
     expect(await page.getByTestId('update-popup').count()).toBe(0);
 
     // the real download needs a packaged app; push the later states the way the updater broadcasts them
-    const push = (v: object) =>
-      app.evaluate(({ BrowserWindow }, view) => BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('updates', view)), v);
+    const push = (v: object) => app.evaluate(({ BrowserWindow }, view) => BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('updates', view)), v);
     const base = { mode: 'auto', currentVersion: '0.10.4', version: '9.9.9', releaseNotes: 'Fake release\n- Faster things\n- Shinier graph' };
     await push({ ...base, status: 'downloading', percent: 63 });
     const pop = page.getByTestId('update-popup');
     await page.locator('[data-testid="update-popup"][data-stage="downloading"]').waitFor({ timeout: 5_000 });
     expect(await page.getByTestId('update-popup-progress').getAttribute('aria-valuenow')).toBe('63');
-    expect(await pop.getByRole('button').allInnerTexts()).toEqual(['Later']);
+    expect(await pop.getByRole('button').allInnerTexts()).toEqual(['Later', 'Restart when done']);
+    expect(await page.getByTestId('tb-update').innerText()).toContain('Updating 63%');
+    // after "Update now" there is nothing left to press but Later
+    await push({ ...base, status: 'downloading', percent: 70, installWhenReady: true });
+    await expect.poll(() => pop.getByRole('button').allInnerTexts(), { timeout: 5_000 }).toEqual(['Later']);
+    expect(await page.getByTestId('update-popup-line').innerText()).toMatch(/restarts as soon as it is done/);
     await page.waitForTimeout(1_000);
     await pop.screenshot({ path: path.join(ART, 'update-popup-downloading.png') });
 
@@ -203,10 +212,11 @@ describe('update pop-up', () => {
     await page.locator('[data-testid="update-popup"][data-stage="ready"]').waitFor({ timeout: 5_000 });
     expect(await page.getByTestId('update-popup-title').innerText()).toBe('Update ready: v9.9.9');
     expect(await pop.getByRole('button', { name: 'Restart & update' }).count()).toBe(1);
+    expect(await page.getByTestId('tb-update').innerText()).toContain('Restart to update');
     await page.waitForTimeout(1_000);
     await pop.screenshot({ path: path.join(ART, 'update-popup-ready.png') });
 
-    // manual mode (unsigned macOS): a Download link to the release page
+    // manual mode (a Mac copy run from the .dmg): a Download link to the release page
     await push({ ...base, mode: 'manual', status: 'available', releaseUrl: 'https://example.invalid/tag/v9.9.9' });
     await page.locator('[data-testid="update-popup"][data-stage="found"]').waitFor({ timeout: 5_000 });
     expect(await pop.getByRole('link', { name: 'Download' }).getAttribute('href')).toBe('https://example.invalid/tag/v9.9.9');
@@ -214,5 +224,62 @@ describe('update pop-up', () => {
     // an error takes it away
     await push({ ...base, status: 'error', error: 'boom' });
     await pop.waitFor({ state: 'detached', timeout: 5_000 });
+  });
+});
+
+describe('update card from the title bar', () => {
+  const cleanup: Array<() => Promise<void> | void> = [];
+  afterAll(async () => {
+    for (const c of cleanup.reverse()) await c();
+  });
+
+  it('the version opens the card: Check now and its result; the first run of a new version says "Updated to" once', async () => {
+    const feed = await startFeed(false);
+    cleanup.push(feed.close);
+    // the last run was an older version, so this run is "updated"
+    const { app, page, userData, home } = await launch(
+      { CLAUDE_VIS_UPDATE_URL: feed.url, CLAUDE_VIS_UPDATE_DELAY_MS: '3600000' },
+      { lastRunVersion: '0.0.1', autoDownloadUpdates: false },
+    );
+    cleanup.push(async () => {
+      await app.close();
+      fs.rmSync(userData, { recursive: true, force: true });
+      fs.rmSync(home, { recursive: true, force: true });
+    });
+    const pop = page.locator('[data-testid="update-popup"][data-stage="updated"]');
+    await pop.waitFor({ timeout: 20_000 });
+    expect(await page.getByTestId('update-popup-title').innerText()).toMatch(/^Updated to v\d+\.\d+\.\d+/);
+    expect(await page.getByTestId('update-popup-line').innerText()).toBe('You were on v0.0.1.');
+    expect(await page.getByTestId('update-popup-whatsnew').getAttribute('href')).toMatch(/\/tag\/v\d/);
+    await page.waitForTimeout(1_000);
+    await page.getByTestId('update-popup').screenshot({ path: path.join(ART, 'update-popup-updated.png') });
+    await page.getByTestId('update-popup-later').click();
+    await pop.waitFor({ state: 'detached', timeout: 5_000 });
+    // said once: opening the window again does not repeat it
+    await hideAndReshow(app);
+    await page.waitForTimeout(1_000);
+    expect(await page.getByTestId('update-popup').count()).toBe(0);
+    // the version is saved for next time
+    expect(JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).lastRunVersion).toMatch(/^\d+\.\d+\.\d+/);
+
+    // the version in the title bar opens the status card; Check now runs a check (404 here: the reason shows)
+    await page.getByTestId('tb-version').click();
+    await page.locator('[data-testid="update-popup"][data-stage="status"]').waitFor({ timeout: 5_000 });
+    await page.getByTestId('update-popup-check').click();
+    await page.locator('[data-testid="update-popup"][data-tone="error"]').waitFor({ timeout: 20_000 });
+    expect(await page.getByTestId('update-popup-line').innerText()).toMatch(/could not be found/);
+    await page.waitForTimeout(800);
+    await page.getByTestId('titlebar').screenshot({ path: path.join(ART, 'update-titlebar-error.png') });
+
+    // the release goes out: the error chip opens the card, Check now finds it, and the chip turns into "Update to"
+    feed.state.published = true;
+    await page.getByTestId('update-popup-later').click();
+    await page.getByTestId('tb-update').click();
+    await page.locator('[data-testid="update-popup"][data-stage="status"]').waitFor({ timeout: 5_000 });
+    await page.getByTestId('update-popup-check').click();
+    await page.locator('[data-testid="update-popup"][data-stage="found"]').waitFor({ timeout: 20_000 });
+    await expect.poll(async () => page.getByTestId('tb-update').innerText(), { timeout: 5_000 }).toContain('Update to v9.9.9');
+    await page.waitForTimeout(800);
+    await page.getByTestId('titlebar').screenshot({ path: path.join(ART, 'update-titlebar-available.png') });
   });
 });

@@ -1,8 +1,10 @@
 # Releasing
 
 Releases are GitHub Releases on `github.com/fatty8me2/claude-visualized` (the repo must be public: installed apps fetch the update
-feed anonymously, and **no token is ever embedded in the app**). Installed apps check about 30 s after start and then every 6 hours,
-download in the background and offer "Restart to update".
+feed anonymously, and **no token is ever embedded in the app**). Installed apps check about 30 s after start and then every hour,
+download in the background and offer "Restart to update" on Windows and macOS alike. The title bar shows the version and, while an update
+waits, a chip ("Update to vX" → "Updating 42%" → "Restart to update"); the version opens the update card with "Check now". If the feed
+goes out of reach (a 404, e.g. the repo was made private), the chip says "Updates unreachable" instead of staying quiet.
 
 ## Cut a release
 
@@ -43,8 +45,8 @@ download in the background and offer "Restart to update".
 5. **macOS assets come from CI, after you publish.** Publishing the release triggers `.github/workflows/release-mac.yml` (macos-latest),
    which checks out the tag, builds an unsigned universal build and uploads `Claude-Visualized-<version>-mac-universal.dmg`, `.zip`, both
    `.blockmap`s and `latest-mac.yml` to that release (`--clobber`). Takes a few minutes. To retry or backfill: Actions, release-mac, Run workflow,
-   enter the tag. The workflow file must be pushed with a token that has the `workflow` scope. Unsigned Macs only get a "download" link in
-   the app (see below), not in-app install. `ci/github-build.yml`'s tag job no longer builds the Mac.
+   enter the tag. The workflow file must be pushed with a token that has the `workflow` scope. Macs update from the `.zip` and
+   `latest-mac.yml` (see below), so a release without them is invisible to Macs. `ci/github-build.yml`'s tag job no longer builds the Mac.
 
 `npm run dist:win` / `dist:mac` build local installers into `release/<version>/` with `--publish never`; nothing is uploaded.
 
@@ -63,10 +65,17 @@ A release without `latest.yml` is invisible to the updater, so never delete it f
   SmartScreen ("Windows protected your PC" → More info → Run anyway) only for the **first, manual** install. Later updates run the NSIS
   installer silently-ish from the already-trusted app and show no SmartScreen prompt. If you later buy a certificate, add
   `win.publisherName` so updates are also verified against it.
-- **macOS:** Squirrel.Mac refuses to apply an update to an app without a valid Developer ID signature. Unsigned Mac builds therefore run in
-  "manual" mode: the app still checks for new versions, and Settings, the sidebar pill and the tray show "Download the new version" with
-  a link to the release page. After signing and notarizing, set `MAC_SIGNED = true` in `src/main/updater.ts` to turn on in-app updates.
-- **Private repo / no releases:** a 404 from GitHub is shown as "No releases published yet", not as an error.
+- **macOS:** Squirrel.Mac refuses to apply an update to an app without a valid Developer ID signature, so the ad-hoc signed app updates
+  itself (`src/main/macUpdate.ts`, pure parts in `src/core/macUpdate.ts`): it downloads the universal `.zip` that `latest-mac.yml` lists,
+  checks its SHA-512, unpacks it with `ditto` into `<userData>/mac-update/`, and checks the bundle's version. On "Restart & update" (or
+  when the app quits) a detached `/bin/sh` script waits for the app to exit, copies the new bundle next to the old one, swaps them with two
+  renames (putting the old one back if the second fails), strips the quarantine flag and reopens the app. Its log is
+  `<userData>/mac-update/swap.log`. The download comes from the app itself, so it carries no quarantine flag and opens without a
+  Gatekeeper prompt. A copy that cannot replace itself (run from the `.dmg`, translocated because it was opened in Downloads, or in a
+  folder it may not write) falls back to "manual" mode: a "Download" link to the release page and the reason. After signing and
+  notarizing, set `MAC_SIGNED = true` in `src/main/updater.ts` to use Squirrel.Mac instead.
+- **Private repo / no releases:** a 404 from GitHub is shown as an error ("Updates unreachable" in the title bar), because a released app
+  that cannot see its releases has silently stopped updating.
 
 ## Environment variables
 
@@ -90,7 +99,8 @@ Full end to end, on a throwaway machine or VM (the NSIS installer installs per u
 3. Serve the new output as a fake release: `npx http-server release/0.2.0 -p 8099` (it contains `latest.yml`, the installer and the blockmap).
 4. Start the installed app with the feed override: `$env:CLAUDE_VIS_UPDATE_URL='http://127.0.0.1:8099/'; & '<install dir>\Claude Visualized.exe'` (the folder chosen in the installer)
    (set `CLAUDE_VIS_UPDATE_DELAY_MS=2000` to skip the 30 s wait, or use Settings → Updates → Check now).
-5. Expect: available → downloading (percent) → "↑ v0.2.0 ready · restart" pill. "Restart & update" runs the installer and relaunches.
+5. Expect: available → downloading (percent) → "Restart to update" in the title bar. "Restart & update" runs the installer and
+   relaunches, and the new version says "Updated to v0.2.0" once.
    Quitting the app normally also installs it (`autoInstallOnAppQuit`).
 
 Alternative with a real GitHub **draft** release: `npx electron-builder --win --publish always` with `releaseType: draft` (override with

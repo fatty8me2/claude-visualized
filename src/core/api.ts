@@ -257,6 +257,8 @@ export interface VisApi {
   downloadUpdate(): Promise<UpdateView>;
   /** quit and install the downloaded update */
   installUpdate(): Promise<boolean>;
+  /** one click: restart now if downloaded, else download and restart when done */
+  updateNow(): Promise<UpdateView>;
   onUpdates(cb: (u: UpdateView) => void): () => void;
   /** the main window was shown (start, or opened again from the tray): the update pop-up may come back */
   onWindowShown(cb: () => void): () => void;

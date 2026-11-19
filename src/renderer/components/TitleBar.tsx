@@ -1,6 +1,7 @@
 import { Icon, type IconName } from './Icon';
 import { LocalChip } from './LocalBits';
 import { UsageMeters } from './UsageMeters';
+import { UpdateChip } from './UpdatesSettings';
 import { useSessions } from '../hooks';
 import '../chrome.css';
 
@@ -49,6 +50,7 @@ export function TitleBar({ page, icon, onSettings, onLocal }: { page: string; ic
           <BrandMark />
           Claude Visualized
         </span>
+        <UpdateChip />
         <span className="tb-crumb">
           <Icon name="chevronRight" size="xs" />
           <Icon name={icon} size="xs" />

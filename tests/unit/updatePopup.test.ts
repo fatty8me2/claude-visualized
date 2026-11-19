@@ -27,7 +27,25 @@ describe('updatePopupModel', () => {
     const ready = reduceUpdate(dl, { type: 'downloaded', version: '0.11.0' });
     expect(updatePopupModel(ready)).toMatchObject({ stage: 'ready', percent: 100 });
   });
-  it('manual mode (unsigned macOS) stays at found with the release page', () => {
+  it('opened from the title bar with nothing pending: a status card, whatever the state', () => {
+    expect(updatePopupModel(idle({ upToDate: true }), true)).toMatchObject({ stage: 'status', version: '0.10.4' });
+    expect(updatePopupModel(reduceUpdate(idle(), { type: 'error', message: '404', at: 1 }), true)).toMatchObject({ stage: 'status' });
+    expect(updatePopupModel(initialUpdateView('0.10.4', { mode: 'disabled' }), true)).toMatchObject({ stage: 'status' });
+    // a pending update still shows as itself
+    expect(updatePopupModel(available, true)).toMatchObject({ stage: 'found', version: '0.11.0' });
+  });
+  it('the first run of a new version says so once (it pops up on its own)', () => {
+    const v = idle({ updatedFrom: '0.10.3' });
+    expect(updatePopupModel(v)).toMatchObject({ stage: 'updated', version: '0.10.4', releaseUrl: expect.stringContaining('/tag/v0.10.4') });
+    expect(shouldShowUpdatePopup(v, { enabled: true, showEpoch: 0, dismissed: null })).toBe(true);
+    expect(shouldShowUpdatePopup(v, { enabled: true, showEpoch: 1, dismissed: { version: '0.10.4', showEpoch: 1 } })).toBe(false);
+    expect(shouldShowUpdatePopup(v, { enabled: true, showEpoch: 5, dismissed: { version: '0.10.4', showEpoch: 1 } })).toBe(false);
+    // opened from the title bar: the status card with Check now
+    expect(updatePopupModel(v, true)).toMatchObject({ stage: 'status' });
+    // a newer update found meanwhile takes over
+    expect(updatePopupModel(reduceUpdate(v, { type: 'available', version: '0.11.0' }))).toMatchObject({ stage: 'found' });
+  });
+  it('manual mode (a Mac copy that cannot replace itself) stays at found with the release page', () => {
     const m = reduceUpdate(idle({ mode: 'manual' }), { type: 'available', version: '0.11.0' });
     expect(updatePopupModel(m)).toMatchObject({ stage: 'found', mode: 'manual', releaseUrl: expect.stringContaining('/tag/v0.11.0') });
   });

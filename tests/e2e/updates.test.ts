@@ -64,7 +64,9 @@ describe('updates', () => {
     expect(await page.getByTestId('update-current').innerText()).toMatch(/^\d+\.\d+\.\d+/);
     expect(await page.getByTestId('update-line').innerText()).toContain('CLAUDE_VIS_NO_UPDATES');
     expect(await page.getByRole('button', { name: 'Check now' }).isDisabled()).toBe(true);
-    expect(await page.getByTestId('update-pill').count()).toBe(0);
+    // the title bar shows the version and no update chip
+    expect(await page.getByTestId('tb-version').innerText()).toMatch(/^v\d+\.\d+\.\d+/);
+    expect(await page.getByTestId('tb-update').count()).toBe(0);
   });
 
   it('the real check flow reaches "available" against a local update feed', async () => {
@@ -108,12 +110,12 @@ describe('updates', () => {
     await page.locator('[data-testid="update-status"][data-status="available"]').waitFor({ timeout: 20_000 });
     expect(await page.getByTestId('update-line').innerText()).toContain('9.9.9');
     expect(await page.getByTestId('update-notes').innerText()).toContain('Faster things');
-    expect(await page.getByRole('button', { name: 'Download v9.9.9' }).count()).toBe(1);
+    expect(await page.getByRole('button', { name: 'Update to v9.9.9 now' }).count()).toBe(1);
     expect(requested.some((u) => u.includes('.yml'))).toBe(true);
     expect(await page.getByLabel(/Automatically download updates/).isChecked()).toBe(false);
   });
 
-  it('a feed with no releases (404) is a calm "no releases" state, not an error', async () => {
+  it('a feed that answers 404 (e.g. the repo went private) shows as an error in Settings and in the title bar', async () => {
     const feed = http.createServer((_req, res) => res.writeHead(404).end());
     await new Promise<void>((r) => feed.listen(0, '127.0.0.1', r));
     cleanup.push(() => new Promise<void>((r) => feed.close(() => r())));
@@ -126,7 +128,12 @@ describe('updates', () => {
     });
     await openSettings(page);
     await page.getByRole('button', { name: 'Check now' }).click();
-    await page.getByText('No releases published yet.').waitFor({ timeout: 20_000 });
-    expect(await page.getByTestId('update-status').getAttribute('data-status')).toBe('idle');
+    await page.locator('[data-testid="update-status"][data-status="error"]').waitFor({ timeout: 20_000 });
+    expect(await page.getByTestId('update-line').innerText()).toMatch(/could not be found.*private/);
+    await page.keyboard.press('Escape');
+    const chip = page.getByTestId('tb-update');
+    await chip.waitFor({ timeout: 5_000 });
+    expect(await chip.getAttribute('data-state')).toBe('error');
+    expect(await chip.innerText()).toContain('Updates unreachable');
   });
 });

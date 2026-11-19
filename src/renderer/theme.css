@@ -1705,24 +1705,6 @@ html.is-fullscreen .tb-inner {
 .pill.err {
   --tone: var(--err);
 }
-.update-pill {
-  position: fixed;
-  left: 10px;
-  bottom: 42px;
-  z-index: 20;
-  padding: 3px 10px;
-  border-radius: var(--r-pill);
-  box-shadow: var(--shadow-2);
-  border: 1px solid color-mix(in srgb, var(--ok) 40%, var(--line-2));
-  background: var(--bg-2);
-  color: var(--ok);
-  font-size: 11px;
-  cursor: pointer;
-  text-decoration: none;
-}
-.update-pill:hover {
-  border-color: var(--ok);
-}
 .update-notes {
   max-height: 120px;
   overflow: auto;
