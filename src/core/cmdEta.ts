@@ -11,6 +11,7 @@
 
 import { quantile, remainingAfter } from './eta';
 import { commandWords } from './ship';
+import { isKilnDelegate, kilnEtaKey } from './kiln';
 
 // ---------- the key ----------
 
@@ -302,6 +303,11 @@ export interface ShellCall {
 
 /** A timed shell call: its key and timeout. Null for other tools, background calls (they return at once) and trivial commands. */
 export function shellCall(name: string, input: unknown): ShellCall | null {
+  // a hand-off to Kiln's local model is timed like a command, from past runs at the same effort (main/kiln.ts adds them)
+  if (isKilnDelegate(name)) {
+    const k = obj(input);
+    return { key: kilnEtaKey(typeof k.effort === 'string' ? k.effort : null, k.readonly === true), timeoutMs: null };
+  }
   if (!SHELL_TOOLS.has(name)) return null;
   const i = obj(input);
   if (i.run_in_background === true) return null;

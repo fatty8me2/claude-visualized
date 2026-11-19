@@ -10,6 +10,7 @@ import { workCounts } from '@core/work';
 import { SessionIndexer, LIVE_MS } from './indexer';
 import { SessionWatcher, type BacklogLoader } from './watcher';
 import { OpenCodeSource, OpenCodeWatcher, type OpenCodeOptions } from './opencode';
+import { KilnSource, KilnWatcher, type KilnOptions } from './kiln';
 import { loadBacklogInWorker } from './workerLoader';
 import { claudeDeepLink } from './desktopSessions';
 
@@ -18,7 +19,9 @@ const POLL_MS = 600;
 const OC_POLL_MS = 250;
 const OC_SCAN_MS = 400;
 
-type Follower = SessionWatcher | OpenCodeWatcher;
+type Follower = SessionWatcher | OpenCodeWatcher | KilnWatcher;
+/** Kiln's events file is a small append-only log: one stat per poll when nothing changed */
+const KILN_POLL_MS = 400;
 const SCAN_MS = 2500;
 const PUSH_MS = 200;
 const MAX_LIVE_WATCHERS = 12;
@@ -70,6 +73,8 @@ export class SessionManager extends EventEmitter {
   private loader: BacklogLoader;
   private watchers = new Map<string, Follower>();
   private oc = new OpenCodeSource();
+  readonly kiln = new KilnSource();
+  private kilnSummaries: SessionSummary[] = [];
   private claudeSummaries: SessionSummary[] = [];
   private ocSummaries: SessionSummary[] = [];
   private summaries: SessionSummary[] = [];
@@ -131,6 +136,7 @@ export class SessionManager extends EventEmitter {
     if (!this.passive) {
       this.timers.push(setInterval(() => void this.pollAll(true), OC_POLL_MS));
       this.timers.push(setInterval(() => this.scanOpenCode(), OC_SCAN_MS));
+      this.timers.push(setInterval(() => void this.pollKiln(), KILN_POLL_MS));
     }
     this.timers.push(
       setInterval(() => {
@@ -319,12 +325,35 @@ export class SessionManager extends EventEmitter {
     this.scanOpenCode();
   }
 
+  /** Settings: show Kiln runs (local-model hand-offs) or not, and where its events file is ('' = Kiln's default). */
+  setKiln(o: KilnOptions) {
+    this.kiln.setConfig(o);
+    for (const [id, w] of [...this.watchers]) if (w instanceof KilnWatcher) this.watchers.delete(id);
+    this.scanKiln();
+  }
+
+  private async pollKiln() {
+    if (!(await this.kiln.poll())) return;
+    this.scanKiln();
+  }
+
+  private scanKiln() {
+    const next = this.kiln.scan(this.claudeSummaries);
+    if (next === this.kilnSummaries) return;
+    this.kilnSummaries = next;
+    this.mergeSummaries();
+    if (this.followActive) this.autoSelect();
+    this.emitSessions();
+    this.overviewDirty = true;
+    this.ovVersion++;
+  }
+
   get openCodeDir(): string | null {
     return this.oc.dir;
   }
 
   private mergeSummaries() {
-    this.summaries = [...this.claudeSummaries, ...this.ocSummaries].sort((a, b) => b.mtime - a.mtime);
+    this.summaries = [...this.claudeSummaries, ...this.ocSummaries, ...this.kilnSummaries].sort((a, b) => b.mtime - a.mtime);
   }
 
   private scanOpenCode() {
@@ -343,7 +372,7 @@ export class SessionManager extends EventEmitter {
     if (w) return w;
     const f = file ?? this.summaries.find((s) => s.id === id)?.file;
     if (!f || isRemoteId(id)) return null;
-    w = f.startsWith('opencode:') ? this.oc.watcher(id) : new SessionWatcher(id, f, this.loader);
+    w = f.startsWith('opencode:') ? this.oc.watcher(id) : f.startsWith('kiln:') ? this.kiln.watcher(id) : new SessionWatcher(id, f, this.loader);
     this.watchers.set(id, w);
     return w;
   }
@@ -351,6 +380,7 @@ export class SessionManager extends EventEmitter {
   private async scan() {
     try {
       this.claudeSummaries = await this.indexer.scan();
+      if (!this.passive) this.kilnSummaries = this.kiln.scan(this.claudeSummaries);
       this.mergeSummaries();
     } catch (e) {
       console.error('scan failed', e);
@@ -417,11 +447,13 @@ export class SessionManager extends EventEmitter {
   private async pollAll(openCode: boolean) {
     let sessionsChanged = false;
     for (const w of [...this.watchers.values()]) {
-      if (w instanceof OpenCodeWatcher !== openCode) continue;
+      if ((w instanceof OpenCodeWatcher || w instanceof KilnWatcher) !== openCode) continue;
       const wasPrimed = w.primed;
       let changed = false;
       try {
         changed = await w.poll();
+        // the local-model runs this session handed to Kiln, as child agents
+        if (w instanceof SessionWatcher && !this.passive && this.kiln.link(w)) changed = true;
       } catch (e) {
         console.error('poll failed', w.sessionId, e);
         continue;
@@ -519,6 +551,8 @@ export class SessionManager extends EventEmitter {
     const f = this.summaries.find((s) => s.id === id)?.file ?? this.watchers.get(id)?.mainFile ?? (await this.indexer.locate(id));
     if (!f) return [];
     if (f.startsWith('opencode:')) return this.oc.watcher(id).collectAllEvents();
-    return new SessionWatcher(id, f, this.loader).collectAllEvents();
+    if (f.startsWith('kiln:')) return this.kiln.watcher(id).collectAllEvents();
+    const events = await new SessionWatcher(id, f, this.loader).collectAllEvents();
+    return this.passive ? events : this.kiln.withRuns(events, id);
   }
 }

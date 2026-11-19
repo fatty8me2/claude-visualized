@@ -154,6 +154,22 @@ Claude Code can run against local models through a gateway or proxy (LiteLLM, Ol
 - **Speed**: OpenCode has no hooks, so the app polls its data about four times a second; an unchanged database costs one `PRAGMA data_version`. A new tool call shows up on screen in well under a second, on the other computer too.
 - **Tests**: `tests/fixtures/opencode/build.ts` builds a sanitized fake data folder in both formats; the `CLAUDE_VIS_OPENCODE_HOME` variable points the app at one (when `CLAUDE_VIS_HOME` is set for a test and this is not, OpenCode data is not read at all).
 
+### Kiln (local-model hand-offs)
+
+[Kiln](https://github.com/fatty8me2/kiln) lets Claude Code hand a self-contained task to a local model through its MCP tool `delegate_task`. Each hand-off appears as a **Kiln** child agent under the Claude agent that made the call, with the teal local tag and the local model's name.
+
+- **What is shown**:
+  - **The Kiln agent**: its brief, every step (Kiln's `read_file`, `edit_file`, `bash`, ... shown as Read, Edit, Bash, ...) with the current one, what the model says, and done or failed when the run ends.
+  - **The drawer's Kiln section**: profile, effort, read-only, files changed with the diff summary, steps, time, tokens per second and the answer. The local tokens count as local (no Anthropic cost or limits).
+  - **A countdown on the hand-off call**, from how long past hand-offs at the same effort took in that project.
+  - **On the Local models page**: Kiln's last model check (profile, model, reachable) and its newest run.
+  - **In History**: search finds the local model's briefs, answers and messages.
+  - **Runs no Claude session can claim** (another MCP client, a session in a folder the app does not see) get a session of their own, with a "KILN" badge.
+- **Where it reads**: Kiln's events file, `~/.config/kiln/events.jsonl` (or `$KILN_EVENTS_PATH`, `$XDG_CONFIG_HOME/kiln/events.jsonl`), and its one rotation `events.jsonl.1`. It is read only, never written, and the app never talks to Kiln or its model server. Kiln has to run on the same computer as the app.
+- **Matching**: a run belongs to the delegate_task call with the same brief, made in the same folder shortly before the run started. A run whose Kiln process is gone without finishing shows as failed.
+- **Settings**: "Show Kiln runs" (on by default; does nothing until Kiln has written its events file) and "Kiln events file" (empty = Kiln's default).
+- **Tests**: `tests/fixtures/kiln.ts` writes Kiln event lines. `CLAUDE_VIS_KILN_EVENTS` points the app at a file. When `CLAUDE_VIS_HOME` is set for a test and this is not, Kiln's file is not read at all.
+
 ### First run
 
 On first launch the app opens the setup wizard (`src/renderer/components/SetupWizard.tsx`, detection in `src/main/setup.ts`).

@@ -195,7 +195,7 @@ function Panel(p: PanelProps) {
           </div>
           <div className="ov-sub">
             {project}
-            {v.entrypoint === 'claude-desktop' ? ' · desktop' : v.entrypoint === 'opencode' ? ' · OpenCode' : v.entrypoint ? ` · ${v.entrypoint}` : ''}
+            {v.entrypoint === 'claude-desktop' ? ' · desktop' : v.entrypoint === 'opencode' ? ' · OpenCode' : v.entrypoint === 'kiln' ? ' · Kiln' : v.entrypoint ? ` · ${v.entrypoint}` : ''}
             {v.lastActivity ? ` · ${ago(v.lastActivity, now)}` : ''}
           </div>
         </div>

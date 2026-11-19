@@ -35,6 +35,7 @@ export function SettingsDialog({
   const [sys, setSys] = useState<SystemInfoView | null>(null);
   const [hotkey, setHotkey] = useState(config.miniHotkey);
   const [ocDir, setOcDir] = useState(config.opencodeDir);
+  const [kilnFile, setKilnFile] = useState(config.kilnEventsFile ?? '');
   const [hotkeyMsg, setHotkeyMsg] = useState<{ ok: boolean; text: string } | null>(null);
   // closing plays the scale+fade out first, then really closes (Escape, the close button and a click on the scrim all come here)
   const [closing, setClosing] = useState(false);
@@ -208,6 +209,24 @@ export function SettingsDialog({
               onChange={(e) => setOcDir(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && set({ opencodeDir: ocDir })}
               onBlur={() => ocDir !== config.opencodeDir && set({ opencodeDir: ocDir })}
+            />
+          </div>
+        )}
+        <label className="chk" data-testid="set-kiln">
+          <input type="checkbox" checked={config.kilnEnabled !== false} onChange={(e) => set({ kilnEnabled: e.target.checked })} />
+          Show Kiln runs: tasks Claude hands to your local model appear as subagents (read-only; reads Kiln&rsquo;s events file)
+        </label>
+        {config.kilnEnabled !== false && (
+          <div className="row">
+            <span>Kiln events file</span>
+            <input
+              style={{ width: 260 }}
+              aria-label="Kiln events file"
+              placeholder="automatic (~/.config/kiln/events.jsonl)"
+              value={kilnFile}
+              onChange={(e) => setKilnFile(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && set({ kilnEventsFile: kilnFile })}
+              onBlur={() => kilnFile !== (config.kilnEventsFile ?? '') && set({ kilnEventsFile: kilnFile })}
             />
           </div>
         )}

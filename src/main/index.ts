@@ -718,6 +718,10 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
     config.opencodeDir = String(config.opencodeDir ?? '').trim();
     manager.setOpenCode({ enabled: config.opencodeEnabled, dir: config.opencodeDir });
   }
+  if (patch.kilnEnabled !== undefined || patch.kilnEventsFile !== undefined) {
+    config.kilnEventsFile = String(config.kilnEventsFile ?? '').trim();
+    manager.setKiln({ enabled: config.kilnEnabled, file: config.kilnEventsFile });
+  }
   if (patch.localModels !== undefined) {
     config.localModels = normalizeLocalConfig(patch.localModels);
     saveConfig(config);
@@ -805,6 +809,7 @@ if (!app.requestSingleInstanceLock()) {
       },
     });
     manager.setOpenCode({ enabled: config.opencodeEnabled, dir: config.opencodeDir });
+    manager.setKiln({ enabled: config.kilnEnabled !== false, file: String(config.kilnEventsFile ?? '') });
     manager.followActive = config.followActive;
     manager.notifyAttention = config.notifyAttention;
     manager.notifyAgentDone = config.notifyAgentDone;

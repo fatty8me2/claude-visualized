@@ -1,3 +1,4 @@
+import { KilnStatusRow } from './KilnPanel';
 import { useState } from 'react';
 import { formatBytes, localSummary, memorySplit, serverKindName, unloadsIn, type LocalModelInfo, type LocalServerStatus } from '@core/localModels';
 import { classifyModel, sameModel } from '@core/models';
@@ -231,6 +232,7 @@ export function LocalModelsPage({ onOpenSession, onSettings }: { onOpenSession: 
       </div>
       <div className="lm-body">
         <div className="lm-faint lm-privacy">Read-only status from the servers you configured; nothing from your sessions is sent to them.</div>
+        <KilnStatusRow onOpen={onOpenSession} />
         {servers.length === 0 ? (
           <span className="loading">checking local servers…</span>
         ) : up === 0 ? (

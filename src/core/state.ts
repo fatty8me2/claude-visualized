@@ -1,4 +1,4 @@
-import type { ShipKind, UsageNumbers } from './events';
+import type { KilnInfo, ShipKind, UsageNumbers } from './events';
 import type { ToolMix } from './goal';
 
 export type AgentStatus = 'running' | 'waiting' | 'idle' | 'done' | 'error';
@@ -69,6 +69,8 @@ export interface AgentNode {
   files: string[];
   /** shell commands run, most recent last, at most 10 */
   commands: string[];
+  /** set on a Kiln run (a task Claude handed to the local model, src/core/kiln.ts) */
+  kiln?: KilnInfo;
 }
 
 export interface TodoItem {
@@ -180,7 +182,18 @@ export interface SessionInternal {
   /** running sizes of seenTools / usage[agent], so the caps in the reducer don't have to count keys each time (set lazily) */
   seenCount?: number;
   usageCount?: Record<string, number>;
+  /** Kiln hand-offs (delegate_task calls) by tool_use id, newest last, so the main process can attach the local model's run */
+  kilnCalls?: Record<string, KilnCallRec>;
 }
+
+export interface KilnCallRec {
+  agentId: string;
+  ts: number;
+  task: string;
+  cwd: string;
+}
+
+export const KILN_CALLS_CAP = 200;
 
 /** bookkeeping caps for hours-long sessions: oldest entries go first (dedupe only needs recent ones) */
 export const SEEN_TOOLS_CAP = 40_000;

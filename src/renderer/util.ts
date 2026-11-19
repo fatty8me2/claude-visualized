@@ -44,5 +44,6 @@ export function ago(ts: number, now: number): string {
 export function agentName(a: AgentNode | undefined): string {
   if (!a) return '?';
   if (a.kind === 'main') return 'main';
+  if (a.agentType === 'kiln') return 'Kiln';
   return a.agentType || 'agent';
 }

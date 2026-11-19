@@ -60,6 +60,7 @@ const api: VisApi = {
   onShowOnboarding: (cb) => on<void>('onboarding:show', () => cb()),
   getLocalModels: () => ipcRenderer.invoke('local:get'),
   onLocalModels: (cb) => on('local', cb),
+  getKilnStatus: () => ipcRenderer.invoke('kiln:status'),
   refreshLocalModels: () => ipcRenderer.invoke('local:refresh'),
   getInbox: () => ipcRenderer.invoke('inbox:get'),
   onInbox: (cb) => on('inbox', cb),

@@ -16,6 +16,7 @@ import { agentBasis, fmtClock, fmtLeft, fmtSpan, useAgentEta } from '../eta';
 import type { FinishLine, PromptEta } from '@core/eta';
 import { agentCmdEta, sessionProject, useCmdPriors } from '../cmdEta';
 import { CmdEtaBlock } from './CmdEtaStrip';
+import { KilnPanel } from './KilnPanel';
 
 const TOOL_ICON: Record<ToolCategory, IconName> = {
   search: 'search',
@@ -388,6 +389,7 @@ export function AgentDrawer({
             <span className="k">started</span>
             <span className="v">{clock(a.startedAt)}</span>
           </div>
+      {a.kiln && <KilnPanel k={a.kiln} />}
       {task && (
         <section>
           <h4>

@@ -34,6 +34,9 @@ export interface AppConfig {
   /** follow OpenCode sessions (read-only) and where its data lives; empty = auto-detect */
   opencodeEnabled: boolean;
   opencodeDir: string;
+  /** show Kiln runs (tasks Claude hands to the local model, read-only) and where Kiln's events file is; empty = Kiln's default */
+  kilnEnabled: boolean;
+  kilnEventsFile: string;
   /** computers watched over SSH, without the app installed on them (docs/SSH-REMOTES.md); never synced between machines */
   sshHosts: SshHostConfig[];
 }
@@ -56,6 +59,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   usagePingMinutes: 10,
   opencodeEnabled: true,
   opencodeDir: '',
+  kilnEnabled: true,
+  kilnEventsFile: '',
   sshHosts: [],
 };
 

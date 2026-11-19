@@ -1,0 +1,163 @@
+/* Kiln runs (local-model hand-offs): the agent drawer's Kiln section, the Kiln row on the Local models page. Prefix: kiln- */
+.kiln-panel {
+  --kc: var(--local, #4fd1c5);
+  border: 1px solid color-mix(in srgb, var(--kc) 35%, var(--line));
+  border-radius: var(--r-3);
+  padding: 8px 10px 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--kc) 9%, transparent), transparent 70%);
+}
+.kiln-panel.kiln-bad {
+  --kc: var(--err);
+}
+.kiln-panel h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.kiln-mark {
+  color: var(--kc);
+  font-size: 10px;
+}
+.kiln-state {
+  margin-left: auto;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  color: var(--kc);
+  border: 1px solid color-mix(in srgb, var(--kc) 45%, transparent);
+}
+.kiln-run .kiln-state {
+  color: var(--run);
+  border-color: color-mix(in srgb, var(--run) 45%, transparent);
+  animation: kiln-pulse 1.6s ease-in-out infinite;
+}
+@keyframes kiln-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kiln-run .kiln-state {
+    animation: none;
+  }
+}
+.kiln-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 8px;
+}
+.kiln-chips .kiln-ro {
+  color: var(--warn);
+}
+.kiln-err {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: var(--r-2);
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 10%, transparent);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.kiln-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.kiln-tiles > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 5px 7px;
+  border-radius: var(--r-2);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-2) 80%, transparent);
+}
+.kiln-panel .tk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.kiln-tiles b {
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.kiln-saved {
+  margin-top: 6px;
+  font-size: var(--fs-xs);
+  color: var(--kc);
+}
+.kiln-files,
+.kiln-answer {
+  margin-top: 10px;
+}
+.kiln-files .chips {
+  margin-top: 4px;
+}
+.kiln-diff {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  max-height: 140px;
+  overflow: auto;
+  border-radius: var(--r-2);
+  background: var(--bg-2);
+  font-size: var(--fs-2xs);
+  color: var(--text-2);
+}
+.kiln-answer-text {
+  margin-top: 4px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.kiln-note {
+  margin-top: 8px;
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+}
+
+/* Local models page: Kiln's own status row */
+.kiln-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--local, #4fd1c5) 30%, var(--line));
+  border-radius: var(--r-3);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.kiln-status b {
+  color: var(--text);
+}
+.kiln-status .kiln-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.kiln-status .kiln-dot.ok {
+  background: var(--ok);
+}
+.kiln-status .kiln-dot.bad {
+  background: var(--err);
+}
+.kiln-status .kiln-muted {
+  color: var(--muted);
+}

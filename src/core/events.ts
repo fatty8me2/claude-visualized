@@ -55,6 +55,28 @@ export interface SpawnInfo {
   workflowPhase?: string;
 }
 
+/** What a Kiln run (local model, src/core/kiln.ts) reported: shown in the agent drawer. */
+export interface KilnInfo {
+  runId: string;
+  model: string;
+  profile: string;
+  effort: string;
+  readonly: boolean;
+  /** null while running */
+  ok: boolean | null;
+  error: string | null;
+  answer: string;
+  filesChanged: string[];
+  diffStat: string | null;
+  /** tool calls */
+  steps: number;
+  promptTokens: number;
+  completionTokens: number;
+  seconds: number;
+  tokensPerSec: number;
+  finished: boolean;
+}
+
 type Base = { ts: number; src: Source; ref: AgentRef };
 
 export type AgentEvent = Base &
@@ -107,6 +129,8 @@ export type AgentEvent = Base &
     | { k: 'compact'; detail?: string }
     | { k: 'attention'; kind: 'permission' | 'notification' | 'error'; detail: string }
     | { k: 'session.end'; detail?: string }
+    /** a Kiln run's details for agent `agentId` ('main' when the run is the session) */
+    | { k: 'kiln'; agentId: string; info: KilnInfo }
     | { k: 'unknown'; raw: string }
   );
 

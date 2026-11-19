@@ -33,6 +33,22 @@ export interface AppConfigView {
   usagePingMinutes: number;
   opencodeEnabled: boolean;
   opencodeDir: string;
+  kilnEnabled: boolean;
+  kilnEventsFile: string;
+}
+
+/** Kiln as the Local models page shows it (src/main/kiln.ts). */
+export interface KilnStatusView {
+  enabled: boolean;
+  file: string | null;
+  /** the events file exists */
+  found: boolean;
+  /** Kiln's latest local_model_status check */
+  check: { ts: number; profile: string; model: string; baseUrl: string; reachable: boolean; detail: string } | null;
+  runs: number;
+  running: number;
+  /** the newest run, and the session that shows it (the Claude session that handed it off, or its own) */
+  last: { title: string; at: number; ok: boolean | null; model: string; seconds: number; tokensPerSec: number; sessionId: string | null } | null;
 }
 
 /** What the setup wizard learns about Claude Code on this computer. Never contains a token. */
@@ -220,6 +236,8 @@ export interface VisApi {
   onLocalModels(cb: (v: LocalModelsView) => void): () => void;
   /** "check again": poll every enabled server now */
   refreshLocalModels(): Promise<void>;
+  /** Kiln (local-model hand-offs): its events file, its last model check and its runs */
+  getKilnStatus(): Promise<KilnStatusView>;
   /** attention inbox: everything across all sessions that needs the user */
   getInbox(): Promise<InboxSnapshot>;
   onInbox(cb: (s: InboxSnapshot) => void): () => void;

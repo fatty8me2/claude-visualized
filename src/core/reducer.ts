@@ -20,7 +20,8 @@ import {
 } from './state';
 import { summarizeTool, toolLabel } from './summarize';
 import { toolCategory } from './goal';
-import { COMMANDS_CAP, FILES_CAP, PROMPT_CAP, RECENT_CAP } from './state';
+import { COMMANDS_CAP, FILES_CAP, KILN_CALLS_CAP, PROMPT_CAP, RECENT_CAP } from './state';
+import { isKilnDelegate } from './kiln';
 
 function firstLineOf(t: string, max: number): string {
   const line = (t.split('\n').find((l) => l.trim()) ?? '').trim();
@@ -101,6 +102,14 @@ function pruneSeenTools(s: SessionState) {
     drop--;
   }
   i.seenCount = Object.keys(i.seenTools).length;
+}
+
+function recordKilnCall(s: SessionState, toolUseId: string, agentId: string, input: unknown, ts: number) {
+  const i = (input ?? {}) as Json;
+  const calls = (s.internal.kilnCalls ??= {});
+  calls[toolUseId] = { agentId, ts, task: typeof i.task === 'string' ? i.task : '', cwd: typeof i.cwd === 'string' ? i.cwd : (s.cwd ?? '') };
+  const ids = Object.keys(calls);
+  if (ids.length > KILN_CALLS_CAP) for (const id of ids.slice(0, ids.length - KILN_CALLS_CAP)) delete calls[id];
 }
 
 function log(s: SessionState, ts: number, agentId: string, kind: LogKind, text: string, attn?: AttentionKind) {
@@ -315,6 +324,7 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
             }
           }
         }
+        if (isKilnDelegate(e.name)) recordKilnCall(s, e.toolUseId, a.id, e.input, ts);
         if (e.name === 'TaskUpdate') {
           const i = (e.input ?? {}) as Json;
           if (typeof i.taskId === 'string') setTodo(s, i.taskId, { status: i.status, text: i.subject }, a.id, ts);
@@ -385,7 +395,8 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       addUsage(a.tokens, e.usage, 1);
       addUsage(s.totals, e.usage, 1);
       const ctx = e.usage.in + e.usage.cacheRead + e.usage.cacheWrite;
-      if (ctx > 0 && ts >= a.contextAt) {
+      // a Kiln run reports prompt tokens summed over all its requests: not a context size
+      if (ctx > 0 && ts >= a.contextAt && !a.kiln) {
         a.contextTokens = ctx;
         a.contextAt = ts;
         if (ctx > a.contextPeak) a.contextPeak = ctx;
@@ -531,6 +542,11 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
           log(s, ts, a.id, 'done', 'stopped by an error');
         }
       }
+      break;
+    }
+    case 'kiln': {
+      const a = s.agents[e.agentId];
+      if (a) a.kiln = e.info;
       break;
     }
     case 'session.end': {
