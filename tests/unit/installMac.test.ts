@@ -75,7 +75,7 @@ describe.skipIf(!sh)('install-mac.sh', async () => {
       fs.writeFileSync(p('Applications', APP, 'Contents', 'Info.plist'), '<plist/>');
     }
     fs.mkdirSync(p('bin'));
-    const stub = (name: string, text: string) => fs.writeFileSync(p('bin', name), `#!/bin/sh\n${text}\n`);
+    const stub = (name: string, text: string) => fs.writeFileSync(p('bin', name), `#!/bin/sh\n${text}\n`, { mode: 0o755 });
     // ditto -x -k <zip> <dest> unpacks: the "app" holds the zip's bytes; ditto <src> <dst> copies
     stub('ditto', `if [ "$1" = "-x" ]; then mkdir -p "$4/${APP}/Contents" && cp "$3" "$4/${APP}/Contents/payload"; else cp -R "$1" "$2"; fi`);
     stub('plutil', 'cat "$(dirname "$4")/v" 2>/dev/null');

@@ -104,9 +104,9 @@ describe.skipIf(!sh)('the swap script', () => {
     fs.mkdirSync(p('staged', 'C.app', 'Contents'), { recursive: true });
     fs.writeFileSync(p('staged', 'C.app', 'Contents', 'v'), 'new');
     fs.mkdirSync(p('bin'));
-    fs.writeFileSync(p('bin', 'ditto'), dittoFails ? '#!/bin/sh\nexit 1\n' : '#!/bin/sh\ncp -R "$1" "$2"\n');
-    fs.writeFileSync(p('bin', 'open'), `#!/bin/sh\necho "$1" >> "${p('opened')}"\n`);
-    fs.writeFileSync(p('bin', 'xattr'), '#!/bin/sh\nexit 0\n');
+    fs.writeFileSync(p('bin', 'ditto'), dittoFails ? '#!/bin/sh\nexit 1\n' : '#!/bin/sh\ncp -R "$1" "$2"\n', { mode: 0o755 });
+    fs.writeFileSync(p('bin', 'open'), `#!/bin/sh\necho "$1" >> "${p('opened')}"\n`, { mode: 0o755 });
+    fs.writeFileSync(p('bin', 'xattr'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
     fs.writeFileSync(p('swap.sh'), MAC_SWAP_SCRIPT);
     return { root, p };
   }
