@@ -261,6 +261,21 @@ describe('Kiln agent harness workers', () => {
     for (const id of finished) await card(id).waitFor({ timeout: 5_000 });
   });
 
+  it('in the all-sessions overview, finished workers fold away shortly after they finish, within one long prompt', async () => {
+    await page.getByRole('button', { name: /all sessions/ }).click();
+    const inPanel = (id: string) => page.locator(`[data-testid="ov-body"] [data-agent="${id}"]`);
+    await page.locator('[data-testid="ov-body"]').first().waitFor({ timeout: 10_000 });
+    // T1 and T3 finished minutes ago: already folded into the chip, though the lead's prompt is older still
+    await expect.poll(() => inPanel(`kh-${T1}`).count(), { timeout: 15_000 }).toBe(0);
+    await expect.poll(() => inPanel(`kh-${T3}`).count(), { timeout: 15_000 }).toBe(0);
+    expect(await page.locator('[data-testid="ov-body"] .node.collapsed').count()).toBeGreaterThan(0);
+    // T2 finished moments ago: it folds within the linger (30 s, checked on a 10 s step)
+    await expect.poll(() => inPanel(`kh-${T2}`).count(), { timeout: 50_000, interval: 1_000 }).toBe(0);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(ART, 'harness-overview-folded.png') });
+    await page.getByRole('button', { name: /one session/ }).click();
+  });
+
   it('lists the local Agent conversation as a Kiln session of its own', async () => {
     const row = page.locator(`.session-row[data-session="kh-${CONV}"]`).first();
     await row.waitFor({ timeout: 10_000 });

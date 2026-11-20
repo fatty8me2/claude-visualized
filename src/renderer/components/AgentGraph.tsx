@@ -371,6 +371,8 @@ function fullyIn(box: { x: number; y: number; w: number; h: number }, wrap: HTML
 
 /** how long before the latest prompt a subagent must have finished to fold into the chip */
 const FINISHED_LINGER_MS = 10 * 60_000;
+/** in the overview, how long a finished subagent stays on its panel before it folds into the chip */
+export const OVERVIEW_FOLD_AFTER_MS = 30_000;
 
 export function AgentGraph({
   view,
@@ -446,7 +448,11 @@ export function AgentGraph({
   const pad = embedded ? 14 : 36;
   // finished agents that ended well before the latest prompt are leftovers of earlier work: they fold into the "N finished"
   // chip. Tied to the prompt, not the clock, so an old or replayed session keeps the agents it ended with.
-  const staleBefore = view.turnStartedAt ? view.turnStartedAt - FINISHED_LINGER_MS : 0;
+  // In the overview's small panels a finished subagent (Claude or local) folds away soon after it finishes, whatever the
+  // prompt: one long prompt (an autopilot run) would otherwise keep every finished worker on screen. Stepped by 10 s so the
+  // layout is not rebuilt on every tick.
+  const foldByClock = embedded ? Math.floor(now / 10_000) * 10_000 - OVERVIEW_FOLD_AFTER_MS : 0;
+  const staleBefore = Math.max(view.turnStartedAt ? view.turnStartedAt - FINISHED_LINGER_MS : 0, foldByClock);
   const colsFor = (o: LayoutOptions) => columnsForWidth(wrapW || 1000, o.nodeW, Math.max(o.gapX, 20), pad);
   const colsFull = colsFor(DEFAULT_LAYOUT);
   const colsCompact = colsFor(COMPACT_LAYOUT);
