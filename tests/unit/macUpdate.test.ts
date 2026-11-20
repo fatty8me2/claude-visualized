@@ -8,7 +8,7 @@ import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { MAC_SWAP_SCRIPT, bundleParent, macAssetUrl, macBundlePath, macSelfInstallBlocker, macZipAsset } from '@core/macUpdate';
+import { MAC_SWAP_SCRIPT, bundleParent, lastSwapOutcome, macAssetUrl, macBundlePath, macSelfInstallBlocker, macZipAsset } from '@core/macUpdate';
 import { MacSelfUpdater } from '../../src/main/macUpdate';
 
 const RELEASES = 'https://github.com/o/r/releases';
@@ -105,16 +105,17 @@ describe.skipIf(!sh)('the swap script', () => {
     fs.writeFileSync(p('staged', 'C.app', 'Contents', 'v'), 'new');
     fs.mkdirSync(p('bin'));
     fs.writeFileSync(p('bin', 'ditto'), dittoFails ? '#!/bin/sh\nexit 1\n' : '#!/bin/sh\ncp -R "$1" "$2"\n', { mode: 0o755 });
-    fs.writeFileSync(p('bin', 'open'), `#!/bin/sh\necho "$1" >> "${p('opened')}"\n`, { mode: 0o755 });
+    fs.writeFileSync(p('bin', 'open'), `#!/bin/sh\necho "$*" >>"${p('opened')}"\n`, { mode: 0o755 });
     fs.writeFileSync(p('bin', 'xattr'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
     fs.writeFileSync(p('swap.sh'), MAC_SWAP_SCRIPT);
     return { root, p };
   }
   // (cd + pwd turns C:/… into a PATH-safe /c/… under Git for Windows); a failed swap exits 1 on purpose, so no execFileSync
-  const swap = (p: (...s: string[]) => string, relaunch: boolean) => {
+  const swap = (p: (...s: string[]) => string, relaunch: boolean | 'bg', version = '9.9.9') => {
+    const mode = relaunch === 'bg' ? 'bg' : relaunch ? 1 : 0;
     const r = spawnSync(sh!, [
       '-c',
-      `PATH="$(cd "${p('bin')}" && pwd):$PATH" sh "${p('swap.sh')}" 999999 "${p('Applications', 'C.app')}" "${p('staged', 'C.app')}" ${relaunch ? 1 : 0} "${p('log')}"`,
+      `PATH="$(cd "${p('bin')}" && pwd):$PATH" sh "${p('swap.sh')}" 999999 "${p('Applications', 'C.app')}" "${p('staged', 'C.app')}" ${mode} "${p('log')}" ${version}`,
     ]);
     if (r.error) throw r.error;
     return r.status;
@@ -129,6 +130,13 @@ describe.skipIf(!sh)('the swap script', () => {
     expect(fs.existsSync(p('staged', 'C.app'))).toBe(false);
     expect(fs.readFileSync(p('opened'), 'utf8').trim()).toBe(p('Applications', 'C.app'));
     expect(fs.readFileSync(p('log'), 'utf8')).toMatch(/updated/);
+    expect(lastSwapOutcome(fs.readFileSync(p('log'), 'utf8'))).toEqual({ ok: true, version: '9.9.9' });
+  });
+  it('an automatic update reopens the app in the background (open -g), so it does not take focus', () => {
+    const { p } = setup();
+    expect(swap(p, 'bg')).toBe(0);
+    expect(fs.readFileSync(p('Applications', 'C.app', 'Contents', 'v'), 'utf8')).toBe('new');
+    expect(fs.readFileSync(p('opened'), 'utf8').trim()).toBe(`-g ${p('Applications', 'C.app')}`);
   });
   it('on quit, swaps without reopening', () => {
     const { p } = setup();
@@ -143,5 +151,7 @@ describe.skipIf(!sh)('the swap script', () => {
     expect(fs.existsSync(p('Applications', 'C.app.cv-new'))).toBe(false);
     expect(fs.readFileSync(p('opened'), 'utf8').trim()).toBe(p('Applications', 'C.app'));
     expect(fs.readFileSync(p('log'), 'utf8')).toMatch(/copy failed/);
+    // what the next start reads back to say why
+    expect(lastSwapOutcome(fs.readFileSync(p('log'), 'utf8'))).toMatchObject({ ok: false, version: '9.9.9', reason: expect.stringMatching(/copied/) });
   });
 });

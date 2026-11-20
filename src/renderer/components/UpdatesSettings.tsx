@@ -41,10 +41,11 @@ export function UpdateChip() {
   );
 }
 
-/** Settings section: version, state, check now, auto-download toggle, release notes, restart. */
+/** Settings section: version, state, check now, auto-download and auto-install toggles, release notes, restart, move to Applications. */
 export function UpdatesSettings({ config }: { config: AppConfigView }) {
   const u = useUpdates();
   const [checking, setChecking] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
   if (!u) return null;
   const busy = checking || u.status === 'checking' || u.status === 'downloading';
   const check = async () => {
@@ -79,6 +80,15 @@ export function UpdatesSettings({ config }: { config: AppConfigView }) {
             Update to v{u.version} now
           </button>
         )}
+        {u.mode === 'manual' && u.movable && (
+          <button
+            className="primary"
+            data-testid="update-move"
+            onClick={() => void window.api.moveToApplications().then((r) => setMoveError(r.ok ? null : (r.error ?? 'The app could not be moved.')))}
+          >
+            Move to Applications
+          </button>
+        )}
         {u.status === 'available' && u.mode === 'manual' && (
           <a href={u.releaseUrl} target="_blank" rel="noreferrer">
             <button className="primary">Download the new version</button>
@@ -89,6 +99,12 @@ export function UpdatesSettings({ config }: { config: AppConfigView }) {
         {describeUpdate(u)}
       </p>
       {u.mode === 'manual' && u.status !== 'disabled' && <p className="note">{u.reason}</p>}
+      {moveError && <p className="note upd-pop-failure">{moveError}</p>}
+      {u.installError && u.status !== 'error' && (
+        <p className="note" data-testid="update-install-error">
+          {u.installError}
+        </p>
+      )}
       {u.releaseNotes && (u.status === 'available' || u.status === 'downloading' || u.status === 'downloaded') && (
         <pre className="update-notes" data-testid="update-notes">
           {u.releaseNotes}
@@ -101,7 +117,17 @@ export function UpdatesSettings({ config }: { config: AppConfigView }) {
           disabled={u.mode !== 'auto'}
           onChange={(e) => void window.api.setConfig({ autoDownloadUpdates: e.target.checked })}
         />
-        Automatically download updates (installed when you restart the app)
+        Automatically download updates
+      </label>
+      <label className="chk">
+        <input
+          type="checkbox"
+          checked={config.autoInstallUpdates ?? true}
+          disabled={u.mode !== 'auto'}
+          data-testid="update-auto-install"
+          onChange={(e) => void window.api.setConfig({ autoInstallUpdates: e.target.checked })}
+        />
+        Install updates automatically (restarts the app when you&apos;re not using it)
       </label>
       <label className="chk">
         <input

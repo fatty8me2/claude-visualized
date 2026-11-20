@@ -14,6 +14,8 @@ export interface AppConfig {
   miniAlwaysOnTop: boolean;
   launchAtLogin: boolean;
   autoDownloadUpdates: boolean;
+  /** install a downloaded update by itself when the app is not in use, and restart into it (Settings > Updates) */
+  autoInstallUpdates: boolean;
   /** pop up "Update available" in the window when an update is found (Settings > Updates) */
   notifyUpdates: boolean;
   /** the app version that ran last (to say "Updated to …" once after an update) */
@@ -52,6 +54,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   miniAlwaysOnTop: true,
   launchAtLogin: false,
   autoDownloadUpdates: true,
+  autoInstallUpdates: true,
   notifyUpdates: true,
   miniHotkey: DEFAULT_MINI_HOTKEY,
   localModels: DEFAULT_LOCAL_CONFIG,

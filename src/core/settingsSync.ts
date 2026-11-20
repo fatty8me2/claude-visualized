@@ -25,6 +25,7 @@ export const SYNC_CONFIG_KEYS = {
   notifyAgentDone: 'boolean',
   miniAlwaysOnTop: 'boolean',
   autoDownloadUpdates: 'boolean',
+  autoInstallUpdates: 'boolean',
   notifyUpdates: 'boolean',
 } as const;
 

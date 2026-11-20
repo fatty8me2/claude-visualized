@@ -136,4 +136,111 @@ describe('updates', () => {
     expect(await chip.getAttribute('data-state')).toBe('error');
     expect(await chip.innerText()).toContain('Updates unreachable');
   });
+
+  /** A feed that offers 9.9.9 (the fake download never fetches the installer). */
+  async function startFeed() {
+    const feed = http.createServer((req, res) => {
+      if ((req.url ?? '').split('?')[0].endsWith('.yml')) {
+        res.writeHead(200, { 'content-type': 'text/yaml' });
+        res.end(
+          [
+            'version: 9.9.9',
+            'files:',
+            '  - url: Claude-Visualized-Setup-9.9.9.exe',
+            `    sha512: ${Buffer.alloc(64, 1).toString('base64')}`,
+            '    size: 1024',
+            'path: Claude-Visualized-Setup-9.9.9.exe',
+            `sha512: ${Buffer.alloc(64, 1).toString('base64')}`,
+            "releaseDate: '2026-01-01T00:00:00.000Z'",
+            '',
+          ].join('\n'),
+        );
+      } else res.writeHead(404).end();
+    });
+    await new Promise<void>((r) => feed.listen(0, '127.0.0.1', r));
+    cleanup.push(() => new Promise<void>((r) => feed.close(() => r())));
+    return `http://127.0.0.1:${(feed.address() as AddressInfo).port}/`;
+  }
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it('"Install updates automatically" is on by default and its choice is saved', async () => {
+    const url = await startFeed();
+    const { app, page, userData, home } = await launch({ CLAUDE_VIS_UPDATE_URL: url, CLAUDE_VIS_UPDATE_DELAY_MS: '3600000' });
+    cleanup.push(async () => {
+      await app.close();
+      fs.rmSync(userData, { recursive: true, force: true });
+      fs.rmSync(home, { recursive: true, force: true });
+    });
+    await openSettings(page);
+    const box = page.getByLabel(/Install updates automatically/);
+    expect(await box.isChecked()).toBe(true);
+    expect(await box.isDisabled()).toBe(false);
+    await box.click();
+    await page.waitForFunction(async () => (await window.api.getConfig()).autoInstallUpdates === false, null, { timeout: 5_000 });
+    expect(await box.isChecked()).toBe(false);
+    const saved = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8'));
+    expect(saved.autoInstallUpdates).toBe(false);
+  });
+
+  it('a downloaded update installs itself only when allowed and the window is not in use, and remembers the hidden window', async () => {
+    const url = await startFeed();
+    const out = path.join(os.tmpdir(), `cvis-fake-install-${process.pid}-${Date.now()}.json`);
+    cleanup.push(() => fs.rmSync(out, { force: true }));
+    const { app, page, userData, home } = await launch(
+      { CLAUDE_VIS_UPDATE_URL: url, CLAUDE_VIS_UPDATE_DELAY_MS: '3600000', CLAUDE_VIS_UPDATE_FAKE_INSTALL: out, CLAUDE_VIS_UPDATE_QUIET_MS: '200' },
+      { autoInstallUpdates: false },
+    );
+    cleanup.push(async () => {
+      await app.close();
+      fs.rmSync(userData, { recursive: true, force: true });
+      fs.rmSync(home, { recursive: true, force: true });
+    });
+    // the user is "in the window": it has focus and there was input just now (test windows never take real focus)
+    const patched = await app.evaluate(({ BrowserWindow, powerMonitor }) => {
+      const w = BrowserWindow.getAllWindows()[0];
+      BrowserWindow.getFocusedWindow = () => w;
+      powerMonitor.getSystemIdleTime = () => 3;
+      return BrowserWindow.getFocusedWindow() === w && powerMonitor.getSystemIdleTime() === 3;
+    });
+    expect(patched).toBe(true);
+    await page.evaluate(() => window.api.checkForUpdates());
+    await page.waitForFunction(async () => (await window.api.getUpdates()).status === 'downloaded', null, { timeout: 20_000 });
+
+    // off in Settings: never installs by itself
+    await sleep(1_200);
+    expect(fs.existsSync(out)).toBe(false);
+    // on, but the user is working in the window: still waits
+    await page.evaluate(() => window.api.setConfig({ autoInstallUpdates: true }));
+    await sleep(1_200);
+    expect(fs.existsSync(out)).toBe(false);
+    // hidden to the tray: installs, silently, and the new version is told to start hidden too
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.hide());
+    const deadline = Date.now() + 10_000;
+    while (!fs.existsSync(out) && Date.now() < deadline) await sleep(100);
+    expect(JSON.parse(fs.readFileSync(out, 'utf8'))).toMatchObject({ auto: true, window: 'hidden', version: '9.9.9' });
+  });
+
+  it('a restart that did not install the new version says so at the next start, and the marker is used once', async () => {
+    const url = await startFeed();
+    const userDataPre = fs.mkdtempSync(path.join(os.tmpdir(), 'cvis-updmark-'));
+    fs.writeFileSync(path.join(userDataPre, 'restart-update.json'), JSON.stringify({ window: 'inactive', version: '9.9.9', at: Date.now() }));
+    const { app, page, userData, home } = await launch({
+      CLAUDE_VIS_UPDATE_URL: url,
+      CLAUDE_VIS_UPDATE_DELAY_MS: '3600000',
+      CLAUDE_VIS_USER_DATA: userDataPre,
+    });
+    cleanup.push(async () => {
+      await app.close();
+      fs.rmSync(userDataPre, { recursive: true, force: true });
+      fs.rmSync(userData, { recursive: true, force: true });
+      fs.rmSync(home, { recursive: true, force: true });
+    });
+    const chip = page.getByTestId('tb-update');
+    await chip.waitFor({ timeout: 10_000 });
+    expect(await chip.getAttribute('data-state')).toBe('error');
+    expect(await chip.innerText()).toContain('Update failed');
+    expect(await chip.getAttribute('title')).toMatch(/Updating to v9\.9\.9 did not finish/);
+    expect(fs.existsSync(path.join(userDataPre, 'restart-update.json'))).toBe(false);
+  });
 });

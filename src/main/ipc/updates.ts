@@ -8,4 +8,5 @@ export const registerUpdatesIpc: IpcRegistrar = ({ updater }) => {
   ipcMain.handle('updates:download', () => updater.download());
   ipcMain.handle('updates:install', () => updater.install());
   ipcMain.handle('updates:now', () => updater.updateNow());
+  ipcMain.handle('updates:moveToApplications', () => updater.moveToApplications());
 };

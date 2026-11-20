@@ -21,6 +21,8 @@ export interface AppConfigView {
   miniAlwaysOnTop: boolean;
   launchAtLogin: boolean;
   autoDownloadUpdates: boolean;
+  /** install a downloaded update by itself when the app is not in use (Settings > Updates) */
+  autoInstallUpdates: boolean;
   /** pop up "Update available" in the window (Settings > Updates) */
   notifyUpdates: boolean;
   miniHotkey: string;
@@ -259,6 +261,8 @@ export interface VisApi {
   installUpdate(): Promise<boolean>;
   /** one click: restart now if downloaded, else download and restart when done */
   updateNow(): Promise<UpdateView>;
+  /** macOS copy run from the disk image or translocated: move it to /Applications and reopen it from there */
+  moveToApplications(): Promise<{ ok: boolean; error?: string }>;
   onUpdates(cb: (u: UpdateView) => void): () => void;
   /** the main window was shown (start, or opened again from the tray): the update pop-up may come back */
   onWindowShown(cb: () => void): () => void;

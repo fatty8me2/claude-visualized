@@ -30,12 +30,25 @@ function useShowEpoch(): number {
  * The update card in the bottom-right corner. It pops up on its own when an update is found (version and release notes, then
  * download progress, then "Restart & update") and once after an update ("Updated to …"). Opened from the title bar it also
  * shows the plain state: up to date, checking, or why updates fail, with "Check now". "Update now" downloads and restarts in
- * one go. A copy that cannot update itself (a Mac app run from the .dmg) gets "Download" (the release page). Errors never pop
+ * one go. With "Install updates automatically" a downloaded update also installs itself at a quiet moment (main process). A Mac
+ * copy run from the .dmg or translocated gets "Move to Applications" (then it updates itself); one that cannot update itself at
+ * all gets "Download" (the release page). Errors never pop
  * up on their own. "Later" (or Escape) hides it for this version until the window is opened again. Held back while a dialog
  * (settings, setup, tour) is open.
  */
-export function UpdatePopup({ updates, enabled, suppressed }: { updates: UpdateView | null; enabled: boolean; suppressed: boolean }) {
+export function UpdatePopup({
+  updates,
+  enabled,
+  autoInstall = true,
+  suppressed,
+}: {
+  updates: UpdateView | null;
+  enabled: boolean;
+  autoInstall?: boolean;
+  suppressed: boolean;
+}) {
   const epoch = useShowEpoch();
+  const [moveError, setMoveError] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
   const [, rerender] = useState(0);
   const card = useRef<HTMLDivElement | null>(null);
@@ -93,7 +106,9 @@ export function UpdatePopup({ updates, enabled, suppressed }: { updates: UpdateV
           : 'New version';
   const line =
     stage === 'ready'
-      ? 'Downloaded. Restart Claude Visualized to finish updating.'
+      ? autoInstall && mode === 'auto'
+        ? 'Downloaded. It installs by itself the next time you are not using the app, or restart now.'
+        : 'Downloaded. Restart Claude Visualized to finish updating.'
       : stage === 'downloading'
         ? updates.installWhenReady
           ? 'Downloading. Claude Visualized restarts as soon as it is done.'
@@ -103,10 +118,20 @@ export function UpdatePopup({ updates, enabled, suppressed }: { updates: UpdateV
           : stage === 'status'
             ? describeUpdate(updates)
             : mode === 'manual'
-              ? `You have v${updates.currentVersion}. This copy cannot update itself: get the new version from the releases page.`
+              ? updates.movable
+                ? `You have v${updates.currentVersion}. Move this copy to Applications and it updates itself from then on.`
+                : `You have v${updates.currentVersion}. This copy cannot update itself: get the new version from the releases page.`
               : `You have v${updates.currentVersion}.`;
   const tone = stage === 'status' && status === 'error' ? 'error' : undefined;
   const reason = mode === 'manual' && (stage === 'found' || stage === 'status') ? updates.reason : undefined;
+  // a restart that did not install the update says why, next to the retry ("Restart & update" or the next download)
+  const failure = updates.installError && stage !== 'status' && stage !== 'updated' ? updates.installError : undefined;
+  const movable = mode === 'manual' && !!updates.movable && (stage === 'found' || stage === 'status');
+  const move = async () => {
+    setMoveError(null);
+    const r = await window.api.moveToApplications();
+    if (!r.ok) setMoveError(r.error ?? 'The app could not be moved.');
+  };
   const busy = status === 'checking';
 
   return (
@@ -137,6 +162,16 @@ export function UpdatePopup({ updates, enabled, suppressed }: { updates: UpdateV
         {line}
       </p>
       {reason && <p className="upd-pop-reason">{reason}</p>}
+      {failure && (
+        <p className="upd-pop-reason upd-pop-failure" data-testid="update-popup-failure">
+          {failure}
+        </p>
+      )}
+      {moveError && (
+        <p className="upd-pop-reason upd-pop-failure" role="alert">
+          {moveError}
+        </p>
+      )}
       {releaseNotes && (stage === 'found' || stage === 'downloading' || stage === 'ready') && (
         <pre className="upd-pop-notes" data-testid="update-popup-notes">
           {releaseNotes}
@@ -180,10 +215,22 @@ export function UpdatePopup({ updates, enabled, suppressed }: { updates: UpdateV
             Restart when done
           </button>
         )}
-        {stage === 'found' && mode === 'manual' && (
+        {stage === 'found' && mode === 'manual' && !movable && (
           <a className="upd-pop-go upd-pop-linkbtn" href={releaseUrl} target="_blank" rel="noreferrer" data-testid="update-popup-go">
             Download
           </a>
+        )}
+        {movable && (
+          <>
+            {stage === 'found' && (
+              <a className="upd-pop-link" href={releaseUrl} target="_blank" rel="noreferrer">
+                Release page
+              </a>
+            )}
+            <button className="primary upd-pop-go" onClick={() => void move()} data-testid="update-popup-move">
+              Move to Applications
+            </button>
+          </>
         )}
         {stage === 'found' && mode === 'auto' && (
           <button className="primary upd-pop-go" onClick={() => void window.api.updateNow()} data-testid="update-popup-go">

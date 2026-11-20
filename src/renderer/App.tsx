@@ -130,7 +130,12 @@ export function App() {
             : null,
         })}
       </ErrorBoundary>
-      <UpdatePopup updates={updates} enabled={config?.notifyUpdates ?? true} suppressed={showSettings || onboarding !== 'none'} />
+      <UpdatePopup
+        updates={updates}
+        enabled={config?.notifyUpdates ?? true}
+        autoInstall={config?.autoInstallUpdates ?? true}
+        suppressed={showSettings || onboarding !== 'none'}
+      />
       {toasts.length > 0 && (
         <div className="toasts" role="status">
           {toasts.map((t) => (

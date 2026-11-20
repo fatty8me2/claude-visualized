@@ -64,10 +64,22 @@ notarized**. The first time you open it, macOS refuses. Use one of these:
   xattr -dr com.apple.quarantine "/Applications/Claude Visualized.app"
   ```
 
-**Updates install themselves** once the app is in Applications: when a new version is out, the title bar shows "Update to vX". Click it
-and the app downloads the update, checks it, and restarts into the new version. Quitting the app also installs a downloaded update. A copy
-run straight from the `.dmg` or from Downloads can't replace itself; it shows "Get vX" and the reason, so move it to Applications first.
-Versions up to 0.12.2 only link to the release page: get off them once with the one-line install above.
+**Updates install themselves** once the app is in Applications. It checks about every hour, downloads a new version in the background
+and checks it. When you are not using the app (its window hidden, minimized or in the background, or no input for 2 minutes), it restarts
+into the new version by itself; the window comes back as it was, without taking focus. Nothing to download, drag or click. Turn this off
+under Settings → Updates → **Install updates automatically**: the update then waits for "Restart to update" in the title bar, or installs
+when you quit the app. Clicking the title bar chip always updates right away.
+
+Right after a release, the Mac files are attached about ten minutes after the Windows installer. A Mac that checks in between says a new
+version is being published (no error) and looks again ten minutes later.
+
+A copy run straight from the `.dmg`, or opened in Downloads (macOS then runs it from a temporary location), can't replace itself. The
+update card and Settings offer **Move to Applications**: one click moves it there and reopens it, and it updates itself from then on. A
+copy in a folder it may not write links to the release page instead.
+
+If an update does not go in, the title bar shows "Update failed" with the reason (from the swap log,
+`~/Library/Application Support/Claude Visualized/mac-update/swap.log`). The app does not retry that version by itself in the same run;
+"Restart & update" tries again. Versions up to 0.12.2 only link to the release page: get off them once with the one-line install above.
 
 ## Share this Mac's sessions with your Windows PC
 

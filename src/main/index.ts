@@ -21,8 +21,8 @@ import { LocalMonitor } from './localMonitor';
 import { InboxService } from './inbox';
 import { overlayIcon, withDot } from './trayBadge';
 import { applyUrlOverrides, normalizeLocalConfig } from '@core/localModels';
-import { Updater } from './updater';
-import { RELEASES_URL } from '@core/updates';
+import { takeRestartMarker, Updater } from './updater';
+import { readRestartMarker, RELEASES_URL, type RestartWindow } from '@core/updates';
 import { mergeUsage } from '@core/remote';
 import { UsageEstimator, type EstimatorSnapshot } from '@core/usageEstimate';
 import { PeerService, type ShareSource } from './peer/service';
@@ -44,6 +44,9 @@ let quitting = false;
 let config: AppConfig;
 /** launched by the login item: keep the main window hidden until the user asks for it */
 let startHidden = false;
+/** how a visible start shows the window: an automatic update restart brings it back as it was (readRestartMarker) */
+let startWindow: RestartWindow = 'normal';
+const launchedAt = Date.now();
 /** tray "Open settings" used while the main window was still loading */
 let pendingOpenSettings = false;
 
@@ -443,7 +446,14 @@ function createMain() {
     ...backgroundOpts(),
   });
   mainWin.once('ready-to-show', () => {
-    if (!startHidden && mainWin) reveal(mainWin);
+    if (!startHidden && mainWin) {
+      if (startWindow === 'minimized' && !backgroundWindows) {
+        mainWin.showInactive();
+        mainWin.minimize();
+      } else if (startWindow === 'inactive') mainWin.showInactive();
+      else reveal(mainWin);
+    }
+    startWindow = 'normal';
     badgeShown = -1;
     applyInboxBadge();
   });
@@ -806,8 +816,22 @@ if (!app.requestSingleInstanceLock()) {
     config.localModels = applyUrlOverrides(config.localModels, process.env);
     localMonitor = new LocalMonitor(config.localModels);
     localMonitor.on('view', (v) => broadcast('local', v));
+    // one-shot marker from an update restart: how the window was, and whether the new version really got installed
+    const restart = readRestartMarker(takeRestartMarker(), Date.now(), app.getVersion());
+    startWindow = restart.window;
     updater = new Updater({
       autoDownload: () => config.autoDownloadUpdates,
+      autoInstall: () => config.autoInstallUpdates,
+      quiet: () => {
+        const w = mainWin && !mainWin.isDestroyed() ? mainWin : null;
+        return {
+          visible: !!w && w.isVisible(),
+          minimized: !!w && w.isMinimized(),
+          focused: !!BrowserWindow.getFocusedWindow(),
+          idleSeconds: powerMonitor.getSystemIdleTime(),
+        };
+      },
+      failedVersion: restart.failedVersion,
       onChange: (v) => {
         broadcast('updates', v);
         rebuildTrayMenu();
@@ -962,9 +986,14 @@ if (!app.requestSingleInstanceLock()) {
     if (!process.env.CLAUDE_VIS_NO_HOOK_SERVER) hookServer.start(config.port);
     if (!process.env.CLAUDE_VIS_NO_TRAY) createTray();
     const openedAtLogin = process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin;
-    startHidden = shouldStartHidden(process.argv, openedAtLogin, !!tray);
+    startHidden = shouldStartHidden(process.argv, openedAtLogin, !!tray) || (startWindow === 'hidden' && !!tray);
+    if (startWindow === 'hidden') startWindow = 'inactive'; // no tray to hide in: come back without taking focus
     createMain();
-    app.on('activate', showMain);
+    // macOS may send 'activate' for the launch itself: a hidden start (login, or an update restart from the tray) stays hidden
+    app.on('activate', () => {
+      if (startHidden && Date.now() - launchedAt < 5_000) return;
+      showMain();
+    });
   });
   app.on('before-quit', () => {
     quitting = true;

@@ -262,3 +262,7 @@
     transition: none;
   }
 }
+/* a restart that did not install the update, or a failed "Move to Applications" */
+.upd-pop-failure {
+  color: color-mix(in srgb, var(--err) 45%, var(--text));
+}

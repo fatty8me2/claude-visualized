@@ -7,7 +7,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { MAC_SWAP_SCRIPT, bundleParent, macAssetUrl, macBundlePath, macSelfInstallBlocker, macZipAsset, type FeedFile } from '@core/macUpdate';
+import {
+  MAC_SWAP_SCRIPT,
+  bundleParent,
+  lastSwapOutcome,
+  macAssetUrl,
+  macBlockerKind,
+  macBundlePath,
+  macCanMoveToApplications,
+  macSelfInstallBlocker,
+  macZipAsset,
+  type FeedFile,
+  type SwapOutcome,
+} from '@core/macUpdate';
 import { RELEASES_URL } from '@core/updates';
 
 const run = promisify(execFile);
@@ -33,8 +45,7 @@ export class MacSelfUpdater {
     this.dir = path.join(userData, 'mac-update');
   }
 
-  /** Why this copy cannot update itself, or null when it can. */
-  blocker(): string | null {
+  private parentWritable(): boolean {
     let writable = false;
     if (this.bundle) {
       try {
@@ -44,7 +55,26 @@ export class MacSelfUpdater {
         writable = false;
       }
     }
-    return macSelfInstallBlocker(this.bundle, writable);
+    return writable;
+  }
+
+  /** Why this copy cannot update itself, or null when it can. */
+  blocker(): string | null {
+    return macSelfInstallBlocker(this.bundle, this.parentWritable());
+  }
+
+  /** The blocker is one "Move to Applications" fixes (translocated, or run from the disk image). */
+  movable(): boolean {
+    return macCanMoveToApplications(macBlockerKind(this.bundle, this.parentWritable()));
+  }
+
+  /** How the last swap went (swap.log), or null when there was none or it has no outcome. */
+  lastOutcome(): SwapOutcome | null {
+    try {
+      return lastSwapOutcome(fs.readFileSync(path.join(this.dir, 'swap.log'), 'utf8'));
+    } catch {
+      return null;
+    }
   }
 
   get ready(): string | null {
@@ -96,17 +126,22 @@ export class MacSelfUpdater {
 
   /**
    * Start the swap: a detached script waits for this process to exit, puts the new bundle in place and, with `relaunch`, opens
-   * it. The caller quits the app right after. Returns false when there is nothing to install.
+   * it (`'background'`: without taking focus, for an automatic update). The caller quits the app right after. Returns false
+   * when there is nothing to install.
    */
-  launchSwap(relaunch: boolean): boolean {
+  launchSwap(relaunch: boolean | 'background'): boolean {
     if (!this.staged || !this.bundle || this.launched) return false;
     const script = path.join(this.dir, 'swap.sh');
     fs.writeFileSync(script, MAC_SWAP_SCRIPT, { mode: 0o755 });
     const log = path.join(this.dir, 'swap.log');
-    const child = spawn('/bin/sh', [script, String(process.pid), this.bundle, this.staged.app, relaunch ? '1' : '0', log], {
-      detached: true,
-      stdio: 'ignore',
-    });
+    const child = spawn(
+      '/bin/sh',
+      [script, String(process.pid), this.bundle, this.staged.app, relaunch === 'background' ? 'bg' : relaunch ? '1' : '0', log, this.staged.version],
+      {
+        detached: true,
+        stdio: 'ignore',
+      },
+    );
     child.unref();
     this.launched = true;
     return true;

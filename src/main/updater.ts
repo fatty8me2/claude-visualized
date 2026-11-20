@@ -1,7 +1,18 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { app } from 'electron';
 import type { AppUpdater, UpdateInfo } from 'electron-updater';
 import {
+  AUTO_INSTALL_POLL_MS,
   decideUpdateMode,
+  installFailedMessage,
+  isQuietMoment,
+  PENDING_RELEASE_RECHECK_MS,
+  RESTART_MARKER_FILE,
+  restartWindowState,
+  shouldAutoInstall,
+  type QuietInput,
+  type RestartMarker,
   initialUpdateView,
   isNewerVersion,
   RECHECK_ON_SHOW_MS,
@@ -12,6 +23,7 @@ import {
   type UpdateView,
 } from '@core/updates';
 import { MacSelfUpdater, type MacFeedInfo } from './macUpdate';
+import { testOverride } from './paths';
 
 const FIRST_CHECK_MS = 30_000;
 const CHECK_EVERY_MS = 60 * 60_000;
@@ -28,6 +40,12 @@ export interface UpdaterDeps {
   beforeInstall: () => void;
   /** the version that ran before this one (config.lastRunVersion) */
   previousVersion?: string;
+  /** "Install updates automatically" from the config */
+  autoInstall: () => boolean;
+  /** the main window and the user's activity, for the quiet-moment check (isQuietMoment) */
+  quiet: () => QuietInput;
+  /** an update restart into this version did not install it (readRestartMarker): never auto-install it again in this run */
+  failedVersion?: string;
 }
 
 /**
@@ -49,6 +67,14 @@ export class Updater {
     process.platform === 'darwin' && !MAC_SIGNED ? new MacSelfUpdater(app.getPath('userData'), process.execPath, this.feedUrl) : null;
   /** the release the last check found (what the Mac self-update downloads) */
   private latest: MacFeedInfo | null = null;
+  private quietTimer: NodeJS.Timeout | null = null;
+  private soon: NodeJS.Timeout | null = null;
+  /** a version whose install did not take (auto-install skips it; "Restart & update" still tries) */
+  private failedVersion: string | undefined;
+  private installing = false;
+  /** test only: download() and install() only pretend, and install() writes what it would do to this file */
+  private readonly fakeInstall = testOverride('CLAUDE_VIS_UPDATE_FAKE_INSTALL');
+  private readonly quietPollMs = Number(testOverride('CLAUDE_VIS_UPDATE_QUIET_MS')) || AUTO_INSTALL_POLL_MS;
 
   constructor(private deps: UpdaterDeps) {
     const decision = decideUpdateMode({
@@ -58,9 +84,18 @@ export class Updater {
       feedOverride: !!this.feedUrl,
       macSigned: MAC_SIGNED,
       macBlocker: this.mac?.blocker() ?? null,
+      macMovable: this.mac?.movable() ?? false,
     });
     this.view = initialUpdateView(app.getVersion(), decision);
     if (isNewerVersion(app.getVersion(), deps.previousVersion)) this.view = { ...this.view, updatedFrom: deps.previousVersion };
+    // a restart that did not install the new version: say why (macOS: the swap script's log), and do not retry it on our own
+    const swap = this.mac?.lastOutcome();
+    const swapFailed = swap && !swap.ok && swap.version && isNewerVersion(swap.version, app.getVersion()) ? swap : null;
+    this.failedVersion = swapFailed?.version ?? deps.failedVersion;
+    if (this.failedVersion && this.view.mode !== 'disabled') {
+      const msg = installFailedMessage(this.failedVersion, swapFailed?.reason);
+      this.view = { ...this.view, status: 'error', error: msg, installError: msg };
+    }
   }
 
   get state(): UpdateView {
@@ -81,11 +116,22 @@ export class Updater {
     this.every = setInterval(() => void this.check(), CHECK_EVERY_MS);
     this.first.unref();
     this.every.unref();
+    this.quietTimer = setInterval(() => this.autoInstallIfQuiet(), this.quietPollMs);
+    this.quietTimer.unref();
   }
 
   stop() {
     if (this.first) clearTimeout(this.first);
     if (this.every) clearInterval(this.every);
+    if (this.quietTimer) clearInterval(this.quietTimer);
+    if (this.soon) clearTimeout(this.soon);
+  }
+
+  /** A downloaded update installs itself when nobody is using the window (see isQuietMoment / shouldAutoInstall). */
+  private autoInstallIfQuiet() {
+    if (this.installing || this.view.status !== 'downloaded') return;
+    const quiet = isQuietMoment(this.deps.quiet());
+    if (shouldAutoInstall(this.view, { enabled: this.deps.autoInstall(), quiet, failedVersion: this.failedVersion })) this.install(true);
   }
 
   private async updater(): Promise<AppUpdater> {
@@ -131,6 +177,14 @@ export class Updater {
     } finally {
       this.busy = false;
     }
+    // a fresh release whose Mac files are not attached yet: look again in ten minutes rather than in an hour
+    if (this.view.pendingRelease && !this.soon) {
+      this.soon = setTimeout(() => {
+        this.soon = null;
+        void this.check();
+      }, PENDING_RELEASE_RECHECK_MS);
+      this.soon.unref();
+    }
     return this.view;
   }
 
@@ -148,6 +202,10 @@ export class Updater {
     if (this.view.mode !== 'auto' || this.view.status !== 'available' || !this.au) return this.view;
     this.dispatch({ type: 'progress', percent: 0 });
     try {
+      if (this.fakeInstall) {
+        this.onDownloaded(this.view.version ?? '0.0.0');
+        return this.view;
+      }
       if (this.mac) {
         const info = this.latest;
         if (!info) throw new Error('No release to download.');
@@ -178,23 +236,70 @@ export class Updater {
     return this.view;
   }
 
-  /** "Restart & update": quit, install, relaunch. Only meaningful once downloaded. */
-  install(): boolean {
-    if (this.view.status !== 'downloaded' || !this.au) return false;
+  /**
+   * Quit, install, relaunch. Only meaningful once downloaded. `auto`: the app chose a quiet moment by itself, so nothing is shown
+   * (Windows: silent installer) and the new version does not take focus (macOS: reopened in the background). Either way a one-shot
+   * marker tells the next start how the window was (hidden to the tray stays hidden) and which version it should be.
+   */
+  install(auto = false): boolean {
+    if (this.view.status !== 'downloaded' || !this.au || this.installing) return false;
+    const marker: RestartMarker = { window: restartWindowState(this.deps.quiet()), version: this.view.version ?? '', at: Date.now() };
+    if (this.fakeInstall) {
+      this.installing = true;
+      fs.writeFileSync(this.fakeInstall, JSON.stringify({ auto, ...marker }));
+      return true;
+    }
     if (this.mac) {
-      if (!this.mac.launchSwap(true)) return false;
+      if (!this.mac.launchSwap(auto ? 'background' : true)) return false;
+      this.installing = true;
+      writeRestartMarker(marker);
       this.deps.beforeInstall();
       app.quit();
       return true;
     }
+    this.installing = true;
+    writeRestartMarker(marker);
     this.deps.beforeInstall();
-    // not silent (shows the NSIS progress), and relaunch afterwards
-    this.au.quitAndInstall(false, true);
+    // the automatic one is silent; "Restart & update" shows the installer's progress. Both relaunch afterwards.
+    this.au.quitAndInstall(auto, true);
     return true;
+  }
+
+  /**
+   * macOS manual mode that "Move to Applications" fixes (translocated, or run from the disk image): Electron copies the app to
+   * /Applications, quits and opens the moved copy, which then updates itself.
+   */
+  moveToApplications(): { ok: boolean; error?: string } {
+    if (process.platform !== 'darwin' || !this.view.movable) return { ok: false, error: 'This copy does not need moving.' };
+    try {
+      return app.moveToApplicationsFolder() ? { ok: true } : { ok: false, error: 'The move was cancelled.' };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message || 'The app could not be moved.' };
+    }
   }
 
   /** The app is quitting: a downloaded Mac update is put in place without reopening (Windows' installer does the same itself). */
   onQuit(): void {
     if (this.mac && this.view.status === 'downloaded') this.mac.launchSwap(false);
+  }
+}
+
+function writeRestartMarker(m: RestartMarker) {
+  try {
+    fs.writeFileSync(path.join(app.getPath('userData'), RESTART_MARKER_FILE), JSON.stringify(m));
+  } catch (e) {
+    console.error('restart marker write failed', e);
+  }
+}
+
+/** Read and delete the restart marker (once, at startup). */
+export function takeRestartMarker(): string | null {
+  const file = path.join(app.getPath('userData'), RESTART_MARKER_FILE);
+  try {
+    const text = fs.readFileSync(file, 'utf8');
+    fs.rmSync(file, { force: true });
+    return text;
+  } catch {
+    return null;
   }
 }
