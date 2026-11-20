@@ -60,7 +60,8 @@ export async function readCredentials(deps: LoginDeps = {}): Promise<Credentials
   } catch {
     /* no file */
   }
-  if (platform === 'darwin') {
+  // tests that point CLAUDE_VIS_HOME at a fixture must never read the real login in the machine's keychain
+  if (platform === 'darwin' && (deps.exec || !process.env.CLAUDE_VIS_HOME?.trim())) {
     const raw = await (deps.exec ?? defaultExec)('security', ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-w']);
     const json = parse(raw);
     if (raw && hasOauth(json)) return { raw: raw.trim(), json, source: 'keychain' };
