@@ -441,6 +441,40 @@ describe('HarnessSource (a real SQLite file)', () => {
     h.close();
   });
 
+  it('exposes the worker\u2019s own model server from the harness settings (read-only)', async () => {
+    const { h, src, file } = setup();
+    h.db.exec(`create table settings (key text primary key, value text not null);`);
+    const setSetting = h.db.prepare(`insert into settings (key, value) values (?, ?);`);
+    setSetting.run('openaiCompatBaseUrl', '"http://127.0.0.1:8000/v1"');
+    setSetting.run('ollamaBaseUrl', '"http://127.0.0.1:9000"');
+    h.project('prj_1', CWD, Date.now());
+    h.task({ id: TASK, project: 'prj_1', title: 'T', brief: BRIEF, state: 'implementing', ts: Date.now() });
+    const hash = () => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex');
+    const before = hash();
+    expect(src.poll()).toBe(true);
+    expect([...src.endpoints()].sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+      { id: 'kiln-ollama', name: 'Kiln worker (Ollama)', url: 'http://127.0.0.1:9000' },
+      { id: 'kiln-openai', name: 'Kiln worker', url: 'http://127.0.0.1:8000' },
+    ]);
+    src.setConfig({ enabled: false });
+    expect(src.endpoints()).toEqual([]);
+    expect(hash()).toBe(before);
+    src.close();
+    h.close();
+  });
+
+  it('reports no endpoints when the DB has no settings table, and still reads tasks', () => {
+    const { h, src } = setup();
+    const now = Date.now();
+    h.project('prj_1', CWD, now);
+    h.task({ id: TASK, project: 'prj_1', title: 'T', brief: BRIEF, state: 'implementing', ts: now });
+    expect(src.poll()).toBe(true);
+    expect(src.scan([]).map((r) => r.id)).toEqual([harnessSessionId(TASK)]);
+    expect(src.endpoints()).toEqual([]);
+    src.close();
+    h.close();
+  });
+
   it('starts a conversation over when rows went away (a rewind)', async () => {
     const { h, src } = setup();
     const now = Date.now() - 10_000;

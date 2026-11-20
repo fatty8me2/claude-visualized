@@ -117,6 +117,11 @@ function applyHotkey(raw: string): { ok: boolean; error?: string; accelerator?: 
 
 const manager = new SessionManager();
 let localMonitor: LocalMonitor;
+
+/** Monitor the model server Kiln's worker runs for itself (read from the harness DB). */
+function syncKilnEndpoints() {
+  localMonitor?.setDiscovered(config.kilnEnabled !== false ? manager.harness.endpoints() : []);
+}
 let inbox: InboxService;
 let updater: Updater;
 let peers: PeerService;
@@ -723,6 +728,7 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
     config.kilnEventsFile = String(config.kilnEventsFile ?? '').trim();
     manager.setKiln({ enabled: config.kilnEnabled, file: config.kilnEventsFile });
     ssh?.setKiln(config.kilnEnabled !== false);
+    syncKilnEndpoints();
   }
   if (patch.localModels !== undefined) {
     config.localModels = normalizeLocalConfig(patch.localModels);
@@ -945,6 +951,9 @@ if (!app.requestSingleInstanceLock()) {
     manager.start();
     inbox.start();
     localMonitor.start();
+    syncKilnEndpoints();
+    const kilnEndpointTimer = setInterval(syncKilnEndpoints, 30_000);
+    kilnEndpointTimer.unref();
     updater.start();
     peers.start();
     ssh.start();

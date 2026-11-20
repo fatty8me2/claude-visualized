@@ -38,6 +38,7 @@ import { apply } from '@core/reducer';
 import { projectName } from '@core/history';
 import { LIVE_MS } from './indexer';
 import type { Foldable } from './kiln';
+import { normalizeBaseUrl } from '@core/localModels';
 
 type Json = Record<string, any>;
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -188,14 +189,23 @@ export class HarnessSource {
   private links = new WeakMap<SessionState, Map<string, Link>>();
   private summaryCache: SessionSummary[] = [];
   private summaryKey = '';
+  private endpointList: { id: string; name: string; url: string }[] = [];
+  private lastEndpointsAt = 0;
 
   setConfig(o: HarnessOptions) {
     this.enabled = o.enabled;
     this.close();
     this.file = null;
     this.lastDetect = 0;
+    this.endpointList = [];
+    this.lastEndpointsAt = 0;
     this.reset();
     if (o.enabled) this.detect();
+  }
+
+  /** Model servers the harness runs itself (read from its settings), for the local-model monitor; [] when disabled. */
+  endpoints(): { id: string; name: string; url: string }[] {
+    return this.enabled ? this.endpointList : [];
   }
 
   get active(): boolean {
@@ -241,6 +251,30 @@ export class HarnessSource {
       /* already closed */
     }
     this.db = null;
+    this.endpointList = [];
+  }
+
+  /** The worker's own model server(s), straight from the harness settings (a DB without a settings table just yields []). */
+  private readEndpoints(db: DatabaseSync) {
+    try {
+      const rows = db.prepare("select key, value from settings where key in ('openaiCompatBaseUrl', 'ollamaBaseUrl')").all() as Json[];
+      const out: { id: string; name: string; url: string }[] = [];
+      for (const r of rows) {
+        let v: unknown;
+        try {
+          v = JSON.parse(String(r.value));
+        } catch {
+          v = String(r.value);
+        }
+        if (typeof v !== 'string') continue;
+        const url = normalizeBaseUrl(v);
+        if (!url) continue;
+        out.push(r.key === 'ollamaBaseUrl' ? { id: 'kiln-ollama', name: 'Kiln worker (Ollama)', url } : { id: 'kiln-openai', name: 'Kiln worker', url });
+      }
+      this.endpointList = out;
+    } catch {
+      this.endpointList = [];
+    }
   }
 
   private run<T>(fn: (db: DatabaseSync) => T, fallback: T): T {
@@ -261,6 +295,11 @@ export class HarnessSource {
     if (!this.file) {
       this.detect();
       if (!this.file) return false;
+    }
+    const db = this.open();
+    if (db && Date.now() - this.lastEndpointsAt >= 30_000) {
+      this.lastEndpointsAt = Date.now();
+      this.readEndpoints(db);
     }
     const seq = this.run((db) => String(num((db.prepare('select max(seq) as s from events').get() as Json | undefined)?.s)), '');
     if (!seq) return false;

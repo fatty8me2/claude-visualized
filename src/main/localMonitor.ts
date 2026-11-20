@@ -3,7 +3,7 @@
 // and never sends transcript data anywhere.
 import { EventEmitter } from 'node:events';
 import { pollServer, baseStatus, type OllamaShowCache, type PollRequest, type PollTarget } from '@core/localPoll';
-import { pollDelayMs, type LocalModelsConfig, type LocalModelsView, type LocalServerStatus } from '@core/localModels';
+import { normalizeBaseUrl, pollDelayMs, type LocalModelsConfig, type LocalModelsView, type LocalServerStatus } from '@core/localModels';
 
 const REQUEST_TIMEOUT_MS = 2500;
 const MAX_BODY_CHARS = 5_000_000;
@@ -38,6 +38,13 @@ export function httpRequester(baseUrl: string): PollRequest {
   };
 }
 
+/** A model server another local app runs for us (e.g. Kiln's worker), to be monitored like a configured one. */
+export interface DiscoveredServer {
+  id: string;
+  name: string;
+  url: string;
+}
+
 interface Slot {
   target: PollTarget;
   enabled: boolean;
@@ -47,7 +54,22 @@ interface Slot {
   showCache: OllamaShowCache;
 }
 
-function targetsOf(c: LocalModelsConfig): { target: PollTarget; enabled: boolean }[] {
+function targetsOf(c: LocalModelsConfig, discovered: DiscoveredServer[] = []): { target: PollTarget; enabled: boolean }[] {
+  const enabledBaseUrls = new Set(
+    targetsConfigured(c)
+      .filter((t) => t.enabled)
+      .map((t) => normalizeBaseUrl(t.target.baseUrl)),
+  );
+  return [
+    ...targetsConfigured(c),
+    // never monitor twice a server a user already monitors
+    ...discovered
+      .filter((d) => !enabledBaseUrls.has(normalizeBaseUrl(d.url) ?? ''))
+      .map((d) => ({ target: { id: d.id, kind: 'openai' as const, name: d.name, baseUrl: d.url }, enabled: true })),
+  ];
+}
+
+function targetsConfigured(c: LocalModelsConfig): { target: PollTarget; enabled: boolean }[] {
   return [
     { target: { id: 'ollama', kind: 'ollama', name: 'Ollama', baseUrl: c.ollama.url }, enabled: c.ollama.enabled },
     { target: { id: 'lmstudio', kind: 'lmstudio', name: 'LM Studio', baseUrl: c.lmstudio.url }, enabled: c.lmstudio.enabled },
@@ -62,6 +84,7 @@ export class LocalMonitor extends EventEmitter {
   private config: LocalModelsConfig;
   private running = false;
   private generation = 0;
+  private discovered: DiscoveredServer[] = [];
 
   constructor(config: LocalModelsConfig) {
     super();
@@ -87,7 +110,7 @@ export class LocalMonitor extends EventEmitter {
     this.config = c;
     this.generation++;
     const next = new Map<string, Slot>();
-    for (const { target, enabled } of targetsOf(c)) {
+    for (const { target, enabled } of targetsOf(c, this.discovered)) {
       const old = this.slots.get(target.id);
       if (old?.timer) clearTimeout(old.timer);
       const same = old && old.target.baseUrl === target.baseUrl && old.enabled === enabled;
@@ -99,6 +122,15 @@ export class LocalMonitor extends EventEmitter {
     this.slots = next;
     this.emitIfChanged(true);
     if (this.running) for (const s of this.slots.values()) if (s.enabled) this.schedule(s, 0);
+  }
+
+  /** A new set of discovered servers (e.g. Kiln's worker). No-op when unchanged. */
+  setDiscovered(list: DiscoveredServer[]) {
+    const same =
+      list.length === this.discovered.length && list.every((d, i) => d.id === this.discovered[i].id && d.url === this.discovered[i].url);
+    if (same) return;
+    this.discovered = list;
+    this.setConfig(this.config);
   }
 
   /** "check again": poll everything now and forget the backoff. */
