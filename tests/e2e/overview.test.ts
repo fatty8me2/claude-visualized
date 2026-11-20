@@ -231,7 +231,8 @@ describe('all-sessions overview (fixture data, 4 live sessions)', () => {
     const w = (await box(`.ov-panel[data-session="${before[1]}"]`)).width;
     expect(sizes).toContain('2×1');
     await page.reload();
-    await page.locator('[data-agent="a1"]').first().waitFor({ timeout: 20_000 });
+    // a1 finished long ago: in the overview it is folded into its panel's chip, so wait for the panels' main agents
+    await page.locator('.ov-panel [data-agent="main"]').first().waitFor({ timeout: 20_000 });
     await openOverview();
     expect(await order()).toEqual(before);
     expect(await page.locator('.ov-panel').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.size))).toEqual(sizes);

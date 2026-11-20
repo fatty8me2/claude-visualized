@@ -31,7 +31,14 @@ function writeSession(home: string, now: number) {
   const asst = (minAgo: number, block: unknown) => ({
     type: 'assistant',
     isSidechain: false,
-    message: { id: `m_${++n}`, model: 'claude-opus-5-5', role: 'assistant', content: [block], stop_reason: null, usage: { input_tokens: 3000, output_tokens: 120 } },
+    message: {
+      id: `m_${++n}`,
+      model: 'claude-opus-5-5',
+      role: 'assistant',
+      content: [block],
+      stop_reason: null,
+      usage: { input_tokens: 3000, output_tokens: 120 },
+    },
     ...base(minAgo),
   });
   const lines = [
@@ -81,7 +88,12 @@ describe('Kiln hand-offs', () => {
         ['bash', 'npm test -- retry', true],
       ],
       text: 'Added five tests; all pass.',
-      finish: { ok: true, answer: 'Added tests/retry.test.ts with five cases (backoff, max tries, abort). npm test -- retry passes.', files: ['tests/retry.test.ts'], seconds: 150 },
+      finish: {
+        ok: true,
+        answer: 'Added tests/retry.test.ts with five cases (backoff, max tries, abort). npm test -- retry passes.',
+        files: ['tests/retry.test.ts'],
+        seconds: 150,
+      },
     });
     // the live run's process is this test runner, so it counts as still running
     const live = kilnRunLines({
@@ -162,7 +174,7 @@ describe('Kiln hand-offs', () => {
   it('counts down the running hand-off from past runs', async () => {
     const strip = page.locator('[data-agent="main"] [data-testid="cmd-eta"]');
     await strip.waitFor({ timeout: 10_000 });
-    expect(await strip.getAttribute('aria-valuetext')).toMatch(/Kiln hand-off \(medium\): (~?\d+ min left|<1 min left)/);
+    expect(await strip.getAttribute('aria-valuetext')).toMatch(/Kiln hand-off \(medium\): (~?\d+ min left|<1 min left|\d+ s left)/);
     await shot('countdown', '[data-agent="main"]');
   });
 

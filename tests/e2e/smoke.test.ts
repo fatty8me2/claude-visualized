@@ -332,8 +332,9 @@ describe('app smoke (fixture data)', () => {
     await page.getByRole('button', { name: /all sessions/ }).click();
     await page.locator(`.ov-panel[data-session="${SID2}"]`).waitFor({ timeout: 15_000 });
     expect(await page.locator('.ov-panel').count()).toBe(2);
-    // each panel draws its own tree: a3 exists only in the first session's subagent files
-    expect(await page.locator(`.ov-panel[data-session="${SID}"] [data-agent="a3"]`).count()).toBe(1);
+    // each panel draws its own tree: the first session's finished subagents (a1 with its nested a3, a2) fold into
+    // "N finished" chips; the second session's copy has no subagent files
+    expect(await page.locator(`.ov-panel[data-session="${SID}"] .node.collapsed`).count()).toBeGreaterThan(0);
     expect(await page.locator(`.ov-panel[data-session="${SID2}"] [data-agent="main"]`).count()).toBe(1);
     expect(await page.locator(`.ov-panel[data-session="${SID2}"] [data-agent="a3"]`).count()).toBe(0);
     await page.waitForTimeout(600);
