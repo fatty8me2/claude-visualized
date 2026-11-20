@@ -1,5 +1,19 @@
 # Building and running on a Mac
 
+## Install or update in one step
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fatty8me2/claude-visualized/master/scripts/install-mac.sh | sh
+```
+
+This downloads the latest release's universal app, checks its SHA-512, quits Claude Visualized if it is running, replaces the copy in
+**Applications** (the old one stays until the new one is in place) and opens it. curl does not mark the download as quarantined, so there
+is no "unidentified developer" prompt and no right-click → Open. Run it again any time; it does nothing when you are up to date. If it
+can't write to `/Applications`, put `CV_APP_DIR="$HOME/Applications"` in front of `sh`. The script is
+[scripts/install-mac.sh](../scripts/install-mac.sh).
+
+The rest of this page is for running or building from source.
+
 CI can't build the Mac app yet (pushing the workflow needs a GitHub token with the `workflow` scope, see the README), so build it on the Mac
 itself. Either way works on Apple Silicon and Intel Macs.
 
@@ -53,7 +67,7 @@ notarized**. The first time you open it, macOS refuses. Use one of these:
 **Updates install themselves** once the app is in Applications: when a new version is out, the title bar shows "Update to vX". Click it
 and the app downloads the update, checks it, and restarts into the new version. Quitting the app also installs a downloaded update. A copy
 run straight from the `.dmg` or from Downloads can't replace itself; it shows "Get vX" and the reason, so move it to Applications first.
-Versions up to 0.12.2 only link to the release page, so install the first version after 0.12.2 by hand once.
+Versions up to 0.12.2 only link to the release page: get off them once with the one-line install above.
 
 ## Share this Mac's sessions with your Windows PC
 

@@ -26,7 +26,16 @@ The screenshots use made-up demo sessions.
 
 ### macOS
 
-The Mac build is not signed or notarized yet, so macOS blocks it the first time. Either:
+The easiest way, to install or to get off an older version, is one line in Terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fatty8me2/claude-visualized/master/scripts/install-mac.sh | sh
+```
+
+It downloads the latest release, checks it, quits the app if it is running, puts the new one in **Applications** and opens it. Nothing
+to drag and no security prompt. From 0.13.0 on the app updates itself after that.
+
+The Mac build is not signed or notarized yet, so a copy installed by hand is blocked the first time. To do it by hand instead:
 
 - download `Claude-Visualized-<version>-mac-universal.dmg` (Apple Silicon and Intel) from the latest [release](https://github.com/fatty8me2/claude-visualized/releases) (it appears a few minutes after the Windows installer), open it, drag **Claude Visualized** to **Applications**, then right-click it and choose **Open** the first time (or run `xattr -dr com.apple.quarantine "/Applications/Claude Visualized.app"` in a terminal), or
 - build it yourself from source (see [Build from source](#build-from-source)). [docs/MAC.md](docs/MAC.md) has the steps.
