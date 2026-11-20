@@ -1,6 +1,6 @@
 /* Kiln runs (local-model hand-offs): the agent drawer's Kiln section, the Kiln row on the Local models page. Prefix: kiln- */
 .kiln-panel {
-  --kc: var(--local, #4fd1c5);
+  --kc: var(--local, #ff8a1e);
   border: 1px solid color-mix(in srgb, var(--kc) 35%, var(--line));
   border-radius: var(--r-3);
   padding: 8px 10px 10px;
@@ -138,7 +138,7 @@
   align-items: center;
   gap: 6px 12px;
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--local, #4fd1c5) 30%, var(--line));
+  border: 1px solid color-mix(in srgb, var(--local, #ff8a1e) 30%, var(--line));
   border-radius: var(--r-3);
   font-size: var(--fs-sm);
   color: var(--text-2);

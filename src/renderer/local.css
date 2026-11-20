@@ -1,6 +1,6 @@
 /* local models: family colour, "⌂ local" tag, agent-card link rows, top-bar chip and the Local models page */
 :root {
-  --local: #4fd1c5;
+  --local: #ff8a1e; /* vivid orange: deeper and more saturated than Sonnet's peach (#f0956a) */
 }
 .fam-local {
   --fam: var(--local);
@@ -215,7 +215,7 @@
 .lm-faint {
   color: var(--muted);
 }
-/* model chips: small glass capsules; the local teal tints the model id */
+/* model chips: small glass capsules; the local orange tints the model id */
 .lm-pill {
   color: var(--text-2);
   font-family: var(--font-mono);
