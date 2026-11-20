@@ -76,7 +76,17 @@ function Row({
   const state = s.waiting ? 'needs you' : active ? 'working' : s.live ? 'live' : 'idle';
   const where = s.machine ? `running on ${s.machine}` : (s.cwd ?? s.file);
   const client =
-    s.source === 'opencode' ? 'OpenCode' : s.source === 'kiln' ? 'Kiln (local model)' : s.entrypoint === 'claude-desktop' ? 'desktop app' : s.entrypoint === 'cli' ? 'claude CLI' : s.entrypoint;
+    s.source === 'opencode'
+      ? 'OpenCode'
+      : s.source === 'kiln'
+        ? 'Kiln (local model)'
+        : s.source === 'kiln-harness'
+          ? 'Kiln agent (local model)'
+          : s.entrypoint === 'claude-desktop'
+            ? 'desktop app'
+            : s.entrypoint === 'cli'
+              ? 'claude CLI'
+              : s.entrypoint;
   return (
     <div
       data-state={dot || 'idle'}
@@ -176,6 +186,15 @@ function Row({
         )}
         {s.source === 'kiln' && (
           <span className="client oc-badge kiln-badge" data-testid="kiln-badge" title="A Kiln run no Claude session claims (local model)">
+            Kiln
+          </span>
+        )}
+        {s.source === 'kiln-harness' && (
+          <span
+            className="client oc-badge kiln-badge"
+            data-testid="harness-badge"
+            title="Kiln: a local Agent session, or a worker task no Claude session claims (local model)"
+          >
             Kiln
           </span>
         )}

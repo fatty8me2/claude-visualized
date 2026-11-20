@@ -11,6 +11,7 @@ import { SessionIndexer, LIVE_MS } from './indexer';
 import { SessionWatcher, type BacklogLoader } from './watcher';
 import { OpenCodeSource, OpenCodeWatcher, type OpenCodeOptions } from './opencode';
 import { KilnSource, KilnWatcher, type KilnOptions } from './kiln';
+import { HarnessSource, HarnessWatcher } from './harness';
 import { loadBacklogInWorker } from './workerLoader';
 import { claudeDeepLink } from './desktopSessions';
 
@@ -19,7 +20,9 @@ const POLL_MS = 600;
 const OC_POLL_MS = 250;
 const OC_SCAN_MS = 400;
 
-type Follower = SessionWatcher | OpenCodeWatcher | KilnWatcher;
+type Follower = SessionWatcher | OpenCodeWatcher | KilnWatcher | HarnessWatcher;
+/** Kiln's agent harness: one MAX(seq) read per poll when nothing changed */
+const HARNESS_POLL_MS = 500;
 /** Kiln's events file is a small append-only log: one stat per poll when nothing changed */
 const KILN_POLL_MS = 400;
 const SCAN_MS = 2500;
@@ -79,6 +82,9 @@ export class SessionManager extends EventEmitter {
   private oc = new OpenCodeSource();
   readonly kiln = new KilnSource();
   private kilnSummaries: SessionSummary[] = [];
+  /** Kiln's agent harness (this computer only: an SSH remote's or a peer's database is not read) */
+  readonly harness = new HarnessSource();
+  private harnessSummaries: SessionSummary[] = [];
   private claudeSummaries: SessionSummary[] = [];
   private ocSummaries: SessionSummary[] = [];
   private summaries: SessionSummary[] = [];
@@ -144,6 +150,7 @@ export class SessionManager extends EventEmitter {
       this.timers.push(setInterval(() => this.scanOpenCode(), OC_SCAN_MS));
     }
     if (this.kilnOn) this.timers.push(setInterval(() => void this.pollKiln(), KILN_POLL_MS));
+    if (!this.passive) this.timers.push(setInterval(() => this.pollHarness(), HARNESS_POLL_MS));
     this.timers.push(
       setInterval(() => {
         if (this.dirty) {
@@ -335,6 +342,24 @@ export class SessionManager extends EventEmitter {
   setKiln(o: KilnOptions) {
     this.kiln.setConfig(o);
     this.resetKiln();
+    // the same switch shows Kiln's agent harness (its workers, sub-agents and local Agent sessions)
+    if (!this.passive) {
+      this.harness.setConfig({ enabled: o.enabled });
+      for (const [id, w] of [...this.watchers]) if (w instanceof HarnessWatcher) this.watchers.delete(id);
+      this.pollHarness(true);
+    }
+  }
+
+  private pollHarness(rescan = false) {
+    if (!this.harness.poll() && !rescan) return;
+    const next = this.harness.scan(this.claudeSummaries, this.followed);
+    if (next === this.harnessSummaries) return;
+    this.harnessSummaries = next;
+    this.mergeSummaries();
+    if (this.followActive) this.autoSelect();
+    this.emitSessions();
+    this.overviewDirty = true;
+    this.ovVersion++;
   }
 
   /** An SSH remote's mirrored Kiln events file, or null to stop showing its runs. */
@@ -376,7 +401,7 @@ export class SessionManager extends EventEmitter {
   }
 
   private mergeSummaries() {
-    this.summaries = [...this.claudeSummaries, ...this.ocSummaries, ...this.kilnSummaries].sort((a, b) => b.mtime - a.mtime);
+    this.summaries = [...this.claudeSummaries, ...this.ocSummaries, ...this.kilnSummaries, ...this.harnessSummaries].sort((a, b) => b.mtime - a.mtime);
   }
 
   private scanOpenCode() {
@@ -395,7 +420,13 @@ export class SessionManager extends EventEmitter {
     if (w) return w;
     const f = file ?? this.summaries.find((s) => s.id === id)?.file;
     if (!f || isRemoteId(id)) return null;
-    w = f.startsWith('opencode:') ? this.oc.watcher(id) : f.startsWith('kiln:') ? this.kiln.watcher(id) : new SessionWatcher(id, f, this.loader);
+    w = f.startsWith('opencode:')
+      ? this.oc.watcher(id)
+      : f.startsWith('kiln:')
+        ? this.kiln.watcher(id)
+        : f.startsWith('kiln-harness:')
+          ? this.harness.watcher(id, f)
+          : new SessionWatcher(id, f, this.loader);
     this.watchers.set(id, w);
     return w;
   }
@@ -404,6 +435,7 @@ export class SessionManager extends EventEmitter {
     try {
       this.claudeSummaries = await this.indexer.scan();
       if (this.kilnOn) this.kilnSummaries = this.kiln.scan(this.claudeSummaries, this.followed);
+      if (!this.passive) this.harnessSummaries = this.harness.scan(this.claudeSummaries, this.followed);
       this.mergeSummaries();
     } catch (e) {
       console.error('scan failed', e);
@@ -470,13 +502,15 @@ export class SessionManager extends EventEmitter {
   private async pollAll(openCode: boolean) {
     let sessionsChanged = false;
     for (const w of [...this.watchers.values()]) {
-      if ((w instanceof OpenCodeWatcher || w instanceof KilnWatcher) !== openCode) continue;
+      if ((w instanceof OpenCodeWatcher || w instanceof KilnWatcher || w instanceof HarnessWatcher) !== openCode) continue;
       const wasPrimed = w.primed;
       let changed = false;
       try {
         changed = await w.poll();
         // the local-model runs this session handed to Kiln, as child agents
         if (w instanceof SessionWatcher && this.kilnOn && this.kiln.link(w)) changed = true;
+        // the qwen workers (and their sub-agents) this session handed to Kiln's agent harness
+        if (w instanceof SessionWatcher && !this.passive && this.harness.link(w)) changed = true;
       } catch (e) {
         console.error('poll failed', w.sessionId, e);
         continue;
@@ -575,7 +609,9 @@ export class SessionManager extends EventEmitter {
     if (!f) return [];
     if (f.startsWith('opencode:')) return this.oc.watcher(id).collectAllEvents();
     if (f.startsWith('kiln:')) return this.kiln.watcher(id).collectAllEvents();
+    if (f.startsWith('kiln-harness:')) return this.harness.watcher(id, f).collectAllEvents();
     const events = await new SessionWatcher(id, f, this.loader).collectAllEvents();
-    return this.kilnOn ? this.kiln.withRuns(events, id) : events;
+    const withKiln = this.kilnOn ? this.kiln.withRuns(events, id) : events;
+    return this.passive ? withKiln : this.harness.withTasks(withKiln, id);
   }
 }

@@ -18,13 +18,18 @@ export function KilnPanel({ k }: { k: KilnInfo }) {
         <span className="kiln-mark" aria-hidden>
           ◆
         </span>
-        Kiln · local model
+        {k.source === 'harness' ? 'Kiln worker · local model' : 'Kiln · local model'}
         <span className="kiln-state" data-testid="kiln-state">
           {state === 'run' ? 'working' : state === 'ok' ? 'finished' : 'failed'}
         </span>
       </h4>
       <div className="kiln-chips">
         {k.model && <span className="chip">{k.model}</span>}
+        {k.state && (
+          <span className="chip" data-testid="kiln-task-state">
+            task {k.state.replace('_', ' ')}
+          </span>
+        )}
         {k.profile && <span className="chip">profile {k.profile}</span>}
         {k.effort && <span className="chip">effort {k.effort}</span>}
         {k.readonly && <span className="chip kiln-ro">read-only</span>}

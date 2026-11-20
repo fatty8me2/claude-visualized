@@ -184,6 +184,20 @@ export interface SessionInternal {
   usageCount?: Record<string, number>;
   /** Kiln hand-offs (delegate_task calls) by tool_use id, newest last, so the main process can attach the local model's run */
   kilnCalls?: Record<string, KilnCallRec>;
+  /** Kiln harness hand-offs (mcp__harness__delegate_task calls) by tool_use id, newest last (src/core/harness.ts) */
+  harnessCalls?: Record<string, HarnessCallRec>;
+}
+
+export interface HarnessCallRec {
+  agentId: string;
+  ts: number;
+  /** the call's title and the first 300 characters of its brief */
+  title: string;
+  brief: string;
+  cwd: string;
+  endTs?: number;
+  /** from the call's result, once it returned */
+  taskId?: string;
 }
 
 export interface KilnCallRec {

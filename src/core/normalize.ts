@@ -4,6 +4,7 @@
 
 import type { AgentEvent, AgentRef, SpawnInfo, TodoInput, UsageNumbers } from './events';
 import { desktopTodoOp, toolShipKinds } from './ship';
+import { harnessTaskIdOf } from './harness';
 
 type Json = Record<string, any>;
 
@@ -221,7 +222,16 @@ export function normalizeLine(line: string, ctx: LineContext, fallbackTs = 0): A
       for (const b of content as Json[]) {
         if (b?.type === 'tool_result' && str(b.tool_use_id)) {
           const error = b.is_error ? (errorText(b.content) ?? (typeof o.toolUseResult === 'string' ? errorText(o.toolUseResult) : undefined)) : undefined;
-          ev({ k: 'tool.end', toolUseId: b.tool_use_id, ok: !b.is_error, result: compactResult(o.toolUseResult), ...(error ? { error } : {}) });
+          // a Kiln harness delegate_task result names the task it created (the reducer keeps it only for those calls)
+          const harnessTaskId = b.is_error ? null : harnessTaskIdOf(b.content);
+          ev({
+            k: 'tool.end',
+            toolUseId: b.tool_use_id,
+            ok: !b.is_error,
+            result: compactResult(o.toolUseResult),
+            ...(error ? { error } : {}),
+            ...(harnessTaskId ? { harnessTaskId } : {}),
+          });
         } else if (b?.type === 'text' && str(b.text) && !o.isMeta && !o.isCompactSummary) {
           const n = parseTaskNotification(b.text);
           if (n) ev({ k: 'task.notification', ...n });

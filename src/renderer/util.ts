@@ -45,5 +45,7 @@ export function agentName(a: AgentNode | undefined): string {
   if (!a) return '?';
   if (a.kind === 'main') return 'main';
   if (a.agentType === 'kiln') return 'Kiln';
+  if (a.agentType === 'kiln-worker') return 'Kiln worker';
+  if (a.agentType === 'kiln-helper') return 'Kiln helper';
   return a.agentType || 'agent';
 }

@@ -214,7 +214,7 @@ export function SettingsDialog({
         )}
         <label className="chk" data-testid="set-kiln">
           <input type="checkbox" checked={config.kilnEnabled !== false} onChange={(e) => set({ kilnEnabled: e.target.checked })} />
-          Show Kiln runs: tasks Claude hands to your local model appear as subagents (read-only; reads Kiln&rsquo;s events file)
+          Show Kiln runs: tasks Claude hands to your local model (Kiln runs and Kiln harness workers) appear as subagents (read-only)
         </label>
         {config.kilnEnabled !== false && (
           <div className="row">

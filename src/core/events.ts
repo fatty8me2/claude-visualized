@@ -75,6 +75,10 @@ export interface KilnInfo {
   seconds: number;
   tokensPerSec: number;
   finished: boolean;
+  /** 'harness': a worker of Kiln's agent harness (src/core/harness.ts), whose usage is one entry per model call (a real context size) */
+  source?: 'harness';
+  /** the harness task's state (implementing, review, accepted, ...) */
+  state?: string;
 }
 
 type Base = { ts: number; src: Source; ref: AgentRef };
@@ -104,6 +108,8 @@ export type AgentEvent = Base &
         durationMs?: number;
         name?: string;
         /** first ~300 chars of a failed call's output */ error?: string;
+        /** the task id a Kiln harness delegate_task call returned (src/core/harness.ts) */
+        harnessTaskId?: string;
       }
     | { k: 'usage'; msgId: string; usage: UsageNumbers }
     | { k: 'agent.spawn'; spawn: SpawnInfo }

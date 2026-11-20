@@ -179,6 +179,18 @@ Claude Code can run against local models through a gateway or proxy (LiteLLM, Ol
 - **Settings**: "Show Kiln runs" (on by default; does nothing until Kiln has written its events file) and "Kiln events file" (empty = Kiln's default).
 - **Tests**: `tests/fixtures/kiln.ts` writes Kiln event lines. `CLAUDE_VIS_KILN_EVENTS` points the app at a file. When `CLAUDE_VIS_HOME` is set for a test and this is not, Kiln's file is not read at all.
 
+#### Kiln agent harness (qwen workers)
+
+The Kiln desktop app runs Claude Code as a "lead" that hands coding tasks to local qwen workers through the MCP tool `mcp__harness__delegate_task`. Those workers show up like Claude's own subagents:
+
+- **Workers**: each delegated task is a **Kiln worker** (or **Kiln helper** for read-only tasks) child agent under the Claude agent that called `delegate_task`, on the orange local model family, with its brief, every tool call (`read_file`, `edit_file`, `run_command`, `grep`, ... shown as Read, Edit, Bash, Grep, ...), what it says, its tokens per model call (counted as local) and its context. It ends done (accepted, or waiting for the lead's review) or failed (failed, cancelled, escalated, with the reason); the drawer's Kiln section shows the task state, summary, steps, tokens and speed.
+- **Sub-agents**: a worker's `task` tool call is a grandchild agent under that worker, live while it runs; when it returns, its steps, tokens and report fill in.
+- **Local Agent sessions** of the Kiln app are sessions of their own (badge "KILN"), on their model, in their project folder, with their todo list and sub-agents. Tasks no Claude session claims (the lead is not open here) get their own row too, like Kiln runs.
+- **Linking**: the task id comes from the `delegate_task` result; until the result is in, the task with the same title and brief created right after the call. Sonnet/Opus-tier tasks are not duplicated: they already run as Claude subagents of the lead.
+- **Where it reads**: the harness database `harness.db` in Kiln's app data folder (`~/Library/Application Support/Kiln` on macOS, `%APPDATA%\Kiln` on Windows, `~/.config/Kiln` on Linux, or `$HARNESS_PROFILE_DIR`). It is opened read-only, polled with one `MAX(seq)` read about every half second, and never written; nothing else of Kiln's is read (never its secrets). This computer only: a database on an SSH remote or a peer is not read.
+- **Settings**: the same "Show Kiln runs" switch.
+- **Tests**: `tests/fixtures/harness.ts` builds a `harness.db` with the harness's schema. `CLAUDE_VIS_HARNESS_DB` points the app at it; when `CLAUDE_VIS_HOME` is set and this is not, no harness database is read.
+
 ### First run
 
 On first launch the app opens the setup wizard (`src/renderer/components/SetupWizard.tsx`, detection in `src/main/setup.ts`).

@@ -22,6 +22,7 @@ import { summarizeTool, toolLabel } from './summarize';
 import { toolCategory } from './goal';
 import { COMMANDS_CAP, FILES_CAP, KILN_CALLS_CAP, PROMPT_CAP, RECENT_CAP } from './state';
 import { isKilnDelegate } from './kiln';
+import { isHarnessDelegate } from './harness';
 
 function firstLineOf(t: string, max: number): string {
   const line = (t.split('\n').find((l) => l.trim()) ?? '').trim();
@@ -108,6 +109,20 @@ function recordKilnCall(s: SessionState, toolUseId: string, agentId: string, inp
   const i = (input ?? {}) as Json;
   const calls = (s.internal.kilnCalls ??= {});
   calls[toolUseId] = { agentId, ts, task: typeof i.task === 'string' ? i.task : '', cwd: typeof i.cwd === 'string' ? i.cwd : (s.cwd ?? '') };
+  const ids = Object.keys(calls);
+  if (ids.length > KILN_CALLS_CAP) for (const id of ids.slice(0, ids.length - KILN_CALLS_CAP)) delete calls[id];
+}
+
+function recordHarnessCall(s: SessionState, toolUseId: string, agentId: string, input: unknown, ts: number) {
+  const i = (input ?? {}) as Json;
+  const calls = (s.internal.harnessCalls ??= {});
+  calls[toolUseId] = {
+    agentId,
+    ts,
+    title: typeof i.title === 'string' ? i.title : '',
+    brief: typeof i.brief === 'string' ? i.brief : '',
+    cwd: s.cwd ?? '',
+  };
   const ids = Object.keys(calls);
   if (ids.length > KILN_CALLS_CAP) for (const id of ids.slice(0, ids.length - KILN_CALLS_CAP)) delete calls[id];
 }
@@ -325,6 +340,7 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
           }
         }
         if (isKilnDelegate(e.name)) recordKilnCall(s, e.toolUseId, a.id, e.input, ts);
+        else if (isHarnessDelegate(e.name)) recordHarnessCall(s, e.toolUseId, a.id, e.input, ts);
         if (e.name === 'TaskUpdate') {
           const i = (e.input ?? {}) as Json;
           if (typeof i.taskId === 'string') setTodo(s, i.taskId, { status: i.status, text: i.subject }, a.id, ts);
@@ -364,6 +380,11 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       }
       const kc = s.internal.kilnCalls?.[e.toolUseId];
       if (kc && kc.endTs === undefined) kc.endTs = ts;
+      const hc = s.internal.harnessCalls?.[e.toolUseId];
+      if (hc) {
+        if (hc.endTs === undefined) hc.endTs = ts;
+        if (e.harnessTaskId && !hc.taskId) hc.taskId = e.harnessTaskId;
+      }
       if (name === 'ExitPlanMode' && s.plan?.exitToolUseId === e.toolUseId) s.plan.approved = e.ok;
       const r = (e.result ?? null) as Json | null;
       if (r && typeof r === 'object') onToolResult(s, a, name, e.toolUseId, r, e.ok, ts, p?.input);
@@ -398,7 +419,8 @@ export function apply(s: SessionState, e: AgentEvent): SessionState {
       addUsage(s.totals, e.usage, 1);
       const ctx = e.usage.in + e.usage.cacheRead + e.usage.cacheWrite;
       // a Kiln run reports prompt tokens summed over all its requests: not a context size
-      if (ctx > 0 && ts >= a.contextAt && !a.kiln) {
+      // (a Kiln harness worker's usage is per model call: a real context size)
+      if (ctx > 0 && ts >= a.contextAt && (!a.kiln || a.kiln.source === 'harness')) {
         a.contextTokens = ctx;
         a.contextAt = ts;
         if (ctx > a.contextPeak) a.contextPeak = ctx;
