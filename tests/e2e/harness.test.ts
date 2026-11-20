@@ -246,6 +246,21 @@ describe('Kiln agent harness workers', () => {
     await expect.poll(async () => (await card(sub).getAttribute('class')) ?? '', { timeout: 10_000 }).toMatch(/\bdone\b/);
   });
 
+  it('folds finished local workers and their sub-agents away like finished Claude subagents', async () => {
+    const liveSub = `kh-${T2}-${LIVE_SUB_MSG}-0`;
+    const finished = [`kh-${T1}`, `kh-${T2}`, liveSub];
+    for (const id of finished) await expect.poll(async () => (await card(id).getAttribute('class')) ?? '', { timeout: 10_000 }).toMatch(/\bdone\b/);
+    // hide finished: every finished local agent goes into its parent's "N finished" chip
+    await page.getByRole('button', { name: 'hide finished' }).click();
+    for (const id of finished) await expect.poll(() => card(id).count(), { timeout: 5_000 }).toBe(0);
+    expect(await page.locator('.node.collapsed').count()).toBeGreaterThan(0);
+    // and they stay folded: nothing revives a finished worker
+    await page.waitForTimeout(1_500);
+    for (const id of finished) expect(await card(id).count(), id).toBe(0);
+    await page.getByRole('button', { name: 'show finished' }).click();
+    for (const id of finished) await card(id).waitFor({ timeout: 5_000 });
+  });
+
   it('lists the local Agent conversation as a Kiln session of its own', async () => {
     const row = page.locator(`.session-row[data-session="kh-${CONV}"]`).first();
     await row.waitFor({ timeout: 10_000 });

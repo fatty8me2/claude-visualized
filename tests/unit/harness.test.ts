@@ -18,7 +18,8 @@ import {
   type HxData,
   type HxTask,
 } from '../../src/core/harness';
-import { isKilnDelegate } from '../../src/core/kiln';
+import { isKilnDelegate, kilnRunEvents, type KilnRun } from '../../src/core/kiln';
+import { DEFAULT_LAYOUT, layoutAgents } from '../../src/core/layout';
 import { classifyModel } from '../../src/core/models';
 import { normalizeLine } from '../../src/core/normalize';
 import { apply, foldEvents } from '../../src/core/reducer';
@@ -494,5 +495,75 @@ describe('HarnessSource (a real SQLite file)', () => {
     expect(cw.state.log.filter((l) => l.kind === 'text').map((l) => l.text)).toEqual(['A short answer']);
     src.close();
     h.close();
+  });
+});
+
+const newKilnRun = (id: string, ts: number): KilnRun => ({
+  id,
+  pid: 1,
+  startedAt: ts,
+  lastAt: ts,
+  finishedAt: null,
+  task: '',
+  cwd: CWD,
+  model: '',
+  profile: '',
+  effort: '',
+  readonly: false,
+  steps: [],
+  ok: null,
+  error: null,
+  answer: '',
+  filesChanged: [],
+  diffStat: null,
+  promptTokens: 0,
+  completionTokens: 0,
+  seconds: 0,
+  tokensPerSec: 0,
+  lost: false,
+});
+
+describe('finished local agents fold like Claude subagents', () => {
+  const folded = (s: ReturnType<typeof leadSession>, showFinished: boolean) => {
+    const l = layoutAgents(s.agents, { ...DEFAULT_LAYOUT, showFinished });
+    const shown = new Set(l.nodes.filter((n) => !n.collapsed).map((n) => n.id));
+    const chips = l.nodes.filter((n) => n.collapsed).flatMap((n) => n.collapsed!.ids);
+    return { shown, chips };
+  };
+
+  it('a finished worker and its finished sub-agent go into the chip; a running worker keeps its finished sub-agent folded', () => {
+    const s = leadSession();
+    for (const e of harnessTaskItems(task(), workerData(), 'S', 'tu1').map((i) => i.e)) apply(s, e);
+    const w = harnessAgentId(TASK);
+    const sub = Object.values(s.agents).find((a) => a.parentId === w)!.id;
+    // running worker: it stays; its finished sub-agent folds under it
+    let f = folded(s, false);
+    expect(f.shown.has(w)).toBe(true);
+    expect(f.chips).toContain(sub);
+    // the worker finishes: it folds too (with its sub-agent inside)
+    for (const e of harnessTaskItems(task({ state: 'review', updatedAt: T0 + 60_000 }), workerData(), 'S', 'tu1').map((i) => i.e)) apply(s, e);
+    expect(s.agents[w].status).toBe('done');
+    f = folded(s, false);
+    expect(f.shown.has(w)).toBe(false);
+    expect(f.chips).toContain(w);
+    // shown when the user asks for finished agents
+    expect(folded(s, true).shown.has(w)).toBe(true);
+  });
+
+  it('a finished Python-Kiln run folds too', () => {
+    const s = leadSession();
+    apply(s, {
+      ts: T0,
+      src: 'transcript',
+      ref: { sessionId: 'S', agentId: null },
+      k: 'tool.start',
+      toolUseId: 'tk',
+      name: 'mcp__kiln__delegate_task',
+      input: { task: 'x' },
+    });
+    const run = { ...newKilnRun('r1', T0 + 100), task: 'Write tests', model: 'qwen3:30b', finishedAt: T0 + 5000, ok: true };
+    for (const e of kilnRunEvents(run, 'S', 'tk')) apply(s, e);
+    expect(s.agents['kiln-r1'].status).toBe('done');
+    expect(folded(s, false).chips).toContain('kiln-r1');
   });
 });
