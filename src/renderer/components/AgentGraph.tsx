@@ -7,7 +7,7 @@ import { GraphCamera, targetFor } from './GraphCamera';
 import { CAMERA, intersects } from '@core/graphCamera';
 import { CameraAnimator } from '../graphCamera';
 import { COMPACT_LAYOUT, DEFAULT_LAYOUT, layoutAgents, type LayoutOptions } from '@core/layout';
-import { clampZoom, columnsForWidth, fitScale, nextCardMode, zoomAnchor, ZOOM, type CardMode } from '@core/graphZoom';
+import { clampZoom, columnsForWidth, fitScale, nextCardMode, steadySize, stickyScale, zoomAnchor, ZOOM, type CardMode, type StickyZoom } from '@core/graphZoom';
 import { MAIN, type AgentNode, type SessionView } from '@core/state';
 import { formatDuration, formatTokens, modeLabel, modelFamily, modelLabel } from '@core/summarize';
 import { CtxChip } from './ContextMeter';
@@ -422,19 +422,23 @@ export function AgentGraph({
   const folded = embedded ? NO_GROUPS : groups.folded;
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [cardMode, setCardMode] = useState<CardMode>(embedded ? 'compact' : 'full');
+  /** the overview panel's zoom, per session (see stickyScale) */
+  const zoomRef = useRef<{ id: string; z: StickyZoom } | null>(null);
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
+    // Changes under 2 px (sub-pixel rounding) do not re-flow the tree. An overview panel measures its full size, scrollbars
+    // included: otherwise a scrollbar appearing narrows it, the tree re-flows, the scrollbar goes, and it starts over (shaking).
     const measure = () => {
-      setWrapW(el.clientWidth);
-      setWrapH(el.clientHeight);
+      setWrapW((w) => steadySize(w, embedded ? el.offsetWidth : el.clientWidth));
+      setWrapH((h) => steadySize(h, embedded ? el.offsetHeight : el.clientHeight));
     };
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     measure();
     return () => ro.disconnect();
-  }, []);
+  }, [embedded]);
 
   // local-model cards carry two extra rows (model id, where it is loaded)
   const extra = useMemo(() => (Object.values(view.agents).some((a) => isLocalModel(a.model)) ? LOCAL_ROWS_H : 0), [view.agents]);
@@ -500,7 +504,12 @@ export function AgentGraph({
   if (embedded) {
     nextMode = 'compact';
     const l = layoutCompact ?? layoutFull;
-    scale = fitScale({ w: l.width, h: l.height }, viewport, pad, true, 0.6, fill ? FILL_MAX_SCALE : 1);
+    const fit = fitScale({ w: l.width, h: l.height }, viewport, pad, true, 0.6, fill ? FILL_MAX_SCALE : 1);
+    // zoom out at once, zoom back in only after a while: no bouncing as agents spawn and fold away
+    const prevZoom = zoomRef.current?.id === view.id ? zoomRef.current.z : null;
+    const z = stickyScale(prevZoom, fit, now, undefined, viewport);
+    zoomRef.current = { id: view.id, z };
+    scale = z.scale;
   } else if (prefs.zoom === 'fit') {
     nextMode = nextCardMode(cardMode, fitFull, prefs.compact);
     scale =

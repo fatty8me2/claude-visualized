@@ -213,6 +213,12 @@ export const PlanStrip = memo(function PlanStrip({ v }: { v: SessionView }) {
 });
 
 const rank = (a: AgentNode) => (a.status === 'running' ? 0 : a.status === 'waiting' ? 1 : a.status === 'error' ? 2 : 3);
+/**
+ * Within a status group, an order that does not change while agents work: running and waiting ones by when they started,
+ * finished ones newest first. (Sorting by last activity made rows swap places on every event while several agents ran.)
+ */
+const steadyOrder = (x: AgentNode, y: AgentNode) =>
+  (rank(x) < 2 ? x.startedAt - y.startedAt : (y.endedAt ?? y.lastActivity) - (x.endedAt ?? x.lastActivity)) || x.id.localeCompare(y.id);
 
 /** F: running agents first, then waiting, failed and finished: goal glyph, name, what it is doing, elapsed time, tokens */
 export const AgentTable = memo(function AgentTable({ v, now, rows }: { v: SessionView; now: number; rows: number }) {
@@ -220,7 +226,7 @@ export const AgentTable = memo(function AgentTable({ v, now, rows }: { v: Sessio
     () =>
       Object.values(v.agents)
         .filter((a) => a.kind !== 'workflow')
-        .sort((x, y) => rank(x) - rank(y) || (x.id === MAIN ? -1 : y.id === MAIN ? 1 : 0) || y.lastActivity - x.lastActivity),
+        .sort((x, y) => rank(x) - rank(y) || (x.id === MAIN ? -1 : y.id === MAIN ? 1 : 0) || steadyOrder(x, y)),
     [v.agents],
   );
   const shown = list.slice(0, rows);

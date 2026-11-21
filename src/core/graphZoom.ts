@@ -94,3 +94,33 @@ export function revealDelta(card: Rect, viewport: Rect, obscuredRight: number, m
   if (card.top - dy - margin < viewport.top) dy = card.top - margin - viewport.top;
   return dx || dy ? { dx, dy } : null;
 }
+
+/** A panel's zoom that does not bounce (see stickyScale). */
+export interface StickyZoom {
+  scale: number;
+  /** the panel size it was fitted to: a resize re-fits at once */
+  vw?: number;
+  vh?: number;
+  /** since when a larger fit has been possible (null: none pending) */
+  upSince: number | null;
+}
+
+/**
+ * The overview's zoom without bouncing: a bigger tree zooms out at once, but zooming back in waits until the larger fit has
+ * held for `holdMs`. Agents spawning, finishing and folding away one after another would otherwise zoom every card in and out.
+ * Differences under 2% are ignored.
+ */
+export function stickyScale(prev: StickyZoom | null, fit: number, now: number, holdMs = 20_000, viewport?: { w: number; h: number }): StickyZoom {
+  const vw = viewport?.w;
+  const vh = viewport?.h;
+  // first fit, or the panel itself was resized: fit at once (the user is resizing, not watching agents come and go)
+  if (!prev || !(prev.scale > 0) || prev.vw !== vw || prev.vh !== vh) return { scale: fit, upSince: null, vw, vh };
+  if (fit <= prev.scale * 1.02) return fit < prev.scale * 0.98 ? { scale: fit, upSince: null, vw, vh } : { scale: prev.scale, upSince: null, vw, vh };
+  if (prev.upSince === null) return { scale: prev.scale, upSince: now, vw, vh };
+  return now - prev.upSince >= holdMs ? { scale: fit, upSince: null, vw, vh } : prev;
+}
+
+/** A measured size that ignores changes under `step` px, so sub-pixel or scrollbar flicker does not re-flow the graph. */
+export function steadySize(prev: number, next: number, step = 2): number {
+  return Math.abs(next - prev) < step ? prev : next;
+}

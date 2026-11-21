@@ -9,7 +9,7 @@ import path from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { showFinishedAgents } from '../fixtures/graphPrefs';
-import { FakeHarness, SYSTEM, asst, delegateResult, subTrace, toolMsg, userMsg } from '../fixtures/harness';
+import { FakeHarness, QWEN, SYSTEM, asst, delegateResult, subTrace, toolMsg, userMsg } from '../fixtures/harness';
 
 const ROOT = path.resolve(__dirname, '../..');
 const ART = path.join(ROOT, 'tests/e2e/artifacts');
@@ -259,6 +259,47 @@ describe('Kiln agent harness workers', () => {
     for (const id of finished) expect(await card(id).count(), id).toBe(0);
     await page.getByRole('button', { name: 'show finished' }).click();
     for (const id of finished) await card(id).waitFor({ timeout: 5_000 });
+  });
+
+  it('the dashboard holds still while many workers run: no card moves, no table row swaps', async () => {
+    await page.getByRole('button', { name: /all sessions/ }).click();
+    await page.locator('[data-testid="ov-body"] [data-agent]').first().waitFor({ timeout: 10_000 });
+    const mainFile = path.join(home, 'projects', PROJECT, `${SID}.jsonl`);
+    // a busy autopilot: 8 workers delegated at once, all working
+    const ids: string[] = [];
+    for (let w = 0; w < 8; w++) {
+      const id = `task_e${String(w).padStart(11, '0')}`;
+      ids.push(id);
+      fs.appendFileSync(
+        mainFile,
+        asstLine(0, { type: 'tool_use', id: `toolu_M${w}`, name: 'mcp__harness__delegate_task', input: { title: `Worker ${w}`, brief: `Job ${w}.` } }) + '\n',
+      );
+      fs.appendFileSync(mainFile, result(0, `toolu_M${w}`, delegateResult(id)) + '\n');
+      h.task({ id, project: 'prj_shop', title: `Worker ${w}`, brief: `Job ${w}.`, state: 'implementing', ts: Date.now() - (8 - w) * 1000, model: QWEN });
+      h.message({ task: id }, userMsg(`Job ${w}.`), Date.now());
+    }
+    await expect.poll(() => page.locator(`[data-testid="ov-body"] [data-agent="kh-${ids[7]}"]`).count(), { timeout: 10_000 }).toBe(1);
+    await page.waitForTimeout(2000);
+    const snap = () =>
+      page.evaluate(() => ({
+        cards: [...document.querySelectorAll('[data-testid="ov-body"] [data-agent]')].map((el) => {
+          const r = el.getBoundingClientRect();
+          return `${(el as HTMLElement).dataset.agent}@${Math.round(r.x)},${Math.round(r.y)}`;
+        }),
+        rows: [...document.querySelectorAll('[data-testid="ov-body"] [data-testid="px-table"] .trow:not(.th) .nm')].map((el) => el.textContent ?? ''),
+      }));
+    const first = await snap();
+    // the workers take turns: each one acts in a different order every round, like real parallel work
+    for (let round = 0; round < 12; round++) {
+      for (const k of [...ids.keys()].sort(() => Math.random() - 0.5)) {
+        h.message({ task: ids[k] }, asst('', [[`r${round}w${k}`, 'read_file', { path: `src/f${k}.ts` }]]), Date.now());
+        h.usage({ task: ids[k] }, { in: 9000 + round, out: 40, ts: Date.now(), model: QWEN.model });
+      }
+      await page.waitForTimeout(400);
+      const now = await snap();
+      expect(now.cards, `round ${round}: cards moved`).toEqual(first.cards);
+      expect(now.rows, `round ${round}: table rows reordered`).toEqual(first.rows);
+    }
   });
 
   it('in the all-sessions overview, finished workers fold away shortly after they finish, within one long prompt', async () => {
