@@ -212,6 +212,10 @@ export function SettingsDialog({
             />
           </div>
         )}
+        <label className="chk" data-testid="set-agy">
+          <input type="checkbox" checked={config.agyEnabled !== false} onChange={(e) => set({ agyEnabled: e.target.checked })} />
+          Show Google Antigravity (agy, Gemini) sessions (read-only; reads agy&rsquo;s conversation transcripts under ~/.gemini, never its login)
+        </label>
         <label className="chk" data-testid="set-kiln">
           <input type="checkbox" checked={config.kilnEnabled !== false} onChange={(e) => set({ kilnEnabled: e.target.checked })} />
           Show Kiln runs: tasks Claude hands to your local model (Kiln runs and Kiln harness workers) appear as subagents (read-only)

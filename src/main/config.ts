@@ -38,6 +38,8 @@ export interface AppConfig {
   /** follow OpenCode sessions (read-only) and where its data lives; empty = auto-detect */
   opencodeEnabled: boolean;
   opencodeDir: string;
+  /** follow Google Antigravity CLI (agy, Gemini) sessions, read-only (~/.gemini/antigravity-cli/brain) */
+  agyEnabled: boolean;
   /** show Kiln runs (tasks Claude hands to the local model, read-only) and where Kiln's events file is; empty = Kiln's default */
   kilnEnabled: boolean;
   kilnEventsFile: string;
@@ -64,6 +66,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   usagePingMinutes: 10,
   opencodeEnabled: true,
   opencodeDir: '',
+  agyEnabled: true,
   kilnEnabled: true,
   kilnEventsFile: '',
   sshHosts: [],

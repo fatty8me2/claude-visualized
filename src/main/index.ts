@@ -734,6 +734,7 @@ function updateConfig(patch: Partial<AppConfig>): AppConfig {
     config.opencodeDir = String(config.opencodeDir ?? '').trim();
     manager.setOpenCode({ enabled: config.opencodeEnabled, dir: config.opencodeDir });
   }
+  if (patch.agyEnabled !== undefined) manager.setAgy({ enabled: config.agyEnabled !== false });
   if (patch.kilnEnabled !== undefined || patch.kilnEventsFile !== undefined) {
     config.kilnEventsFile = String(config.kilnEventsFile ?? '').trim();
     manager.setKiln({ enabled: config.kilnEnabled, file: config.kilnEventsFile });
@@ -846,6 +847,7 @@ if (!app.requestSingleInstanceLock()) {
       saveConfig(config);
     }
     manager.setOpenCode({ enabled: config.opencodeEnabled, dir: config.opencodeDir });
+    manager.setAgy({ enabled: config.agyEnabled !== false });
     manager.setKiln({ enabled: config.kilnEnabled !== false, file: String(config.kilnEventsFile ?? '') });
     manager.followActive = config.followActive;
     manager.notifyAttention = config.notifyAttention;

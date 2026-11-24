@@ -6,7 +6,7 @@ import { useRef } from 'react';
 import { displayStatus } from '../util';
 import { WORK_HELP, workCounts } from '@core/work';
 import '../chrome.css';
-import { tokensByProvider } from '@core/localModels';
+import { addUsage, tokensByProvider } from '@core/localModels';
 
 /** A value whose changed characters roll in (one-shot CSS transform/opacity; no timers, no state). Text content stays the plain value. */
 function Roll({ v, className }: { v: string; className?: string }) {
@@ -43,7 +43,8 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
   const running = work.working;
   const st = main ? displayStatus(main, now) : 'idle';
   const split = tokensByProvider(view.agents, view.totals);
-  const t = split.claude;
+  // hosted tokens: Claude's, or Gemini's in an Antigravity session (neither is local)
+  const t = addUsage(split.claude, split.gemini);
   const lt = split.local;
   const hooksLive = view.lastHookAt && now - view.lastHookAt < 10 * 60_000;
   const plan = view.mode === 'plan';
@@ -90,7 +91,7 @@ export function StatusBar({ view, now, hookSrv, replaying }: { view: SessionView
         </b>
       </span>
       {view.warnings > 0 && <span title="Transcript lines this version doesn't understand (ignored)">unparsed {view.warnings}</span>}
-      <span>{view.version ? `${view.entrypoint === 'opencode' ? 'opencode' : 'cc'} ${view.version}` : ''}</span>
+      <span>{view.version ? `${view.entrypoint === 'opencode' ? 'opencode' : view.entrypoint === 'antigravity' ? 'agy' : 'cc'} ${view.version}` : ''}</span>
     </div>
   );
 }

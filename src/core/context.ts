@@ -5,6 +5,8 @@ import { classifyModel } from './models';
 
 export const WINDOW_STD = 200_000;
 export const WINDOW_1M = 1_000_000;
+/** Gemini's window as Antigravity's status line reports it (context_window_size) for Gemini 4 Neon */
+export const WINDOW_GEMINI = 1_048_576;
 
 export interface ContextWindow {
   size: number;
@@ -73,6 +75,18 @@ export function contextInfo(
   localWindow?: LocalWindow | null,
 ): ContextInfo | null {
   if (!a.contextTokens) return null;
+  if (a.model && classifyModel(a.model).provider === 'google') {
+    const fraction = a.contextTokens / WINDOW_GEMINI;
+    return {
+      tokens: a.contextTokens,
+      size: WINDOW_GEMINI,
+      estimated: true,
+      windowKnown: true,
+      fraction,
+      pct: Math.round(fraction * 100),
+      level: contextLevel(fraction),
+    };
+  }
   if (a.model && classifyModel(a.model).provider !== 'anthropic') {
     if (!localWindow || !localWindow.size) {
       return { tokens: a.contextTokens, size: 0, estimated: false, windowKnown: false, fraction: 0, pct: 0, level: 'ok' };

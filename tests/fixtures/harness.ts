@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { LEAD_SESSIONS_SQL } from './agy';
 
 const SCHEMA = `
 CREATE TABLE projects (
@@ -235,6 +236,16 @@ export class FakeHarness {
   todos(kind: 'task' | 'conversation', id: string, items: { content: string; status: string }[], ts: number) {
     this.db.prepare('INSERT OR REPLACE INTO todos(owner_kind, owner_id, items, updated_at) VALUES(?,?,?,?)').run(kind, id, JSON.stringify(items), ts);
     this.event(`${kind}.todos`, ts);
+  }
+
+  /** a lead session Kiln launched (Claude Code, Codex or Antigravity), in Kiln's lead_sessions table (created on first use) */
+  leadSession(l: { kind: 'claude' | 'codex' | 'agy'; nativeId: string; project: string; ts: number; transcript?: string }) {
+    const has = this.db.prepare("select 1 from sqlite_master where type = 'table' and name = 'lead_sessions'").get();
+    if (!has) this.db.exec(LEAD_SESSIONS_SQL);
+    this.db
+      .prepare('INSERT INTO lead_sessions(id, project_id, kind, native_session_id, started_at, transcript_path) VALUES(?,?,?,?,?,?)')
+      .run(this.id('lead'), l.project, l.kind, l.nativeId, l.ts, l.transcript ?? null);
+    this.event('lead.session', l.ts);
   }
 
   close() {

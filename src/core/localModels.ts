@@ -461,24 +461,37 @@ export function loadedText(link: LocalLink): string {
  * Tokens split by who served them. Local agents have no Anthropic cost or limits, so their tokens are
  * counted apart: `claude` is everything else (totals minus the local agents' tokens).
  */
-export function tokensByProvider(agents: Record<string, AgentNode>, totals: UsageNumbers): { claude: UsageNumbers; local: UsageNumbers; localAgents: number } {
+export function tokensByProvider(
+  agents: Record<string, AgentNode>,
+  totals: UsageNumbers,
+): { claude: UsageNumbers; local: UsageNumbers; localAgents: number; gemini: UsageNumbers; geminiAgents: number } {
   const local: UsageNumbers = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 };
+  const gemini: UsageNumbers = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 };
   let localAgents = 0;
+  let geminiAgents = 0;
   for (const a of Object.values(agents)) {
-    if (classifyModel(a.model).provider !== 'local') continue;
-    localAgents++;
-    local.in += a.tokens.in;
-    local.out += a.tokens.out;
-    local.cacheRead += a.tokens.cacheRead;
-    local.cacheWrite += a.tokens.cacheWrite;
+    const p = classifyModel(a.model).provider;
+    // Gemini (an Antigravity lead) is hosted but not Claude: kept apart so it never reads as Claude usage
+    const into = p === 'local' ? local : p === 'google' ? gemini : null;
+    if (!into) continue;
+    if (p === 'local') localAgents++;
+    else geminiAgents++;
+    into.in += a.tokens.in;
+    into.out += a.tokens.out;
+    into.cacheRead += a.tokens.cacheRead;
+    into.cacheWrite += a.tokens.cacheWrite;
   }
   const claude: UsageNumbers = {
-    in: Math.max(0, totals.in - local.in),
-    out: Math.max(0, totals.out - local.out),
-    cacheRead: Math.max(0, totals.cacheRead - local.cacheRead),
-    cacheWrite: Math.max(0, totals.cacheWrite - local.cacheWrite),
+    in: Math.max(0, totals.in - local.in - gemini.in),
+    out: Math.max(0, totals.out - local.out - gemini.out),
+    cacheRead: Math.max(0, totals.cacheRead - local.cacheRead - gemini.cacheRead),
+    cacheWrite: Math.max(0, totals.cacheWrite - local.cacheWrite - gemini.cacheWrite),
   };
-  return { claude, local, localAgents };
+  return { claude, local, localAgents, gemini, geminiAgents };
+}
+
+export function addUsage(a: UsageNumbers, b: UsageNumbers): UsageNumbers {
+  return { in: a.in + b.in, out: a.out + b.out, cacheRead: a.cacheRead + b.cacheRead, cacheWrite: a.cacheWrite + b.cacheWrite };
 }
 
 /** "unloads in 4m 12s" countdown text; null when unknown. */

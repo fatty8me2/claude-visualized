@@ -19,9 +19,10 @@ const PLAN_SCALE: Record<string, number> = { pro: 5, max: 1, max_5x: 1, max5x: 1
 /** unknown models weigh like a mid-priced one */
 const FALLBACK_MODEL = 'claude-sonnet-4-6';
 
-/** Weighted units of one message: USD at list price (local models are free). */
+/** Weighted units of one message: USD at list price. Only Claude counts: local models are free, Gemini (Antigravity) bills Google's quota. */
 export function weightOf(model: string | null | undefined, u: UsageNumbers): number {
-  if (model && classifyModel(model).provider === 'local') return 0;
+  const p = model ? classifyModel(model).provider : null;
+  if (p === 'local' || p === 'google') return 0;
   return estimateCostUSD(u, model) ?? estimateCostUSD(u, FALLBACK_MODEL) ?? 0;
 }
 

@@ -191,6 +191,8 @@ export class HarnessSource {
   private summaryKey = '';
   private endpointList: { id: string; name: string; url: string }[] = [];
   private lastEndpointsAt = 0;
+  /** Antigravity (agy) leads Kiln launched: conversation id -> the project folder it runs in (lead_sessions) */
+  private agyRoots = new Map<string, string>();
 
   setConfig(o: HarnessOptions) {
     this.enabled = o.enabled;
@@ -221,8 +223,31 @@ export class HarnessSource {
     this.owners.clear();
     this.claimed.clear();
     this.links = new WeakMap();
+    this.agyRoots = new Map();
     this.summaryKey = '';
     this.version++;
+  }
+
+  /** The folder Kiln launched an Antigravity conversation in (its project's root), or null. */
+  agyRoot(conversationId: string): string | null {
+    return this.enabled ? (this.agyRoots.get(conversationId) ?? null) : null;
+  }
+
+  /** Kiln's Antigravity lead sessions (a database without lead_sessions, from before leads, has none). */
+  private readAgyRoots(db: DatabaseSync) {
+    try {
+      const rows = db
+        .prepare(
+          `select ls.native_session_id as sid, coalesce(p.root_path, '') as root from lead_sessions ls left join projects p on p.id = ls.project_id
+           where ls.kind = 'agy' order by ls.started_at desc limit 500`,
+        )
+        .all() as Json[];
+      const next = new Map<string, string>();
+      for (const r of rows) if (str(r.sid) && str(r.root) && !next.has(str(r.sid))) next.set(str(r.sid), str(r.root));
+      this.agyRoots = next;
+    } catch {
+      /* no lead_sessions table: no Antigravity leads */
+    }
   }
 
   private detect() {
@@ -314,6 +339,7 @@ export class HarnessSource {
     const tasks = this.run((db) => (db.prepare(`${TASK_SQL} order by t.created_at desc limit ${TASK_LIMIT}`).all() as Json[]).map(taskOf), null);
     const convs = this.run((db) => (db.prepare(CONV_SQL).all() as Json[]).map(convOf), null);
     if (!tasks || !convs) return false;
+    if (db) this.readAgyRoots(db);
     const key = (a: { id: string; updatedAt: number; messages: number; state?: string; status?: string }[]) =>
       a.map((x) => `${x.id}:${x.updatedAt}:${x.messages}:${x.state ?? x.status}`).join(',');
     const changed = moved || key(tasks) !== key(this.tasks) || key(convs) !== key(this.convs);

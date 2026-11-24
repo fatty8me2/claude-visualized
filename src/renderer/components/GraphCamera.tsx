@@ -7,7 +7,7 @@ import type { EdgeMeta } from './GraphEdges';
 import { agentName, famClass } from '../util';
 import type { CameraAnimator } from '../graphCamera';
 
-const FAM_VAR: Record<string, string> = { opus: '--opus', sonnet: '--sonnet', haiku: '--haiku', fable: '--fable' };
+const FAM_VAR: Record<string, string> = { opus: '--opus', sonnet: '--sonnet', haiku: '--haiku', fable: '--fable', gemini: '--gemini' };
 
 function famColor(css: CSSStyleDeclaration, fam: string): string {
   return css.getPropertyValue(FAM_VAR[fam] ?? '--muted').trim() || '#8a8f9c';
@@ -204,7 +204,7 @@ export function GraphCamera({
       const live_ = st === 'running' || st === 'waiting';
       const col = n.collapsed ? 'rgba(160,168,190,0.55)' : famColor(css, fam);
       ctx.globalAlpha = live_ ? 1 : st === 'error' ? 0.9 : 0.42;
-      ctx.fillStyle = st === 'error' ? (css.getPropertyValue('--err').trim() || '#ff6b6b') : col;
+      ctx.fillStyle = st === 'error' ? css.getPropertyValue('--err').trim() || '#ff6b6b' : col;
       const r = n.id === MAIN ? dim * 1.5 : n.collapsed ? dim * 0.7 : dim;
       if (live_) {
         ctx.shadowColor = col;

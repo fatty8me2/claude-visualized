@@ -3,11 +3,11 @@
 // endpoint, claude-code-router, LM Studio ...), in which case message.model holds a non-Claude id such
 // as "qwen2.5-coder:32b" or "ollama/llama3.1:70b".
 
-export type ModelProvider = 'anthropic' | 'local' | 'other';
+export type ModelProvider = 'anthropic' | 'google' | 'local' | 'other';
 
 export interface ModelClass {
   provider: ModelProvider;
-  /** anthropic: opus|sonnet|haiku|fable; local: qwen|llama|...|'local' (unknown open model); other: 'other' */
+  /** anthropic: opus|sonnet|haiku|fable; google: gemini; local: qwen|llama|...|'local' (unknown open model); other: 'other' */
   family: string;
   label: string;
 }
@@ -122,6 +122,31 @@ export function claudeLabel(model: string): string {
   return m[3] ? `${fam} ${m[2]}.${m[3]}` : `${fam} ${m[2]}`;
 }
 
+/** Google's hosted Gemini models (Antigravity's `gemini-4-neon-high`, `gemini-2.5-pro`, `models/gemini-…`); Gemma is an open model, not this. */
+export function isGeminiModel(id: string): boolean {
+  return /(^|[/_\s-])gemini(?=$|[\s_-]|\d)/i.test(id.trim());
+}
+
+/** Antigravity puts the reasoning effort in the model id ("gemini-4-neon-high") or the display name ("Gemini 4 Neon (High)"). */
+const GEMINI_EFFORT = /(?:[-_\s]+|\s*\()(minimal|low|medium|high|xhigh|max)\)?$/i;
+
+/** The effort a Gemini id carries, if any ("gemini-4-neon-high" -> "high"). */
+export function geminiEffort(model: string | null | undefined): string | null {
+  const name = (model ?? '').trim();
+  return isGeminiModel(name) ? (GEMINI_EFFORT.exec(name)?.[1]?.toLowerCase() ?? null) : null;
+}
+
+/** "gemini-4-neon-high" -> "Gemini 4 Neon", "gemini-2.5-pro" -> "Gemini 2.5 Pro", "Gemini 4 Neon (High)" -> "Gemini 4 Neon". */
+export function geminiLabel(model: string): string {
+  const name = splitPrefixes(model).name || model.trim();
+  const words = name
+    .replace(GEMINI_EFFORT, '')
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((w) => (/^gemini$/i.test(w) ? 'Gemini' : titleWord(w.toLowerCase())));
+  return words.join(' ') || 'Gemini';
+}
+
 export function classifyModel(model: string | null | undefined): ModelClass {
   const raw = (model ?? '').trim();
   if (!raw) return { provider: 'other', family: 'other', label: '—' };
@@ -134,6 +159,9 @@ export function classifyModel(model: string | null | undefined): ModelClass {
     const fam = ANTHROPIC_FAMILY.exec(raw)?.[1]?.toLowerCase() ?? 'other';
     return { provider: 'anthropic', family: fam, label: claudeLabel(name || raw) };
   }
+
+  // Google's Gemini (Antigravity / agy): hosted, never local, never counted as Claude
+  if (!prefixLocal && isGeminiModel(name || raw)) return { provider: 'google', family: 'gemini', label: geminiLabel(name || raw) };
 
   const lowName = name.toLowerCase();
   const famIdx = LOCAL_FAMILIES.findIndex(([, re]) => re.test(lowName));

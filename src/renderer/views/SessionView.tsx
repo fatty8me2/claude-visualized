@@ -15,13 +15,21 @@ import { useGraphPrefs } from '../state/graphPrefs';
 import { LayoutToolbar, PanelGrid, type LayoutApi } from '../layout';
 import type { useReplay } from '../replay';
 import type { SessionUi } from '../state/sessionUi';
-import { clock } from '../util';
+import { clock, opensInClaude } from '../util';
 import { MachineChip } from '../components/MachineChip';
 import { openInClaude } from '../state/toast';
 import { eventIndexAt } from '@core/timeline';
 import { GRAPH_VIEWS } from './graphViews';
 
-const FAMILY_ROLE: Record<string, string> = { opus: 'plan / main', sonnet: 'build', haiku: 'search', fable: 'agents', local: 'local model', other: 'other' };
+const FAMILY_ROLE: Record<string, string> = {
+  opus: 'plan / main',
+  sonnet: 'build',
+  haiku: 'search',
+  fable: 'agents',
+  gemini: 'Gemini (Antigravity)',
+  local: 'local model',
+  other: 'other',
+};
 
 function Legend({ view }: { view: CoreSessionView }) {
   // one entry per Claude family, but one per model for local models (qwen and llama are different things)
@@ -103,7 +111,7 @@ export function SessionView({ view, summary, now, replay: replayApi, hookSrv, la
           </span>
         </div>
         <div className="actions">
-          {view.entrypoint !== 'opencode' && (
+          {opensInClaude(view.entrypoint) && (
             <button
               data-tour="open-in-claude"
               data-testid="open-in-claude"

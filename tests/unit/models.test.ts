@@ -54,7 +54,8 @@ describe('classifyModel', () => {
   it('does not call hosted gateways local', () => {
     expect(c('openrouter/qwen/qwen3-coder')).toMatchObject({ provider: 'other', label: 'Qwen3 Coder' });
     expect(c('gpt-4o')).toMatchObject({ provider: 'other', family: 'other' });
-    expect(c('gemini-2.5-pro').provider).toBe('other');
+    // hosted, never local: Gemini has its own provider (Antigravity sessions)
+    expect(c('gemini-2.5-pro').provider).toBe('google');
     expect(c('openrouter/anthropic/claude-sonnet-5-5').provider).toBe('anthropic');
   });
 

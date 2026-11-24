@@ -4,8 +4,16 @@ import { niceTicks, type GroupRow } from '@core/history';
 import { formatTokens } from '@core/summarize';
 
 /** Stack order bottom to top. Local models sit on top in their own colour so they never blend into Claude's. */
-export const FAMILIES = ['opus', 'sonnet', 'haiku', 'fable', 'other', 'local'] as const;
-export const FAMILY_LABEL: Record<string, string> = { opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku', fable: 'Fable', other: 'other', local: 'local models' };
+export const FAMILIES = ['opus', 'sonnet', 'haiku', 'fable', 'gemini', 'other', 'local'] as const;
+export const FAMILY_LABEL: Record<string, string> = {
+  opus: 'Opus',
+  sonnet: 'Sonnet',
+  haiku: 'Haiku',
+  fable: 'Fable',
+  gemini: 'Gemini',
+  other: 'other',
+  local: 'local models',
+};
 export const familyColor = (f: string) => `var(--${FAMILIES.includes(f as (typeof FAMILIES)[number]) ? f : 'other'})`;
 
 /** Width of an element, tracked with a ResizeObserver, so SVG text stays crisp instead of being scaled. */
@@ -72,13 +80,7 @@ export function TokenBars({ groups, by, all }: { groups: GroupRow[]; by: 'day' |
           let acc = 0;
           const x = M.left + i * step + (step - bw) / 2;
           return (
-            <g
-              key={g.key}
-              onMouseEnter={() => setHover(i)}
-              onMouseLeave={() => setHover(null)}
-              data-day={g.key}
-              style={{ '--i': i } as React.CSSProperties}
-            >
+            <g key={g.key} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} data-day={g.key} style={{ '--i': i } as React.CSSProperties}>
               <rect x={M.left + i * step} y={M.top} width={step} height={ih} fill="transparent" />
               {FAMILIES.map((f) => {
                 const v = series(g)[f] ?? 0;
@@ -87,7 +89,16 @@ export function TokenBars({ groups, by, all }: { groups: GroupRow[]; by: 'day' |
                 const hgt = Math.max(1, y(acc) - y1);
                 acc += v;
                 return (
-                  <rect key={f} x={x} y={y1} width={bw} height={hgt} fill={`url(#hist-grad-${f})`} opacity={hover == null || hover === i ? 1 : 0.55} data-family={f} />
+                  <rect
+                    key={f}
+                    x={x}
+                    y={y1}
+                    width={bw}
+                    height={hgt}
+                    fill={`url(#hist-grad-${f})`}
+                    opacity={hover == null || hover === i ? 1 : 0.55}
+                    data-family={f}
+                  />
                 );
               })}
               {i % every === 0 && (

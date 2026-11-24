@@ -7,7 +7,7 @@ import { useLocalWindow } from '../localStore';
 let settingsModel: string | null = null;
 void window.api?.claudeModelSetting().then((m) => (settingsModel = m));
 
-const sizeText = (size: number) => (size >= 1_000_000 ? `${size / 1_000_000}M` : formatTokens(size));
+const sizeText = (size: number) => (size >= 1_000_000 ? `${+(size / 1_000_000).toFixed(2)}M` : formatTokens(size));
 
 export function contextTitle(c: ContextInfo): string {
   if (!c.windowKnown) return `context ${formatTokens(c.tokens)} tokens (window size unknown: no running server reported one for this model)`;

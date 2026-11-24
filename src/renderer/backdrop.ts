@@ -36,6 +36,7 @@ const FALLBACK: Record<string, RGB> = {
   haiku: [122, 167, 255],
   fable: [111, 208, 140],
   local: [94, 200, 190],
+  gemini: [34, 211, 197],
   other: [160, 150, 200],
   ok: [111, 208, 140],
   err: [255, 107, 122],
@@ -84,7 +85,8 @@ export class BackdropEngine {
   ) {
     this.ctx = canvas.getContext('2d', { alpha: true })!;
     const cs = getComputedStyle(wrap);
-    for (const k of ['opus', 'sonnet', 'haiku', 'fable', 'local', 'ok', 'err']) this.colors[k] = parseColor(cs.getPropertyValue(`--${k}`), FALLBACK[k]);
+    for (const k of ['opus', 'sonnet', 'haiku', 'fable', 'gemini', 'local', 'ok', 'err'])
+      this.colors[k] = parseColor(cs.getPropertyValue(`--${k}`), FALLBACK[k]);
     this.colors.bg = parseColor(cs.getPropertyValue('--bg'), FALLBACK.bg);
     this.ro = new ResizeObserver(() => {
       this.resize();

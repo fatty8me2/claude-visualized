@@ -21,6 +21,11 @@ export const STATUS_WORD: Record<DisplayStatus, string> = {
   error: 'failed',
 };
 
+/** Sessions the Claude desktop app cannot open: another tool wrote them (OpenCode, Google Antigravity). */
+export function opensInClaude(entrypointOrSource: string | null | undefined): boolean {
+  return entrypointOrSource !== 'opencode' && entrypointOrSource !== 'antigravity';
+}
+
 export function famClass(model: string | null | undefined): string {
   return `fam-${modelFamily(model)}`;
 }

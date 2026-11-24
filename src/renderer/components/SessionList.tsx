@@ -5,7 +5,7 @@ import { groupRecent, matchSession, type ProjectGroup } from '@core/sessionGroup
 import type { SessionSummary } from '@core/state';
 import { openInClaude, showToast } from '../state/toast';
 import { useSidebarPrefs } from '../state/sidebarPrefs';
-import { ago, clock } from '../util';
+import { ago, clock, opensInClaude } from '../util';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { Icon } from './Icon';
 import { localMachineName, MachineChip } from './MachineChip';
@@ -78,15 +78,17 @@ function Row({
   const client =
     s.source === 'opencode'
       ? 'OpenCode'
-      : s.source === 'kiln'
-        ? 'Kiln (local model)'
-        : s.source === 'kiln-harness'
-          ? 'Kiln agent (local model)'
-          : s.entrypoint === 'claude-desktop'
-            ? 'desktop app'
-            : s.entrypoint === 'cli'
-              ? 'claude CLI'
-              : s.entrypoint;
+      : s.source === 'antigravity'
+        ? 'Google Antigravity (Gemini)'
+        : s.source === 'kiln'
+          ? 'Kiln (local model)'
+          : s.source === 'kiln-harness'
+            ? 'Kiln agent (local model)'
+            : s.entrypoint === 'claude-desktop'
+              ? 'desktop app'
+              : s.entrypoint === 'cli'
+                ? 'claude CLI'
+                : s.entrypoint;
   return (
     <div
       data-state={dot || 'idle'}
@@ -137,7 +139,7 @@ function Row({
         )}
       </span>
       <span className="row-acts">
-        {s.source !== 'opencode' && (
+        {opensInClaude(s.source) && (
           <button
             className="row-claude btn-icon ghost"
             aria-label="open in Claude"
@@ -182,6 +184,11 @@ function Row({
         {s.source === 'opencode' && (
           <span className="client oc-badge" data-testid="oc-badge" title="OpenCode session">
             OpenCode
+          </span>
+        )}
+        {s.source === 'antigravity' && (
+          <span className="client oc-badge agy-badge" data-testid="agy-badge" title="Google Antigravity (agy) session, running Gemini">
+            Antigravity
           </span>
         )}
         {s.source === 'kiln' && (

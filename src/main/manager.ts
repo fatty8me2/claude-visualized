@@ -12,6 +12,7 @@ import { SessionWatcher, type BacklogLoader } from './watcher';
 import { OpenCodeSource, OpenCodeWatcher, type OpenCodeOptions } from './opencode';
 import { KilnSource, KilnWatcher, type KilnOptions } from './kiln';
 import { HarnessSource, HarnessWatcher } from './harness';
+import { AgySource, AgyWatcher, type AgyOptions } from './agy';
 import { loadBacklogInWorker } from './workerLoader';
 import { claudeDeepLink } from './desktopSessions';
 
@@ -20,7 +21,7 @@ const POLL_MS = 600;
 const OC_POLL_MS = 250;
 const OC_SCAN_MS = 400;
 
-type Follower = SessionWatcher | OpenCodeWatcher | KilnWatcher | HarnessWatcher;
+type Follower = SessionWatcher | OpenCodeWatcher | KilnWatcher | HarnessWatcher | AgyWatcher;
 /** Kiln's agent harness: one MAX(seq) read per poll when nothing changed */
 const HARNESS_POLL_MS = 500;
 /** Kiln's events file is a small append-only log: one stat per poll when nothing changed */
@@ -85,6 +86,9 @@ export class SessionManager extends EventEmitter {
   /** Kiln's agent harness (this computer only: an SSH remote's or a peer's database is not read) */
   readonly harness = new HarnessSource();
   private harnessSummaries: SessionSummary[] = [];
+  /** Google Antigravity CLI (agy) conversations: Kiln's Gemini lead, or agy on its own (this computer only) */
+  readonly agy = new AgySource();
+  private agySummaries: SessionSummary[] = [];
   private claudeSummaries: SessionSummary[] = [];
   private ocSummaries: SessionSummary[] = [];
   private summaries: SessionSummary[] = [];
@@ -109,6 +113,9 @@ export class SessionManager extends EventEmitter {
     if (opts.kilnFile) this.kiln.useFile(opts.kilnFile, true);
     this.loader = opts.backlogLoader ?? loadBacklogInWorker;
     this.indexer = new SessionIndexer(opts.projectsRoot, !this.passive);
+    // Kiln's lead_sessions name the folder an agy conversation runs in (agy's transcript does not)
+    this.agy.cwdOf = (id) => this.harness.agyRoot(id);
+    if (this.passive) this.agy.setConfig({ enabled: false });
   }
 
   /** number of windows currently showing the all-sessions overview */
@@ -350,9 +357,22 @@ export class SessionManager extends EventEmitter {
     }
   }
 
+  /** Settings: show Google Antigravity (agy) sessions or not. */
+  setAgy(o: AgyOptions) {
+    if (this.passive) return;
+    this.agy.setConfig(o);
+    if (!o.enabled) for (const [id, w] of [...this.watchers]) if (w instanceof AgyWatcher) this.watchers.delete(id);
+    void this.scan();
+  }
+
+  /** The lead sessions that can hand tasks to Kiln's harness: Claude Code and Antigravity. */
+  private get leadSummaries(): SessionSummary[] {
+    return this.agySummaries.length ? [...this.claudeSummaries, ...this.agySummaries] : this.claudeSummaries;
+  }
+
   private pollHarness(rescan = false) {
     if (!this.harness.poll() && !rescan) return;
-    const next = this.harness.scan(this.claudeSummaries, this.followed);
+    const next = this.harness.scan(this.leadSummaries, this.followed);
     if (next === this.harnessSummaries) return;
     this.harnessSummaries = next;
     this.mergeSummaries();
@@ -379,10 +399,10 @@ export class SessionManager extends EventEmitter {
     this.scanKiln();
   }
 
-  /** a Claude session this manager follows and has read (so it would have claimed its Kiln runs) */
+  /** a lead session (Claude Code, or Antigravity for the harness) this manager follows and has read (so it would have claimed its runs) */
   private followed = (id: string): boolean => {
     const w = this.watchers.get(id);
-    return !!w && w.primed && w instanceof SessionWatcher;
+    return !!w && w.primed && (w instanceof SessionWatcher || w instanceof AgyWatcher);
   };
 
   private scanKiln() {
@@ -401,7 +421,9 @@ export class SessionManager extends EventEmitter {
   }
 
   private mergeSummaries() {
-    this.summaries = [...this.claudeSummaries, ...this.ocSummaries, ...this.kilnSummaries, ...this.harnessSummaries].sort((a, b) => b.mtime - a.mtime);
+    this.summaries = [...this.claudeSummaries, ...this.agySummaries, ...this.ocSummaries, ...this.kilnSummaries, ...this.harnessSummaries].sort(
+      (a, b) => b.mtime - a.mtime,
+    );
   }
 
   private scanOpenCode() {
@@ -426,7 +448,9 @@ export class SessionManager extends EventEmitter {
         ? this.kiln.watcher(id)
         : f.startsWith('kiln-harness:')
           ? this.harness.watcher(id, f)
-          : new SessionWatcher(id, f, this.loader);
+          : AgySource.isFile(f)
+            ? this.agy.watcher(id, f)
+            : new SessionWatcher(id, f, this.loader);
     this.watchers.set(id, w);
     return w;
   }
@@ -434,8 +458,9 @@ export class SessionManager extends EventEmitter {
   private async scan() {
     try {
       this.claudeSummaries = await this.indexer.scan();
+      if (!this.passive) this.agySummaries = await this.agy.scan();
       if (this.kilnOn) this.kilnSummaries = this.kiln.scan(this.claudeSummaries, this.followed);
-      if (!this.passive) this.harnessSummaries = this.harness.scan(this.claudeSummaries, this.followed);
+      if (!this.passive) this.harnessSummaries = this.harness.scan(this.leadSummaries, this.followed);
       this.mergeSummaries();
     } catch (e) {
       console.error('scan failed', e);
@@ -509,8 +534,8 @@ export class SessionManager extends EventEmitter {
         changed = await w.poll();
         // the local-model runs this session handed to Kiln, as child agents
         if (w instanceof SessionWatcher && this.kilnOn && this.kiln.link(w)) changed = true;
-        // the qwen workers (and their sub-agents) this session handed to Kiln's agent harness
-        if (w instanceof SessionWatcher && !this.passive && this.harness.link(w)) changed = true;
+        // the qwen workers (and their sub-agents) this session handed to Kiln's agent harness (a Claude Code or an Antigravity lead)
+        if ((w instanceof SessionWatcher || w instanceof AgyWatcher) && !this.passive && this.harness.link(w)) changed = true;
       } catch (e) {
         console.error('poll failed', w.sessionId, e);
         continue;
@@ -557,7 +582,8 @@ export class SessionManager extends EventEmitter {
     for (const a of Object.values(w.state.agents)) now.set(a.id, a.status);
     this.prevStatus.set(w.sessionId, now);
     const recent = w.drainRecent();
-    this.emitTokens(w.sessionId, recent);
+    // the 5-hour / weekly meters are Claude's: Gemini tokens bill Google's quota
+    if (!(w instanceof AgyWatcher)) this.emitTokens(w.sessionId, recent);
     if (!wasPrimed || !before) return;
     const title = w.state.title ?? 'Claude session';
     for (const e of recent) {
@@ -610,6 +636,10 @@ export class SessionManager extends EventEmitter {
     if (f.startsWith('opencode:')) return this.oc.watcher(id).collectAllEvents();
     if (f.startsWith('kiln:')) return this.kiln.watcher(id).collectAllEvents();
     if (f.startsWith('kiln-harness:')) return this.harness.watcher(id, f).collectAllEvents();
+    if (AgySource.isFile(f)) {
+      const events = await this.agy.watcher(id, f).collectAllEvents();
+      return this.passive ? events : this.harness.withTasks(events, id);
+    }
     const events = await new SessionWatcher(id, f, this.loader).collectAllEvents();
     const withKiln = this.kilnOn ? this.kiln.withRuns(events, id) : events;
     return this.passive ? withKiln : this.harness.withTasks(withKiln, id);

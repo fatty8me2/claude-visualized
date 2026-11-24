@@ -25,9 +25,12 @@ export function ModePanel({
   const main = view.agents[MAIN];
   const done = view.todos.filter((t) => t.status === 'completed').length;
   const split = tokensByProvider(view.agents, view.totals);
-  const t = split.claude;
+  const claudeTokens = split.claude.in + split.claude.out + split.claude.cacheRead + split.claude.cacheWrite;
+  // an Antigravity session: its hosted tokens are Gemini's, never shown as Claude's
+  const gemini = split.geminiAgents > 0 && claudeTokens === 0;
+  const t = gemini ? split.gemini : split.claude;
   const lt = split.local;
-  const allLocal = split.localAgents > 0 && t.in + t.out + t.cacheRead + t.cacheWrite === 0;
+  const allLocal = split.localAgents > 0 && !gemini && t.in + t.out + t.cacheRead + t.cacheWrite === 0;
   const hookFresh = view.lastHookAt && now - view.lastHookAt < 10 * 60_000;
   const est = estimateAgents(view.agents);
   const byModel = Object.entries(view.costByModel ?? {}).filter(([, v]) => v > 0);
@@ -108,7 +111,7 @@ In Claude Code, shift+tab switches modes.`}
       </div>
 
       <div className="section">
-        <h4>{split.localAgents > 0 ? 'tokens (Claude agents)' : 'tokens (all agents)'}</h4>
+        <h4>{gemini ? 'tokens (Gemini)' : split.localAgents > 0 ? 'tokens (Claude agents)' : 'tokens (all agents)'}</h4>
         <div className="kv">
           <span className="k">input</span>
           <span className="v">{formatTokens(t.in)}</span>
@@ -129,6 +132,10 @@ In Claude Code, shift+tab switches modes.`}
             <span className="v est" title={estimateTooltip(est)} data-testid="cost">
               ~{formatUSD(est.usd)}
               {est.unpriced.length ? '+' : ''}
+            </span>
+          ) : est.unpriced.length ? (
+            <span className="v" title={`No list price known for ${est.unpriced.join(', ')}`} data-testid="cost">
+              unknown
             </span>
           ) : (
             <span className="v">—</span>

@@ -85,12 +85,13 @@ export function summarizeTool(name: string, input: unknown): string {
   return '';
 }
 
-export type ModelFamily = 'opus' | 'sonnet' | 'haiku' | 'fable' | 'local' | 'other';
+export type ModelFamily = 'opus' | 'sonnet' | 'haiku' | 'fable' | 'gemini' | 'local' | 'other';
 
-/** Visual family: the Claude families, 'local' for any local model, else 'other'. */
+/** Visual family: the Claude families, 'gemini' for Google's Gemini (Antigravity), 'local' for any local model, else 'other'. */
 export function modelFamily(model: string | null | undefined): ModelFamily {
   const c = classifyModel(model);
   if (c.provider === 'local') return 'local';
+  if (c.provider === 'google') return 'gemini';
   if (c.provider === 'anthropic' && (c.family === 'opus' || c.family === 'sonnet' || c.family === 'haiku' || c.family === 'fable')) return c.family;
   return 'other';
 }

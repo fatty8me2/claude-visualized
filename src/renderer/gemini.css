@@ -1,0 +1,15 @@
+/* Google Gemini (Antigravity / agy sessions): its own model family colour, a teal apart from Haiku's blue, Fable's green and
+   the local orange, plus the sidebar badge. */
+:root {
+  --gemini: #22d3c5;
+}
+.fam-gemini {
+  --fam: var(--gemini);
+}
+.pfam-gemini {
+  --pfam: var(--gemini);
+}
+.session-row .sub .client.agy-badge {
+  color: var(--gemini);
+  border-color: color-mix(in srgb, var(--gemini) 45%, var(--line-2));
+}

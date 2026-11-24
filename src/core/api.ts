@@ -35,6 +35,8 @@ export interface AppConfigView {
   usagePingMinutes: number;
   opencodeEnabled: boolean;
   opencodeDir: string;
+  /** show Google Antigravity CLI (agy, Gemini) sessions; absent = on */
+  agyEnabled?: boolean;
   kilnEnabled: boolean;
   kilnEventsFile: string;
 }

@@ -37,7 +37,7 @@ import {
 import { GoalBadge } from './GoalBadge';
 import { seedOf, StatusText } from './cardParts';
 import { useNow, useOverview } from '../hooks';
-import { agentName, ago, clock, displayStatus, famClass } from '../util';
+import { agentName, ago, clock, displayStatus, famClass, opensInClaude } from '../util';
 import { addCounts, workCounts } from '@core/work';
 import { WorkPill } from './WorkPill';
 import { AgentGraph } from './AgentGraph';
@@ -199,11 +199,13 @@ function Panel(p: PanelProps) {
               ? ' · desktop'
               : v.entrypoint === 'opencode'
                 ? ' · OpenCode'
-                : v.entrypoint === 'kiln' || v.entrypoint === 'kiln-harness'
-                  ? ' · Kiln'
-                  : v.entrypoint
-                    ? ` · ${v.entrypoint}`
-                    : ''}
+                : v.entrypoint === 'antigravity'
+                  ? ' · Antigravity'
+                  : v.entrypoint === 'kiln' || v.entrypoint === 'kiln-harness'
+                    ? ' · Kiln'
+                    : v.entrypoint
+                      ? ` · ${v.entrypoint}`
+                      : ''}
             {v.lastActivity ? ` · ${ago(v.lastActivity, now)}` : ''}
           </div>
         </div>
@@ -269,14 +271,16 @@ function Panel(p: PanelProps) {
           <button className="ov-ibtn" title={hidden ? 'Show this panel again' : 'Hide from the overview'} data-testid="ov-hide" onClick={() => p.onHide(v.id)}>
             <Icon name={hidden ? 'unhide' : 'hide'} size="xs" />
           </button>
-          <button
-            className="ov-claude"
-            title={v.machine ? `This session is running on ${v.machine}` : 'Open in the Claude desktop app'}
-            onClick={() => void openInClaude(v.id)}
-          >
-            <Icon name="openExternal" size="xs" />
-            Claude
-          </button>
+          {opensInClaude(v.entrypoint) && (
+            <button
+              className="ov-claude"
+              title={v.machine ? `This session is running on ${v.machine}` : 'Open in the Claude desktop app'}
+              onClick={() => void openInClaude(v.id)}
+            >
+              <Icon name="openExternal" size="xs" />
+              Claude
+            </button>
+          )}
         </div>
       </header>
       {eta && <EtaLine prompt={eta} now={tick} />}

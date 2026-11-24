@@ -163,6 +163,15 @@ Claude Code can run against local models through a gateway or proxy (LiteLLM, Ol
 - **Speed**: OpenCode has no hooks, so the app polls its data about four times a second; an unchanged database costs one `PRAGMA data_version`. A new tool call shows up on screen in well under a second, on the other computer too.
 - **Tests**: `tests/fixtures/opencode/build.ts` builds a sanitized fake data folder in both formats; the `CLAUDE_VIS_OPENCODE_HOME` variable points the app at one (when `CLAUDE_VIS_HOME` is set for a test and this is not, OpenCode data is not read at all).
 
+### Google Antigravity (Gemini)
+
+Sessions of the Google Antigravity CLI (`agy`, running Gemini), including Kiln's Antigravity lead and autopilot, appear next to Claude Code ones with an "ANTIGRAVITY" badge in the sidebar and "Antigravity" on the all-sessions page. Gemini models have their own family colour (teal), distinct from the Claude families and the local orange.
+
+- **What is shown**: the session in its project group (live while it is active), the main agent on its Gemini model and effort (from ids like `gemini-4-neon-high`), the request typed, replies, tool calls (agy's `run_command`, `read_file`, `write_file`/`edit_file`, ... under the app's usual names), the `update_steps` plan as the checklist, tokens per model call, subagent calls as child agents, the session log, replay and the overview. Kiln workers the lead hands off through Kiln's MCP bridge (`delegate_task`) hang under it exactly as under a Claude lead, never also as unclaimed rows. Gemini tokens never count toward the Claude 5-hour or weekly meters, and the cost shows as unknown (no list price is assumed). "Open in Claude" is hidden for these sessions.
+- **Where it reads**: `~/.gemini/antigravity-cli/brain/<conversation>/.system_generated/logs/transcript.jsonl` (and the same under `~/.gemini/antigravity`), read-only. The transcript has no folder, so the project comes from Kiln's `harness.db` (`lead_sessions`, read-only) or a command's working directory. Google's login and settings files are never opened, and nothing is written there.
+- **Settings**: "Show Google Antigravity (agy, Gemini) sessions" (on by default; does nothing when agy is not installed).
+- **Tests**: `tests/fixtures/agy.ts` builds transcripts in agy's format; `CLAUDE_VIS_AGY_DIR` points the app at a fake data folder (when `CLAUDE_VIS_HOME` is set for a test and this is not, Antigravity data is not read at all).
+
 ### Kiln (local-model hand-offs)
 
 [Kiln](https://github.com/fatty8me2/kiln) lets Claude Code hand a self-contained task to a local model through its MCP tool `delegate_task`. Each hand-off appears as a **Kiln** child agent under the Claude agent that made the call, with the orange local tag and the local model's name.

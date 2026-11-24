@@ -11,6 +11,7 @@ import './panelExtras.css';
 import './agentInfo.css';
 import './graphCards.css';
 import './local.css';
+import './gemini.css';
 import './inbox.css';
 import './peers.css';
 import './insights.css';

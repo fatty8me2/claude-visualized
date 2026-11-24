@@ -8,7 +8,7 @@ import { findHubs } from '../edgeFx/junctions';
 export interface EdgeMeta {
   /** display status: running | quiet | waiting | idle | done | error */
   st: string;
-  /** model family: opus | sonnet | haiku | fable | local | other */
+  /** model family: opus | sonnet | haiku | fable | gemini | local | other */
   fam: string;
   started: number;
   /** a tool call is in flight (only reported while few agents run; packets burn brighter) */
@@ -103,7 +103,11 @@ function SpawnFx({ d, len, x2, y2 }: { d: string; len: number; x2: number; y2: n
   const dur = clamp(len / 760, 0.36, 0.9);
   const lead = clamp((34 / len) * 100, 4, 40);
   const t = `${dur.toFixed(2)}s cubic-bezier(0.3, 0.6, 0.4, 1)`;
-  const style = (l: number) => ({ ['--l' as string]: l, strokeDasharray: `${l} 400`, animation: `gf-head ${t} both, gf-arcout 0.45s ease-in ${(dur * 0.9).toFixed(2)}s forwards` });
+  const style = (l: number) => ({
+    ['--l' as string]: l,
+    strokeDasharray: `${l} 400`,
+    animation: `gf-head ${t} both, gf-arcout 0.45s ease-in ${(dur * 0.9).toFixed(2)}s forwards`,
+  });
   const sparks = Array.from({ length: 9 }, (_, i) => {
     const a = (200 + (i * 140) / 8) * (Math.PI / 180);
     const r = 14 + ((i * 7) % 5) * 5;
@@ -111,14 +115,35 @@ function SpawnFx({ d, len, x2, y2 }: { d: string; len: number; x2: number; y2: n
   });
   return (
     <g className="gf-l gf-anim gf-fxs">
-      <path className="fx-arc-halo" d={d} pathLength={100} style={{ strokeDasharray: '100 400', animation: `gf-draw ${t} both, gf-flick 0.5s steps(1) both, gf-arcout 0.5s ease-in ${(dur * 0.85).toFixed(2)}s forwards` }} />
-      <path className="fx-arc-core" d={d} pathLength={100} style={{ strokeDasharray: '100 400', animation: `gf-draw ${t} both, gf-flick 0.42s steps(1) both, gf-arcout 0.5s ease-in ${(dur * 0.85).toFixed(2)}s forwards` }} />
+      <path
+        className="fx-arc-halo"
+        d={d}
+        pathLength={100}
+        style={{
+          strokeDasharray: '100 400',
+          animation: `gf-draw ${t} both, gf-flick 0.5s steps(1) both, gf-arcout 0.5s ease-in ${(dur * 0.85).toFixed(2)}s forwards`,
+        }}
+      />
+      <path
+        className="fx-arc-core"
+        d={d}
+        pathLength={100}
+        style={{
+          strokeDasharray: '100 400',
+          animation: `gf-draw ${t} both, gf-flick 0.42s steps(1) both, gf-arcout 0.5s ease-in ${(dur * 0.85).toFixed(2)}s forwards`,
+        }}
+      />
       <path className="fx-spark-halo" d={d} pathLength={100} style={style(lead)} />
       <path className="fx-spark" d={d} pathLength={100} style={style(lead * 0.3)} />
       <g transform={`translate(${x2} ${y2})`}>
         <circle className="fx-flash" r={5} style={{ animationDelay: `${dur.toFixed(2)}s` }} />
         {sparks.map((s) => (
-          <circle key={s.i} className="fx-burst" r={1.7} style={{ ['--dx' as string]: `${s.dx}px`, ['--dy' as string]: `${s.dy}px`, animationDelay: `${(dur + s.i * 0.01).toFixed(2)}s` }} />
+          <circle
+            key={s.i}
+            className="fx-burst"
+            r={1.7}
+            style={{ ['--dx' as string]: `${s.dx}px`, ['--dy' as string]: `${s.dy}px`, animationDelay: `${(dur + s.i * 0.01).toFixed(2)}s` }}
+          />
         ))}
       </g>
     </g>
@@ -130,7 +155,11 @@ function ReturnFx({ rd, len, x1, y1, err }: { rd: string; len: number; x1: numbe
   const dur = clamp(len / 560, 0.4, 0.95);
   const l = clamp((56 / len) * 100, 8, 60);
   const t = `${dur.toFixed(2)}s cubic-bezier(0.45, 0, 0.5, 1)`;
-  const style = (k: number) => ({ ['--l' as string]: l * k, strokeDasharray: `${l * k} 400`, animation: `gf-head ${t} both, gf-arcout 0.3s ease-in ${dur.toFixed(2)}s forwards` });
+  const style = (k: number) => ({
+    ['--l' as string]: l * k,
+    strokeDasharray: `${l * k} 400`,
+    animation: `gf-head ${t} both, gf-arcout 0.3s ease-in ${dur.toFixed(2)}s forwards`,
+  });
   return (
     <g className={`gf-l gf-anim gf-fxr${err ? ' err' : ''}`}>
       <path className="fx-surge-halo" d={rd} pathLength={100} style={style(1)} />
@@ -343,8 +372,16 @@ export const GraphEdges = memo(function GraphEdges({
       </defs>
       <g className="gf-casings">{casing}</g>
       <g className="gf-bases">{bases}</g>
-      {glows.length > 0 && <g className="gf-glows" filter={calm ? undefined : `url(#${fid})`}>{glows}</g>}
-      {waitGlows.length > 0 && <g className="gf-glows gf-wglows" filter={calm ? undefined : `url(#${fid})`}>{waitGlows}</g>}
+      {glows.length > 0 && (
+        <g className="gf-glows" filter={calm ? undefined : `url(#${fid})`}>
+          {glows}
+        </g>
+      )}
+      {waitGlows.length > 0 && (
+        <g className="gf-glows gf-wglows" filter={calm ? undefined : `url(#${fid})`}>
+          {waitGlows}
+        </g>
+      )}
       <g className="gf-cores">{cores}</g>
       {hotPaths.length > 0 && <g className="gf-hotlayer">{hotPaths}</g>}
       <g className="gf-hubs">
@@ -353,7 +390,11 @@ export const GraphEdges = memo(function GraphEdges({
           const any = live ?? h.tos.find((id) => meta.get(id)?.st === 'waiting');
           const isHot = h.tos.some((id) => hot.has(id));
           return (
-            <g key={`${h.x},${h.y}`} className={`gf-hub${live ? ' on' : any ? ' wait' : ''} fam-${meta.get(any ?? h.tos[0])?.fam ?? 'other'}${isHot ? ' hot' : ''}`} transform={`translate(${h.x} ${h.y})`}>
+            <g
+              key={`${h.x},${h.y}`}
+              className={`gf-hub${live ? ' on' : any ? ' wait' : ''} fam-${meta.get(any ?? h.tos[0])?.fam ?? 'other'}${isHot ? ' hot' : ''}`}
+              transform={`translate(${h.x} ${h.y})`}
+            >
               <circle className="gf-hub-halo" r={7} />
               <circle className="gf-hub-dot" r={3} />
             </g>
